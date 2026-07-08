@@ -1,0 +1,15 @@
+// SocialHub — Prisma schema
+//
+// Milestone 0.4 scope: datasource + generator only, zero models.
+// Models are introduced incrementally starting with Organization/User in
+// Milestone 1.2 — see docs/database/SocialHub_Database_Design.md for the
+// full target schema this will grow into.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
