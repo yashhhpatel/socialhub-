@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/theme/theme_mode_controller.dart';
 
@@ -40,6 +41,11 @@ class AppShellPlaceholder extends ConsumerWidget {
             Text(
               isDark ? 'Dark mode' : 'Light mode',
               style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 24),
+            TextButton(
+              onPressed: () => context.go('/login'),
+              child: const Text('Go to login (Milestone 1.3)'),
             ),
           ],
         ),
