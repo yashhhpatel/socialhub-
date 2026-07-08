@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging, main]
+
+jobs:
+  frontend:
+    name: Frontend (Flutter Web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect frontend project
+        id: detect
+        run: |
+          if [ -f "frontend/pubspec.yaml" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Steps below activate once Milestone 0.2 scaffolds the Flutter project.
+      - name: Set up Flutter
+        if: steps.detect.outputs.exists == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Analyze
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: frontend
+        run: flutter analyze
+
+      - name: Test
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: frontend
+        run: flutter test
+
+      - name: Build (web)
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: frontend
+        run: flutter build web
+
+      - name: No-op placeholder
+        if: steps.detect.outputs.exists == 'false'
+        run: echo "frontend project not yet scaffolded (pending Milestone 0.2) — skipping"
+
+  backend:
+    name: Backend (NestJS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect backend project
+        id: detect
+        run: |
+          if [ -f "backend/package.json" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Steps below activate once Milestone 0.3 scaffolds the NestJS project.
+      - name: Set up Node
+        if: steps.detect.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: backend
+        run: npm run lint
+
+      - name: Test
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: backend
+        run: npm run test
+
+      - name: Build
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: backend
+        run: npm run build
+
+      - name: No-op placeholder
+        if: steps.detect.outputs.exists == 'false'
+        run: echo "backend project not yet scaffolded (pending Milestone 0.3) — skipping"

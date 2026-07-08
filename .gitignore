@@ -1,0 +1,38 @@
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# --- Node / NestJS (backend) ---
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/.nest/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Flutter / Dart (frontend) ---
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/web/flutter_service_worker.js
+
+# --- Prisma ---
+backend/prisma/*.db
+
+# --- IDE ---
+.vscode/
+.idea/
+*.iml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
