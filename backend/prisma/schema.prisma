@@ -1,9 +1,13 @@
 // SocialHub — Prisma schema
 //
-// Milestone 0.4 scope: datasource + generator only, zero models.
-// Models are introduced incrementally starting with Organization/User in
-// Milestone 1.2 — see docs/database/SocialHub_Database_Design.md for the
-// full target schema this will grow into.
+// Models are introduced incrementally, milestone by milestone, rather than
+// all at once — see docs/database/SocialHub_Database_Design.md for the
+// full target schema this grows into.
+//
+// Milestone 1.1 adds User + RefreshToken. Deliberately NOT included yet:
+// Organization and User.orgId/role — those arrive in Milestone 1.2, which
+// is explicitly scoped to add org auto-creation and the RBAC guard. Until
+// then, User is intentionally organization-less.
 //
 // NOTE (Prisma 7+): the datasource `url` no longer lives here — Prisma 7
 // moved connection URLs to prisma.config.ts (see ../prisma.config.ts).
@@ -16,4 +20,28 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  refreshTokens RefreshToken[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("user")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, revoked])
+  @@map("refresh_token")
 }

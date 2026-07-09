@@ -1,14 +1,17 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { HealthModule } from './health/health.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { UsersModule } from './users/users.module';
 
 /**
- * Root module. Additional feature modules (auth, organizations,
- * social-accounts, etc.) are added here one at a time as their milestones
- * land — see docs/blueprint/SocialHub_Implementation_Blueprint.md.
+ * Root module. Additional feature modules (organizations, social-accounts,
+ * etc.) are added here one at a time as their milestones land — see
+ * docs/blueprint/SocialHub_Implementation_Blueprint.md.
  */
 @Module({
-  imports: [ConfigModule, HealthModule],
+  imports: [ConfigModule, PrismaModule, HealthModule, UsersModule, AuthModule],
 })
 export class AppModule {}
