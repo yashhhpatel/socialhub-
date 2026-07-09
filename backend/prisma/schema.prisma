@@ -4,6 +4,11 @@
 // Models are introduced incrementally starting with Organization/User in
 // Milestone 1.2 — see docs/database/SocialHub_Database_Design.md for the
 // full target schema this will grow into.
+//
+// NOTE (Prisma 7+): the datasource `url` no longer lives here — Prisma 7
+// moved connection URLs to prisma.config.ts (see ../prisma.config.ts).
+// schema.prisma is now purely structural (models + provider), never
+// environment-dependent. See https://pris.ly/d/config-datasource.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,5 +16,4 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
