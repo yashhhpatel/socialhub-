@@ -16,6 +16,14 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().port().default(3000),
 
+  // Was never added here despite being introduced in Milestone 0.4 — a
+  // real gap, only surfaced now that PrismaService (this fix) reads it
+  // directly via ConfigService rather than Prisma's own tooling picking
+  // it up independently. Without this, a missing DATABASE_URL would have
+  // failed with a cryptic Prisma/pg connection error instead of our own
+  // clear boot-time validation message.
+  DATABASE_URL: Joi.string().required(),
+
   // Access token (short-lived JWT, verified via passport-jwt strategy).
   // No default for the secret — a missing secret must fail boot loudly,
   // never silently fall back to a hardcoded value.
