@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 
@@ -28,6 +29,7 @@ export class AuthService {
   async register(params: {
     email: string;
     password: string;
+    orgName: string;
   }): Promise<AuthResponseDto> {
     const existing = await this.usersService.findByEmail(params.email);
     if (existing) {
@@ -37,12 +39,32 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(params.password, BCRYPT_SALT_ROUNDS);
-    const user = await this.usersService.create({
-      email: params.email,
-      passwordHash,
+    const normalizedEmail = params.email.trim().toLowerCase();
+
+    // Org + owning user must be created atomically — a user with no org,
+    // or an org with no owner, are both invalid states this app should
+    // never be able to observe even transiently. This intentionally does
+    // NOT go through OrganizationsService/UsersService.create (see their
+    // doc comments) since those use the plain, non-transactional
+    // PrismaService.
+    const { user, organization } = await this.prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: { name: params.orgName },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          orgId: organization.id,
+          role: UserRole.owner,
+        },
+      });
+
+      return { user, organization };
     });
 
-    return this.issueTokenPair(user.id, user.email);
+    return this.issueTokenPair(user.id, user.email, user.role, organization.id);
   }
 
   async login(params: {
@@ -66,7 +88,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    return this.issueTokenPair(user.id, user.email);
+    return this.issueTokenPair(user.id, user.email, user.role, user.orgId);
   }
 
   async refresh(rawRefreshToken: string): Promise<AuthResponseDto> {
@@ -113,7 +135,12 @@ export class AuthService {
       data: { revoked: true },
     });
 
-    return this.issueTokenPair(existing.user.id, existing.user.email);
+    return this.issueTokenPair(
+      existing.user.id,
+      existing.user.email,
+      existing.user.role,
+      existing.user.orgId,
+    );
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
@@ -130,8 +157,10 @@ export class AuthService {
   private async issueTokenPair(
     userId: string,
     email: string,
+    role: UserRole,
+    orgId: string,
   ): Promise<AuthResponseDto> {
-    const payload: JwtPayload = { sub: userId, email };
+    const payload: JwtPayload = { sub: userId, email, role, orgId };
     const accessToken = await this.jwtService.signAsync(payload);
 
     const rawRefreshToken = randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
@@ -151,7 +180,7 @@ export class AuthService {
     });
 
     return {
-      user: { id: userId, email },
+      user: { id: userId, email, role, orgId },
       accessToken,
       refreshToken: rawRefreshToken,
     };

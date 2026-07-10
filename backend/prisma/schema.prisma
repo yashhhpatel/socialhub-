@@ -4,10 +4,10 @@
 // all at once — see docs/database/SocialHub_Database_Design.md for the
 // full target schema this grows into.
 //
-// Milestone 1.1 adds User + RefreshToken. Deliberately NOT included yet:
-// Organization and User.orgId/role — those arrive in Milestone 1.2, which
-// is explicitly scoped to add org auto-creation and the RBAC guard. Until
-// then, User is intentionally organization-less.
+// Milestone 1.2 adds Organization, plus orgId/role on User. Organization
+// only carries the fields needed so far (name, planTier, requiresApproval)
+// — relations to BrandKit/SsoConfig/etc. are added in the milestones that
+// introduce those models, not stubbed in now.
 //
 // NOTE (Prisma 7+): the datasource `url` no longer lives here — Prisma 7
 // moved connection URLs to prisma.config.ts (see ../prisma.config.ts).
@@ -22,14 +22,43 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  passwordHash String
-  refreshTokens RefreshToken[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+enum PlanTier {
+  free
+  starter
+  pro
+  enterprise
+}
 
+enum UserRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+model Organization {
+  id               String   @id @default(uuid())
+  name             String
+  planTier         PlanTier @default(free)
+  requiresApproval Boolean  @default(false)
+  users            User[]
+  createdAt        DateTime @default(now())
+
+  @@map("organization")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  role          UserRole       @default(editor)
+  orgId         String
+  organization  Organization   @relation(fields: [orgId], references: [id])
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([orgId])
   @@map("user")
 }
 
