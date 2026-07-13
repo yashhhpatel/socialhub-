@@ -34,4 +34,10 @@ export const envValidationSchema = Joi.object({
   // src/auth/auth.service.ts). This only controls how long a stored
   // refresh_token row stays valid, not a JWT expiry.
   JWT_REFRESH_EXPIRES_IN_DAYS: Joi.number().integer().min(1).default(30),
+
+  // AES-256-GCM key for TokenEncryptionService (Milestone 2.1) — must be
+  // exactly 32 bytes, hex-encoded (64 hex characters). No default, same
+  // reasoning as JWT_ACCESS_SECRET: a missing encryption key must fail
+  // boot loudly, never silently fall back to something guessable.
+  TOKEN_ENCRYPTION_KEY: Joi.string().hex().length(64).required(),
 });
