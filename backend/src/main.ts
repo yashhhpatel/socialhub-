@@ -1,31 +1,22 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
-import { execSync } from 'child_process';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // --- TEMPORARY DIAGNOSTIC LOGGING ---
-  // Prints which exact source tree is actually running, to rule out a
-  // stale/duplicate project copy before debugging anything else. Remove
-  // once the Prisma initialization issue is confirmed resolved.
-  // eslint-disable-next-line no-console
-  console.log('[bootstrap diagnostic] running from:', __dirname);
-  try {
-    const commit = execSync('git rev-parse HEAD', { cwd: __dirname })
-      .toString()
-      .trim();
-    // eslint-disable-next-line no-console
-    console.log('[bootstrap diagnostic] git HEAD commit:', commit);
-  } catch {
-    // eslint-disable-next-line no-console
-    console.log(
-      '[bootstrap diagnostic] could not read git HEAD (not a git repo from this cwd, or git unavailable)',
-    );
-  }
-
   const app = await NestFactory.create(AppModule);
+
+  // Flutter Web (dev server on its own port) calls this API from a
+  // different origin, so the browser enforces CORS. Permissive for now
+  // (reflects any origin) since there's no deployed environment yet to
+  // scope this to specific domains — tightening this per-environment is
+  // exactly the kind of thing the Phase 6 hardening pass exists for, not
+  // something to guess at prematurely here.
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
 
   // Global request validation, enforcing every DTO's class-validator
   // decorators (see src/auth/dto/*, src/users/dto/*). Not explicitly

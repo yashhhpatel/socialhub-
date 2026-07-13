@@ -32,41 +32,14 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor(configService: ConfigService) {
-    // --- TEMPORARY DIAGNOSTIC LOGGING ---
-    // Added specifically to root-cause a "PrismaClient needs to be
-    // constructed with a non-empty, valid PrismaClientOptions" report
-    // that persisted after this file was already fixed to pass an
-    // adapter. Remove once confirmed resolved — see commit message.
-    // eslint-disable-next-line no-console
-    console.log('[PrismaService diagnostic] constructor starting');
-    // eslint-disable-next-line no-console
-    console.log(
-      '[PrismaService diagnostic] resolved from:',
-      __filename,
-    );
-
-    const databaseUrl = configService.getOrThrow<string>('DATABASE_URL');
-    const maskedUrl = databaseUrl.replace(/:\/\/([^:]+):([^@]+)@/, '://$1:****@');
-    // eslint-disable-next-line no-console
-    console.log('[PrismaService diagnostic] DATABASE_URL (masked):', maskedUrl);
-
-    const adapter = new PrismaPg({ connectionString: databaseUrl });
-    // eslint-disable-next-line no-console
-    console.log(
-      '[PrismaService diagnostic] adapter created, type:',
-      adapter?.constructor?.name,
-    );
-
+    const adapter = new PrismaPg({
+      connectionString: configService.getOrThrow<string>('DATABASE_URL'),
+    });
     super({ adapter });
-
-    // eslint-disable-next-line no-console
-    console.log('[PrismaService diagnostic] super() completed successfully');
   }
 
   async onModuleInit() {
     await this.$connect();
-    // eslint-disable-next-line no-console
-    console.log('[PrismaService diagnostic] $connect() succeeded');
   }
 
   async onModuleDestroy() {
