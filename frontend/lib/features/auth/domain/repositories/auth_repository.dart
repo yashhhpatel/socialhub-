@@ -6,11 +6,14 @@ import '../entities/auth_result.dart';
 /// (Dependency Injection): interfaces live in domain/, implementations live
 /// in data/. `AuthController` depends only on this interface.
 ///
-/// Backed by `MockAuthRepository` for this milestone; a real
-/// `ApiAuthRepository` (calling POST /auth/register, POST /auth/login per
-/// docs/api/SocialHub_REST_API_Design.md) is introduced in Milestone 1.4
-/// without requiring any change to this contract or to the screens that
-/// use it.
+/// Backed by `MockAuthRepository` through Milestone 1.3. As of Milestone
+/// 1.4, `authRepositoryProvider` resolves to the real `ApiAuthRepository`
+/// instead (see data/repositories/api_auth_repository.dart) — register()
+/// and login() needed no contract changes to make that swap, exactly as
+/// planned. `logout()` is the one honest exception: it wasn't in this
+/// interface as of 1.3, because revoking a specific refresh token
+/// server-side wasn't meaningful against a mock backend. It's added now
+/// because the real backend's POST /auth/logout does something real.
 abstract class AuthRepository {
   Future<AuthResult> register({
     required String email,
@@ -22,4 +25,6 @@ abstract class AuthRepository {
     required String email,
     required String password,
   });
+
+  Future<void> logout(String refreshToken);
 }

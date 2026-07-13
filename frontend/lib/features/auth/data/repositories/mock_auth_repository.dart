@@ -1,7 +1,5 @@
 import 'dart:math';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../domain/entities/auth_result.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -21,17 +19,15 @@ class _MockUserRecord {
   final String orgId;
 }
 
-/// Mock auth repository for Milestone 1.3.
+/// Mock auth repository, used as the active `authRepositoryProvider`
+/// through Milestone 1.3.
 ///
-/// Simulates realistic register/login behavior (duplicate email rejected,
-/// wrong password rejected, network latency simulated) entirely in memory
-/// — no HTTP calls. This lets the auth screens and state management be
-/// built and tested end to end before the backend exists.
-///
-/// Replaced by a real `ApiAuthRepository` in Milestone 1.4. Because both
-/// implement the same `AuthRepository` interface, that swap happens in one
-/// place (the provider override below) with zero changes to screens or the
-/// controller.
+/// As of Milestone 1.4, `authRepositoryProvider` resolves to the real
+/// `ApiAuthRepository` instead (see api_auth_repository.dart) — this class
+/// is kept, unused by the provider but still a complete, correct
+/// `AuthRepository` implementation, as a fast networkless fake available
+/// for future widget/unit tests that shouldn't depend on a running
+/// backend.
 class MockAuthRepository implements AuthRepository {
   final Map<String, _MockUserRecord> _usersByEmail = {};
   final Random _random = Random();
@@ -103,17 +99,15 @@ class MockAuthRepository implements AuthRepository {
     );
   }
 
+  @override
+  Future<void> logout(String refreshToken) async {
+    // No-op: the mock doesn't track live refresh-token validity state the
+    // way the real backend's refresh_token table does, so there's nothing
+    // meaningful to revoke here. Kept as a real (not throwing) method so
+    // this class still satisfies AuthRepository for any future test that
+    // wants a fast, networkless fake.
+    await Future<void>.delayed(_simulatedLatency);
+  }
+
   String _randomId() => _random.nextInt(1 << 32).toRadixString(16);
 }
-
-/// DI wiring for this feature.
-///
-/// NOTE: per the architecture doc, repository wiring ultimately belongs in
-/// a central `core/di/providers.dart`. That folder doesn't exist yet — no
-/// milestone has created it. Keeping the provider here, feature-local, is
-/// the minimal-scope choice for now; it should be moved into `core/di` in
-/// whichever future milestone introduces that composition root, at which
-/// point this line is a one-line relocation, not a redesign.
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return MockAuthRepository();
-});

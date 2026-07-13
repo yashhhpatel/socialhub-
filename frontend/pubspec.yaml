@@ -17,6 +17,11 @@ dependencies:
   # Routing (see docs/architecture — Flutter Web Application Architecture, §4)
   go_router: ^14.2.0
 
+  # Networking — chosen over the plain `http` package specifically for its
+  # built-in Interceptor abstraction, needed for the silent token-refresh
+  # flow (see core/network/auth_interceptor.dart).
+  dio: ^5.7.0
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
