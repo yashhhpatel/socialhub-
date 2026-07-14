@@ -63,18 +63,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // No manual navigation on success — see login_screen.dart's _submit()
+    // for why: the route guard is the single source of truth for where
+    // an authenticated user lands.
     await ref.read(authControllerProvider.notifier).register(
           email: _emailController.text,
           password: _passwordController.text,
           orgName: _orgNameController.text,
         );
-
-    if (!mounted) return;
-
-    final state = ref.read(authControllerProvider);
-    if (state.status == AuthStatus.authenticated) {
-      context.go('/');
-    }
   }
 
   @override

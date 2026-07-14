@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -91,10 +92,27 @@ class ApiAuthRepository implements AuthRepository {
 
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout) {
-      return 'Could not reach the server. Check your connection and try again.';
+      return 'Could not reach the server. Check your connection and try again.'
+          '${_debugSuffix(e)}';
     }
 
-    return 'Something went wrong. Please try again.';
+    return 'Something went wrong. Please try again.${_debugSuffix(e)}';
+  }
+
+  /// Debug-only diagnostic detail appended to fallback error messages —
+  /// status code, DioExceptionType, the exact URL, and the raw
+  /// underlying message. Compiled out entirely in release builds
+  /// (kDebugMode), so this never leaks internal detail to real users;
+  /// it exists so a connection failure during development is immediately
+  /// diagnosable from the error text itself, not just from console logs.
+  String _debugSuffix(DioException e) {
+    if (!kDebugMode) return '';
+    final status = e.response?.statusCode;
+    final url = e.requestOptions.uri;
+    return '\n[DEV] ${e.type.name}'
+        '${status != null ? ' · HTTP $status' : ''}'
+        ' · $url'
+        '${e.message != null ? ' · ${e.message}' : ''}';
   }
 }
 

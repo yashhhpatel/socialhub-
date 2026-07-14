@@ -43,17 +43,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // No manual navigation on success — the route guard (see
+    // core/router/route_guards.dart) reacts to the token store changing
+    // and redirects away from /login automatically. Two places deciding
+    // where to go after login would risk drifting out of sync; the guard
+    // is the single source of truth for that now.
     await ref.read(authControllerProvider.notifier).login(
           email: _emailController.text,
           password: _passwordController.text,
         );
-
-    if (!mounted) return;
-
-    final state = ref.read(authControllerProvider);
-    if (state.status == AuthStatus.authenticated) {
-      context.go('/');
-    }
   }
 
   @override
