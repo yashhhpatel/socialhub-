@@ -9,6 +9,10 @@
 // — relations to BrandKit/SsoConfig/etc. are added in the milestones that
 // introduce those models, not stubbed in now.
 //
+// Milestone 2.2 adds SocialAccount. Platform enum values match
+// PlatformName exactly (see social-accounts/adapters/adapter.interface.ts)
+// — that file's comment already flagged this alignment back in 2.1.
+//
 // NOTE (Prisma 7+): the datasource `url` no longer lives here — Prisma 7
 // moved connection URLs to prisma.config.ts (see ../prisma.config.ts).
 // schema.prisma is now purely structural (models + provider), never
@@ -36,13 +40,29 @@ enum UserRole {
   viewer
 }
 
+enum Platform {
+  instagram
+  facebook
+  threads
+  x
+  linkedin
+}
+
+enum SocialAccountStatus {
+  connected
+  expired
+  revoked
+  error
+}
+
 model Organization {
-  id               String   @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String
-  planTier         PlanTier @default(free)
-  requiresApproval Boolean  @default(false)
+  planTier         PlanTier        @default(free)
+  requiresApproval Boolean         @default(false)
   users            User[]
-  createdAt        DateTime @default(now())
+  socialAccounts   SocialAccount[]
+  createdAt        DateTime        @default(now())
 
   @@map("organization")
 }
@@ -73,4 +93,25 @@ model RefreshToken {
 
   @@index([userId, revoked])
   @@map("refresh_token")
+}
+
+model SocialAccount {
+  id                String              @id @default(uuid())
+  orgId             String
+  organization      Organization        @relation(fields: [orgId], references: [id])
+  platform          Platform
+  externalAccountId String
+  // Encrypted via TokenEncryptionService (Milestone 2.1) before ever
+  // touching the database — never stored raw. See social-accounts.service.ts.
+  accessTokenEnc    String
+  refreshTokenEnc   String?
+  expiresAt         DateTime?
+  status            SocialAccountStatus @default(connected)
+  createdAt         DateTime            @default(now())
+
+  // Prevents the same external Instagram/X/etc. account being connected
+  // twice to one org.
+  @@unique([orgId, platform, externalAccountId])
+  @@index([orgId])
+  @@map("social_account")
 }
