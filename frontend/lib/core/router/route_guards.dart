@@ -1,3 +1,5 @@
+import '../layout/nav_destination_data.dart';
+
 /// Redirect decision logic, extracted from the route table itself, per
 /// docs/architecture — Flutter Web Application Architecture, §4
 /// (Routing).
@@ -13,6 +15,11 @@
 /// - Authenticated + hitting /login or /register -> bounce to /dashboard
 ///   (skip showing the login form to someone already signed in).
 ///
+/// Protected routes are every path in navDestinations (core/layout) —
+/// derived, not duplicated, so adding a 10th sidebar item automatically
+/// protects it too, rather than needing a second list kept in sync by
+/// hand.
+///
 /// A pure function (location + bool in, redirect target or null out) so
 /// it's testable without spinning up a GoRouter/widget tree at all.
 String? authRedirect({
@@ -20,7 +27,7 @@ String? authRedirect({
   required bool isAuthenticated,
 }) {
   const authRoutes = {'/login', '/register'};
-  const protectedRoutes = {'/dashboard'};
+  final protectedRoutes = navDestinations.map((d) => d.path).toSet();
 
   if (!isAuthenticated && protectedRoutes.contains(matchedLocation)) {
     return '/login';

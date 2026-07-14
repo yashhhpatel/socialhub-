@@ -58,5 +58,26 @@ void main() {
       );
       expect(result, isNull);
     });
+
+    test(
+      'protection is derived from navDestinations, not hardcoded to /dashboard alone',
+      () {
+        // /content, /settings, etc. are only protected because they're
+        // in navDestinations — this proves the derivation actually works,
+        // not just the one route that was hand-tested before.
+        expect(
+          authRedirect(matchedLocation: '/content', isAuthenticated: false),
+          '/login',
+        );
+        expect(
+          authRedirect(matchedLocation: '/settings', isAuthenticated: false),
+          '/login',
+        );
+        expect(
+          authRedirect(matchedLocation: '/team', isAuthenticated: true),
+          isNull,
+        );
+      },
+    );
   });
 }
