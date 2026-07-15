@@ -4,20 +4,20 @@
  * capabilities() contract so the editor and scheduler can validate
  * BEFORE attempting to publish, not after a failure.
  *
- * SCOPE NOTE: this milestone's file list is "Files/folders modified:
- * none" — schema.prisma is not touched here, so there is no Prisma
- * `Platform` enum yet (that arrives in Milestone 2.2 alongside the
- * SocialAccount model). PlatformName below is this file's own type,
- * not a re-export of a Prisma enum that doesn't exist yet. When 2.2
- * introduces the real Platform enum, its values are defined to match
- * these exact strings — so adapters constructed against PlatformName
- * now need no translation layer later, just an import swap.
+ * PlatformName's values are defined to match the Prisma `Platform` enum
+ * (schema.prisma, added Milestone 2.2) exactly — no translation layer
+ * needed between the two.
  *
- * SCOPE NOTE: no publish()/OAuth-callback-handling methods yet. Per the
- * blueprint, those are what Milestones 2.2/2.3 (Instagram/X OAuth) and
- * 4.2 (synchronous publish) actually need — adding them speculatively
- * now, before any adapter implements them, would be an interface nobody
- * can verify is even shaped correctly yet.
+ * SCOPE NOTE: no publish() method yet — that's Milestone 4.2's job, once
+ * something actually needs it.
+ *
+ * PKCE NOTE (added Milestone 2.3, for X): getAuthorizationUrl() and
+ * connect() both gained an optional trailing parameter. Instagram's
+ * existing adapter (Milestone 2.2) needed zero code changes for this —
+ * TypeScript allows an implementing method to declare fewer parameters
+ * than its interface, so InstagramAdapter's original
+ * `getAuthorizationUrl(state: string): string` still satisfies this
+ * interface unmodified. Only X's adapter uses the new parameters.
  */
 
 export type PlatformName = 'instagram' | 'facebook' | 'threads' | 'x' | 'linkedin';
@@ -69,14 +69,26 @@ export interface PlatformAdapter {
    * `state` is an opaque, caller-generated anti-CSRF token the adapter
    * must round-trip unmodified — verifying it on the callback is the
    * caller's responsibility, not the adapter's.
+   *
+   * `codeChallenge` is only used by PKCE-based adapters (X) — the
+   * caller is responsible for generating the PKCE verifier/challenge
+   * pair (see common/crypto/pkce.util.ts) and remembering the verifier
+   * (typically by embedding it in its own `state` payload) until the
+   * later `connect()` call. Non-PKCE adapters (Instagram) ignore this
+   * parameter entirely.
    */
-  getAuthorizationUrl(state: string): string;
+  getAuthorizationUrl(state: string, codeChallenge?: string): string;
 
   /**
    * Exchanges an OAuth authorization code (received on the callback
-   * route) for real tokens.
+   * route) for real tokens. `codeVerifier` is only required by
+   * PKCE-based adapters (X) — must be the same verifier whose challenge
+   * was passed to getAuthorizationUrl for this same flow.
    */
-  connect(authorizationCode: string): Promise<OAuthConnectionResult>;
+  connect(
+    authorizationCode: string,
+    codeVerifier?: string,
+  ): Promise<OAuthConnectionResult>;
 
   /**
    * Exchanges a refresh token for a new access token. Throws if the
