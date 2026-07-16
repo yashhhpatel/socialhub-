@@ -3,6 +3,7 @@
 This folder holds the project's planning and reference documentation:
 
 - `architecture/` — high-level architecture and planning decisions (added later)
+  - `adr/` — Architecture Decision Records, one file per significant decision
 - `blueprint/` — the phase/milestone implementation blueprint (added later)
 - `git-workflow/` — branching, commit, and release conventions (added later)
 - `api/` — generated REST/GraphQL API reference (added later)
