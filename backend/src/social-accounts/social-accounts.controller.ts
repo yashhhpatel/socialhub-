@@ -8,9 +8,11 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { Request, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
@@ -25,7 +27,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller('social-accounts')
 export class SocialAccountsController {
-  constructor(private readonly socialAccountsService: SocialAccountsService) {}
+  constructor(
+    private readonly socialAccountsService: SocialAccountsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -69,34 +74,41 @@ export class SocialAccountsController {
    * there is no Authorization header available at this point, only the
    * `state` param (see SocialAccountsService) to attribute the request
    * back to an org.
+   *
+   * Redirects to FRONTEND_URL/settings if configured (Milestone 2.4 —
+   * closes the loop explicitly deferred here since 2.2). Falls back to a
+   * plain JSON confirmation if FRONTEND_URL isn't set, since Flutter
+   * Web's local dev server runs on a random port by default (only fixed
+   * if you run `flutter run -d chrome --web-port=<port>`) — this way
+   * nothing breaks for a dev who hasn't set that up yet.
    */
   @Get('instagram/callback')
-  async instagramCallback(@Query() query: InstagramCallbackQueryDto) {
+  async instagramCallback(
+    @Query() query: InstagramCallbackQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
     if (query.error) {
-      return {
-        status: 'error' as const,
-        message: `Instagram authorization was not granted: ${query.error}`,
-      };
+      this.respondToCallback(res, {
+        connectError: `Instagram authorization was not granted: ${query.error}`,
+      });
+      return;
     }
 
     if (!query.code || !query.state) {
-      return { status: 'error' as const, message: 'Missing code or state parameter.' };
+      this.respondToCallback(res, { connectError: 'Missing code or state parameter.' });
+      return;
     }
 
-    const account = await this.socialAccountsService.handleInstagramCallback(
-      query.code,
-      query.state,
-    );
-
-    // Deferred to Milestone 2.4: redirect the browser to a real frontend
-    // URL once FRONTEND_URL config and the Connected Accounts screen
-    // exist. A plain JSON confirmation is the honest placeholder
-    // response for now, not a guess at a URL that doesn't exist yet.
-    return {
-      status: 'connected' as const,
-      platform: account.platform,
-      externalAccountId: account.externalAccountId,
-    };
+    try {
+      const account = await this.socialAccountsService.handleInstagramCallback(
+        query.code,
+        query.state,
+      );
+      this.respondToCallback(res, { connected: account.platform });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed.';
+      this.respondToCallback(res, { connectError: message });
+    }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -109,27 +121,56 @@ export class SocialAccountsController {
 
   /** PUBLIC — same reasoning as instagramCallback above. */
   @Get('x/callback')
-  async xCallback(@Query() query: XCallbackQueryDto) {
+  async xCallback(
+    @Query() query: XCallbackQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
     if (query.error) {
-      return {
-        status: 'error' as const,
-        message: `X authorization was not granted: ${query.error}`,
-      };
+      this.respondToCallback(res, {
+        connectError: `X authorization was not granted: ${query.error}`,
+      });
+      return;
     }
 
     if (!query.code || !query.state) {
-      return { status: 'error' as const, message: 'Missing code or state parameter.' };
+      this.respondToCallback(res, { connectError: 'Missing code or state parameter.' });
+      return;
     }
 
-    const account = await this.socialAccountsService.handleXCallback(
-      query.code,
-      query.state,
-    );
+    try {
+      const account = await this.socialAccountsService.handleXCallback(
+        query.code,
+        query.state,
+      );
+      this.respondToCallback(res, { connected: account.platform });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed.';
+      this.respondToCallback(res, { connectError: message });
+    }
+  }
 
-    return {
-      status: 'connected' as const,
-      platform: account.platform,
-      externalAccountId: account.externalAccountId,
-    };
+  /**
+   * Shared by both callback handlers. Redirects to the frontend's
+   * Settings screen with a query param it reads on load (see
+   * frontend/lib/features/social_accounts/) if FRONTEND_URL is
+   * configured; otherwise returns the same info as plain JSON.
+   */
+  private respondToCallback(
+    res: Response,
+    result: { connected: string } | { connectError: string },
+  ): void {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (frontendUrl) {
+      const params = new URLSearchParams(result as Record<string, string>);
+      res.redirect(`${frontendUrl}/settings?${params.toString()}`);
+      return;
+    }
+
+    res.json(
+      'connected' in result
+        ? { status: 'connected', platform: result.connected }
+        : { status: 'error', message: result.connectError },
+    );
   }
 }

@@ -11,7 +11,7 @@ import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/media_library/presentation/screens/media_library_screen.dart';
 import '../../features/organizations/presentation/screens/organizations_screen.dart';
-import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/social_accounts/presentation/screens/social_accounts_screen.dart';
 import '../../features/team/presentation/screens/team_screen.dart';
 import '../layout/app_shell.dart';
 import '../network/auth_token_store.dart';
@@ -35,6 +35,15 @@ import 'route_guards.dart';
 /// each time it runs. Recreating the whole GoRouter instance on every
 /// auth change (a common mistake when wiring Riverpod + GoRouter
 /// together) would tear down navigator state — deliberately avoided.
+///
+/// /settings (Milestone 2.4): now renders SocialAccountsScreen — the
+/// original features/settings/presentation/screens/settings_screen.dart
+/// placeholder is left in place but unreferenced by any route, rather
+/// than deleted. It becomes a real multi-section settings page (of which
+/// Connected Accounts is the first section) once a second real settings
+/// concern exists to sit alongside it — merging them prematurely, with
+/// only one real section, would just be structure with nothing to
+/// organize yet.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -111,7 +120,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             name: 'settings',
-            builder: (context, state) => const SettingsScreen(),
+            builder: (context, state) => SocialAccountsScreen(
+              queryParams: state.uri.queryParameters,
+            ),
           ),
         ],
       ),
