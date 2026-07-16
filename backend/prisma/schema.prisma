@@ -13,6 +13,15 @@
 // PlatformName exactly (see social-accounts/adapters/adapter.interface.ts)
 // — that file's comment already flagged this alignment back in 2.1.
 //
+// Milestone 3.1 adds ContentAsset. Deliberately NOT included yet:
+// templateId/brandKitId — those FKs reference Template/BrandKit models
+// that don't exist until Phase 9, same reasoning as every other deferred
+// FK in this file (User.orgId before Organization existed, etc.).
+// approvalStatus IS included now despite approval enforcement itself not
+// arriving until Milestone 13.2 — every asset has some approval state
+// from creation regardless of whether an org requires approval, so this
+// isn't a forward FK dependency the way templateId/brandKitId are.
+//
 // NOTE (Prisma 7+): the datasource `url` no longer lives here — Prisma 7
 // moved connection URLs to prisma.config.ts (see ../prisma.config.ts).
 // schema.prisma is now purely structural (models + provider), never
@@ -55,6 +64,18 @@ enum SocialAccountStatus {
   error
 }
 
+enum ContentAssetType {
+  image
+  video
+}
+
+enum ApprovalStatus {
+  draft
+  pending_approval
+  approved
+  rejected
+}
+
 model Organization {
   id               String          @id @default(uuid())
   name             String
@@ -62,6 +83,7 @@ model Organization {
   requiresApproval Boolean         @default(false)
   users            User[]
   socialAccounts   SocialAccount[]
+  contentAssets    ContentAsset[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
@@ -75,6 +97,7 @@ model User {
   orgId         String
   organization  Organization   @relation(fields: [orgId], references: [id])
   refreshTokens RefreshToken[]
+  createdAssets ContentAsset[] @relation("CreatedAssets")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -114,4 +137,25 @@ model SocialAccount {
   @@unique([orgId, platform, externalAccountId])
   @@index([orgId])
   @@map("social_account")
+}
+
+model ContentAsset {
+  id             String           @id @default(uuid())
+  orgId          String
+  organization   Organization     @relation(fields: [orgId], references: [id])
+  createdById    String
+  createdBy      User             @relation("CreatedAssets", fields: [createdById], references: [id])
+  type           ContentAssetType
+  // Arbitrary editor canvas state (width/height/layers/etc.) — schema
+  // owned by the editor (Milestone 3.3+), not by this model. Validated
+  // at the API boundary (see content/dto/canvas-json.dto.ts), not by
+  // the database.
+  canvasJson     Json
+  approvalStatus ApprovalStatus   @default(draft)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, approvalStatus])
+  @@map("content_asset")
 }
