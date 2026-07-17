@@ -1,5 +1,5 @@
-import 'social_account.dart';
-import 'social_platform.dart';
+import '../entities/social_account.dart';
+import '../entities/social_platform.dart';
 
 abstract class SocialAccountsRepository {
   Future<List<SocialAccount>> list();
