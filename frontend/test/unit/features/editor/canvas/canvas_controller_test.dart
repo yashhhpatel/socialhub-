@@ -105,5 +105,109 @@ void main() {
 
       expect(controller.state.selectedLayerId, 'layer_a');
     });
+
+    test('selectLayerById selects directly by id, without needing a canvas point', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_b');
+      expect(controller.state.selectedLayerId, 'layer_b');
+    });
+
+    test('selectLayerById(null) clears selection, same as clearSelection', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.selectLayerById(null);
+      expect(controller.state.selectedLayerId, isNull);
+    });
+
+    test('updateSelectedLayerGeometry is a no-op when nothing is selected', () {
+      final controller = CanvasController(document);
+      controller.updateSelectedLayerGeometry(width: 999);
+
+      final layerA = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(layerA.width, 100); // unchanged
+    });
+
+    test('updateSelectedLayerGeometry updates only the fields passed, on only the selected layer', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.updateSelectedLayerGeometry(width: 300, rotationDegrees: 45);
+
+      final layerA = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      final layerB = controller.state.document.layers.firstWhere((l) => l.id == 'layer_b');
+
+      expect(layerA.width, 300);
+      expect(layerA.rotationDegrees, 45);
+      expect(layerA.x, 0); // untouched — wasn't passed
+      expect(layerA.height, 100); // untouched — wasn't passed
+      // layer_b completely untouched.
+      expect(layerB.width, 100);
+      expect(layerB.rotationDegrees, 0);
+    });
+
+    test('updateSelectedLayerColor sets fill color on a selected ShapeCanvasLayer', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.updateSelectedLayerColor(const Color(0xFFFF00FF));
+
+      final layerA = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a')
+          as ShapeCanvasLayer;
+      expect(layerA.fillColor, const Color(0xFFFF00FF));
+    });
+
+    test('updateSelectedLayerColor sets text color on a selected TextCanvasLayer', () {
+      final withText = document.copyWithLayers([
+        ...document.layers,
+        const TextCanvasLayer(id: 'text_a', x: 200, y: 200, width: 100, height: 30, text: 'Hi'),
+      ]);
+      final controller = CanvasController(withText);
+      controller.selectLayerById('text_a');
+      controller.updateSelectedLayerColor(const Color(0xFF123456));
+
+      final textLayer =
+          controller.state.document.layers.firstWhere((l) => l.id == 'text_a') as TextCanvasLayer;
+      expect(textLayer.color, const Color(0xFF123456));
+    });
+
+    test('updateSelectedLayerColor is a safe no-op on a selected ImageCanvasLayer', () {
+      final withImage = document.copyWithLayers([
+        ...document.layers,
+        const ImageCanvasLayer(
+          id: 'img_a',
+          x: 300,
+          y: 300,
+          width: 100,
+          height: 100,
+          imageUrl: 'https://example.com/a.jpg',
+        ),
+      ]);
+      final controller = CanvasController(withImage);
+      controller.selectLayerById('img_a');
+
+      expect(
+        () => controller.updateSelectedLayerColor(const Color(0xFFABCDEF)),
+        returnsNormally,
+      );
+      final imageLayer =
+          controller.state.document.layers.firstWhere((l) => l.id == 'img_a') as ImageCanvasLayer;
+      expect(imageLayer.imageUrl, 'https://example.com/a.jpg'); // still intact
+    });
+
+    test('addLayer appends to the stack and selects the new layer', () {
+      final controller = CanvasController(document);
+      const newLayer = ShapeCanvasLayer(
+        id: 'layer_c',
+        x: 10,
+        y: 10,
+        width: 50,
+        height: 50,
+        shapeKind: ShapeKind.ellipse,
+      );
+
+      controller.addLayer(newLayer);
+
+      expect(controller.state.document.layers.length, 3);
+      expect(controller.state.document.layers.last.id, 'layer_c');
+      expect(controller.state.selectedLayerId, 'layer_c');
+    });
   });
 }

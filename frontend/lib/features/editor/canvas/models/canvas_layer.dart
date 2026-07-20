@@ -29,10 +29,25 @@ sealed class CanvasLayer {
 
   Offset get center => Offset(x + width / 2, y + height / 2);
 
-  /// Every subtype must implement this — used by CanvasController's
-  /// drag handling, kept on the base type so the controller never needs
-  /// to know which concrete subtype it's moving.
-  CanvasLayer copyWithPosition(double newX, double newY);
+  /// Every subtype must implement this. Covers every field the property
+  /// panel (Milestone 3.4) edits that's common to ALL layer types —
+  /// position, size, rotation, opacity. Subtype-specific fields (color,
+  /// image URL, text content) each have their own dedicated copyWith*
+  /// method instead (see below) rather than being crammed into one
+  /// enormous param list here.
+  ///
+  /// Named, nullable params: passing nothing for a field leaves it
+  /// unchanged — CanvasController.updateSelectedLayerGeometry (see
+  /// canvas_controller.dart) relies on this so a property panel field
+  /// edit (e.g. just X) doesn't require re-specifying every other value.
+  CanvasLayer copyWithGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  });
 }
 
 class ImageCanvasLayer extends CanvasLayer {
@@ -50,15 +65,34 @@ class ImageCanvasLayer extends CanvasLayer {
   final String imageUrl;
 
   @override
-  ImageCanvasLayer copyWithPosition(double newX, double newY) => ImageCanvasLayer(
+  ImageCanvasLayer copyWithGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  }) =>
+      ImageCanvasLayer(
         id: id,
-        x: newX,
-        y: newY,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+        opacity: opacity ?? this.opacity,
+        imageUrl: imageUrl,
+      );
+
+  ImageCanvasLayer copyWithImageUrl(String newImageUrl) => ImageCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
         width: width,
         height: height,
         rotationDegrees: rotationDegrees,
         opacity: opacity,
-        imageUrl: imageUrl,
+        imageUrl: newImageUrl,
       );
 }
 
@@ -83,15 +117,51 @@ class TextCanvasLayer extends CanvasLayer {
   final String? fontFamily;
 
   @override
-  TextCanvasLayer copyWithPosition(double newX, double newY) => TextCanvasLayer(
+  TextCanvasLayer copyWithGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  }) =>
+      TextCanvasLayer(
         id: id,
-        x: newX,
-        y: newY,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+        opacity: opacity ?? this.opacity,
+        text: text,
+        fontSize: fontSize,
+        color: color,
+        fontFamily: fontFamily,
+      );
+
+  TextCanvasLayer copyWithColor(Color newColor) => TextCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
         width: width,
         height: height,
         rotationDegrees: rotationDegrees,
         opacity: opacity,
         text: text,
+        fontSize: fontSize,
+        color: newColor,
+        fontFamily: fontFamily,
+      );
+
+  TextCanvasLayer copyWithText(String newText) => TextCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+        text: newText,
         fontSize: fontSize,
         color: color,
         fontFamily: fontFamily,
@@ -117,15 +187,35 @@ class ShapeCanvasLayer extends CanvasLayer {
   final Color fillColor;
 
   @override
-  ShapeCanvasLayer copyWithPosition(double newX, double newY) => ShapeCanvasLayer(
+  ShapeCanvasLayer copyWithGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  }) =>
+      ShapeCanvasLayer(
         id: id,
-        x: newX,
-        y: newY,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+        opacity: opacity ?? this.opacity,
+        shapeKind: shapeKind,
+        fillColor: fillColor,
+      );
+
+  ShapeCanvasLayer copyWithFillColor(Color newFillColor) => ShapeCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
         width: width,
         height: height,
         rotationDegrees: rotationDegrees,
         opacity: opacity,
         shapeKind: shapeKind,
-        fillColor: fillColor,
+        fillColor: newFillColor,
       );
 }
