@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:socialhub/features/content/domain/entities/content_asset_summary.dart';
 import 'package:socialhub/features/content/domain/repositories/content_repository.dart';
 import 'package:socialhub/features/editor/canvas/models/canvas_document.dart';
 import 'package:socialhub/features/editor/state/autosave_controller.dart';
@@ -28,6 +30,32 @@ class _FakeContentRepository implements ContentRepository {
   @override
   Future<CanvasDocument> loadCanvas(String assetId) async =>
       const CanvasDocument(width: 1, height: 1);
+
+  // Milestone 3.6 additions. These tests only exercise autosave, so the
+  // rest of the contract is stubbed out rather than faked in detail —
+  // any accidental call fails loudly instead of silently succeeding.
+  @override
+  Future<List<ContentAssetSummary>> list() async =>
+      throw UnimplementedError('not exercised by autosave tests');
+
+  @override
+  Future<String> createAsset({required CanvasDocument document}) async =>
+      throw UnimplementedError('not exercised by autosave tests');
+
+  @override
+  Future<void> uploadMasterRender({
+    required String assetId,
+    required Uint8List pngBytes,
+  }) async =>
+      throw UnimplementedError('not exercised by autosave tests');
+
+  @override
+  Future<List<({String platform, String? renderedMediaUrl, String status})>>
+      generateVariants({
+    required String assetId,
+    required List<String> platforms,
+  }) async =>
+          throw UnimplementedError('not exercised by autosave tests');
 }
 
 void main() {

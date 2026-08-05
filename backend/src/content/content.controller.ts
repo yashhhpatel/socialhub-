@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -23,6 +24,7 @@ import { ContentAssetDetailDto, ContentAssetDto } from './dto/content-asset.dto'
 import { GenerateVariantsResponseDto } from './dto/content-variant.dto';
 import { CreateContentAssetDto } from './dto/create-content-asset.dto';
 import { GenerateVariantsDto } from './dto/generate-variants.dto';
+import { ListContentAssetsDto, PaginatedDto } from './dto/list-content-assets.dto';
 import { UpdateContentAssetDto } from './dto/update-content-asset.dto';
 import { UploadMediaResponseDto } from './dto/upload-media-response.dto';
 import { VariantGeneratorService } from './variant-generator.service';
@@ -49,6 +51,22 @@ export class ContentController {
     @Body() dto: CreateContentAssetDto,
   ): Promise<ContentAssetDto> {
     return this.contentService.create(req.user.orgId, req.user.userId, dto);
+  }
+
+  /**
+   * Paginated content library (Milestone 3.6). Declared BEFORE the
+   * `:id` route below — Nest matches in declaration order, and a bare
+   * `@Get()` placed after `@Get(':id')` still works, but keeping the
+   * more specific route last is the convention that avoids surprises as
+   * more routes are added here.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  listAssets(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListContentAssetsDto,
+  ): Promise<PaginatedDto<ContentAssetDto>> {
+    return this.contentService.list(req.user.orgId, query);
   }
 
   // Not in Milestone 3.1's literal expected output (only PATCH is named),

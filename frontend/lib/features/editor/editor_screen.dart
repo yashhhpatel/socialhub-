@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/network/api_error_message.dart';
 import 'canvas/models/canvas_document.dart';
 import 'canvas/state/canvas_controller.dart';
 import 'canvas/widgets/canvas_surface.dart';
@@ -9,60 +11,85 @@ import 'panels/layer_panel.dart';
 import 'panels/property_panel.dart';
 import 'panels/toolbar.dart';
 import 'state/autosave_controller.dart';
+import 'state/editor_actions_controller.dart';
 
-/// Assembles the canvas engine (Milestone 3.3) with the panels/toolbar
-/// (3.4) and, as of Milestone 3.5, undo/redo shortcuts plus debounced
-/// autosave.
+/// Route target for `/editor/:assetId` (Milestone 3.6).
 ///
-/// NOTE: the blueprint lists this file as "modified" for Milestone 3.4,
-/// but it never existed before now — Milestone 3.3 built only the
-/// canvas engine itself (files under canvas/), not a screen around it.
-/// Created there instead, flagged the same way as every other case in
-/// this project where the blueprint's literal file list didn't quite
-/// match what the milestone needed to actually be buildable/verifiable.
-///
-/// `assetId` is optional. Passing one turns on autosave against
-/// `PATCH /content/assets/:id`; omitting it gives a local scratch
-/// artboard with undo/redo but no persistence. That split exists because
-/// there is still no route into this screen carrying a real asset id
-/// (wiring the editor into app_router.dart with an asset-loading route is
-/// its own increment) — without the optional form, this milestone's
-/// undo/redo work would be unreachable and unverifiable until that
-/// routing exists.
-class EditorScreen extends ConsumerStatefulWidget {
-  EditorScreen({super.key, CanvasDocument? initialDocument, this.assetId})
-      : document = initialDocument ?? const CanvasDocument(width: 1080, height: 1080);
+/// Loads the saved canvas, then hands it to the editor proper. Before
+/// this milestone EditorScreen existed but was imported by nothing —
+/// the canvas engine (3.3), panels (3.4) and undo/redo + autosave (3.5)
+/// were all unreachable from the running app.
+class EditorScreen extends ConsumerWidget {
+  const EditorScreen({super.key, required this.assetId});
 
-  final CanvasDocument document;
-  final String? assetId;
+  final String assetId;
 
   @override
-  ConsumerState<EditorScreen> createState() => _EditorScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final document = ref.watch(editorDocumentProvider(assetId));
+
+    return document.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Could not open this design: ${describeApiError(error)}'),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () => context.go('/content'),
+                child: const Text('Back to Content'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (doc) => _EditorWorkspace(assetId: assetId, document: doc),
+    );
+  }
 }
 
-class _EditorScreenState extends ConsumerState<EditorScreen> {
+class _EditorWorkspace extends ConsumerWidget {
+  const _EditorWorkspace({required this.assetId, required this.document});
+
+  final String assetId;
+  final CanvasDocument document;
+
   @override
-  Widget build(BuildContext context) {
-    final provider = canvasControllerProvider(widget.document);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = canvasControllerProvider(document);
     final controller = ref.read(provider.notifier);
-    final assetId = widget.assetId;
 
     // Feed every committed document change into the debounced autosave.
     // ref.listen (not watch) because this is a side effect, not something
     // the build output depends on — watching would rebuild the whole
     // editor on each canvas mutation for no visual reason.
-    if (assetId != null) {
-      ref.listen<CanvasDocument>(
-        provider.select((s) => s.document),
-        (previous, next) {
-          if (previous == null || identical(previous, next)) return;
-          ref.read(autosaveControllerProvider(assetId).notifier).onDocumentChanged(next);
-        },
-      );
-    }
+    ref.listen<CanvasDocument>(
+      provider.select((s) => s.document),
+      (previous, next) {
+        if (previous == null || identical(previous, next)) return;
+        ref.read(autosaveControllerProvider(assetId).notifier).onDocumentChanged(next);
+      },
+    );
 
-    final autosaveStatus =
-        assetId == null ? null : ref.watch(autosaveControllerProvider(assetId)).status;
+    // Surface export/variant results, which happen outside the widget
+    // tree and would otherwise complete invisibly.
+    ref.listen<EditorActionState>(editorActionsProvider(assetId), (_, next) {
+      final message = next.message;
+      if (message == null || next.busy) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: next.status == EditorActionStatus.failed
+              ? Theme.of(context).colorScheme.error
+              : null,
+        ),
+      );
+    });
+
+    final autosaveStatus = ref.watch(autosaveControllerProvider(assetId)).status;
+    final actions = ref.watch(editorActionsProvider(assetId));
 
     return CallbackShortcuts(
       bindings: {
@@ -77,26 +104,42 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): controller.undo,
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true, shift: true):
             controller.redo,
-        if (assetId != null)
-          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
-              ref.read(autosaveControllerProvider(assetId).notifier).flush(),
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
+            ref.read(autosaveControllerProvider(assetId).notifier).flush(),
       },
       child: Focus(
         autofocus: true,
         child: Scaffold(
-          appBar: EditorToolbar(document: widget.document, autosaveStatus: autosaveStatus),
+          appBar: EditorToolbar(
+            document: document,
+            autosaveStatus: autosaveStatus,
+            actionState: actions,
+            onBack: () => context.go('/content'),
+            onExport: () async {
+              // Flush pending canvas edits first: exporting a design whose
+              // last change hasn't been saved would attach a render that
+              // doesn't match the persisted canvasJson.
+              await ref.read(autosaveControllerProvider(assetId).notifier).flush();
+              final current = ref.read(provider).document;
+              await ref
+                  .read(editorActionsProvider(assetId).notifier)
+                  .exportMasterRender(current);
+            },
+            onGenerateVariants: () =>
+                ref.read(editorActionsProvider(assetId).notifier).generateVariants(),
+          ),
           body: Row(
             children: [
-              LayerPanel(document: widget.document),
+              LayerPanel(document: document),
               const VerticalDivider(width: 1),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: CanvasSurface(document: widget.document),
+                  child: CanvasSurface(document: document),
                 ),
               ),
               const VerticalDivider(width: 1),
-              PropertyPanel(document: widget.document),
+              PropertyPanel(document: document),
             ],
           ),
         ),

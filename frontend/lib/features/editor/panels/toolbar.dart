@@ -6,6 +6,7 @@ import '../canvas/models/canvas_document.dart';
 import '../canvas/models/canvas_layer.dart';
 import '../canvas/state/canvas_controller.dart';
 import '../state/autosave_controller.dart';
+import '../state/editor_actions_controller.dart';
 
 /// SCOPE NOTE: add-layer actions only, per this milestone. Deliberately
 /// NOT here yet: image upload (needs Milestone 3.2's Cloudinary endpoint
@@ -13,9 +14,24 @@ import '../state/autosave_controller.dart';
 /// undo/redo (Milestone 3.5), alignment/smart guides (later Phase 3
 /// milestones per the blueprint's phase-level feature list).
 class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
-  const EditorToolbar({super.key, required this.document, this.autosaveStatus});
+  const EditorToolbar({
+    super.key,
+    required this.document,
+    this.autosaveStatus,
+    this.actionState,
+    this.onBack,
+    this.onExport,
+    this.onGenerateVariants,
+  });
 
   final CanvasDocument document;
+
+  /// Publish-pipeline actions (Milestone 3.6). Null when the editor runs
+  /// without a backing asset, where there is nothing to export to.
+  final EditorActionState? actionState;
+  final VoidCallback? onBack;
+  final Future<void> Function()? onExport;
+  final VoidCallback? onGenerateVariants;
 
   /// Null when the editor is running without a backing asset (the blank
   /// scratch document EditorScreen defaults to) — there's nothing to save
@@ -47,6 +63,12 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
         padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
         child: Row(
           children: [
+            if (onBack != null)
+              _ToolbarButton(
+                icon: Icons.arrow_back,
+                tooltip: 'Back to Content',
+                onPressed: onBack,
+              ),
             _ToolbarButton(
               icon: Icons.crop_square,
               tooltip: 'Add rectangle',
@@ -101,6 +123,32 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
               onPressed: state.canRedo ? controller.redo : null,
             ),
             const Spacer(),
+            if (onExport != null) ...[
+              OutlinedButton.icon(
+                onPressed: actionState?.busy == true ? null : () => onExport!(),
+                icon: actionState?.status == EditorActionStatus.exporting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Export'),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              FilledButton.icon(
+                onPressed: actionState?.busy == true ? null : onGenerateVariants,
+                icon: actionState?.status == EditorActionStatus.generating
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_motion, size: 18),
+                label: const Text('Generate variants'),
+              ),
+              const SizedBox(width: SpacingTokens.md),
+            ],
             if (autosaveStatus != null) _AutosaveIndicator(status: autosaveStatus!),
           ],
         ),

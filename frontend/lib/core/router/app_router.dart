@@ -9,6 +9,7 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/calendar/presentation/screens/calendar_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/editor/editor_screen.dart';
 import '../../features/media_library/presentation/screens/media_library_screen.dart';
 import '../../features/organizations/presentation/screens/organizations_screen.dart';
 import '../../features/social_accounts/presentation/screens/social_accounts_screen.dart';
@@ -70,6 +71,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Milestone 3.6. Deliberately OUTSIDE the ShellRoute: the editor is
+      // a full-bleed workspace with its own toolbar, and keeping the
+      // sidebar/top bar around it would leave the canvas fighting the app
+      // chrome for horizontal space on exactly the screen that needs it
+      // most. Its own back button returns to /content.
+      //
+      // Not covered by authRedirect's protectedRoutes (which derives from
+      // navDestinations, and the editor is not a sidebar destination), so
+      // it is guarded explicitly here.
+      GoRoute(
+        path: '/editor/:assetId',
+        name: 'editor',
+        redirect: (context, state) =>
+            ref.read(authTokenStoreProvider) == null ? '/login' : null,
+        builder: (context, state) =>
+            EditorScreen(assetId: state.pathParameters['assetId']!),
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(

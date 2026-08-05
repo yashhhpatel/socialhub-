@@ -3,6 +3,7 @@ import { ContentAsset, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentAssetDto } from './dto/create-content-asset.dto';
+import { ListContentAssetsDto, PaginatedDto } from './dto/list-content-assets.dto';
 import { UpdateContentAssetDto } from './dto/update-content-asset.dto';
 
 @Injectable()
@@ -22,6 +23,48 @@ export class ContentService {
         canvasJson: dto.canvasJson as unknown as Prisma.InputJsonValue,
       },
     });
+  }
+
+  /**
+   * Paginated list for the content library screen (Milestone 3.6).
+   *
+   * Always org-scoped at the query level rather than filtered after the
+   * fact — an asset from another org must never be loaded into memory in
+   * the first place, let alone counted in `total`.
+   *
+   * Ordered by updatedAt desc: the library's job is "get me back to what
+   * I was working on", and recency is the closest proxy for that.
+   */
+  async list(
+    orgId: string,
+    query: ListContentAssetsDto,
+  ): Promise<PaginatedDto<ContentAsset>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const where = {
+      orgId,
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.approvalStatus ? { approvalStatus: query.approvalStatus } : {}),
+    };
+
+    // One round trip rather than two sequential ones — the count and the
+    // page are independent, and a list screen needs both before it can
+    // render anything.
+    const [data, total] = await Promise.all([
+      this.prisma.contentAsset.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.contentAsset.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
