@@ -19,7 +19,7 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CloudinaryService } from '../media/cloudinary.service';
 import { ContentService } from './content.service';
-import { ContentAssetDto } from './dto/content-asset.dto';
+import { ContentAssetDetailDto, ContentAssetDto } from './dto/content-asset.dto';
 import { GenerateVariantsResponseDto } from './dto/content-variant.dto';
 import { CreateContentAssetDto } from './dto/create-content-asset.dto';
 import { GenerateVariantsDto } from './dto/generate-variants.dto';
@@ -61,8 +61,8 @@ export class ContentController {
   get(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-  ): Promise<ContentAssetDto> {
-    return this.contentService.findByIdScoped(id, req.user.orgId);
+  ): Promise<ContentAssetDetailDto> {
+    return this.contentService.findByIdScopedWithVariants(id, req.user.orgId);
   }
 
   @UseGuards(JwtAuthGuard)

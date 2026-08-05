@@ -68,6 +68,36 @@ describe('ContentService', () => {
     });
   });
 
+  describe('findByIdScopedWithVariants', () => {
+    it('includes variants, which the documented 202 polling flow depends on', async () => {
+      prisma.contentAsset.findUnique.mockResolvedValue({
+        id: 'asset_1',
+        orgId: 'org_1',
+        variants: [{ id: 'var_1', platform: 'instagram' }],
+      });
+
+      const result = await service.findByIdScopedWithVariants('asset_1', 'org_1');
+
+      expect(prisma.contentAsset.findUnique).toHaveBeenCalledWith({
+        where: { id: 'asset_1' },
+        include: { variants: { orderBy: { platform: 'asc' } } },
+      });
+      expect(result.variants).toHaveLength(1);
+    });
+
+    it('applies the same cross-org 404 rule as findByIdScoped', async () => {
+      prisma.contentAsset.findUnique.mockResolvedValue({
+        id: 'asset_1',
+        orgId: 'some_other_org',
+        variants: [],
+      });
+
+      await expect(
+        service.findByIdScopedWithVariants('asset_1', 'org_1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe('update', () => {
     it('checks ownership before updating, and persists the new canvasJson', async () => {
       prisma.contentAsset.findUnique.mockResolvedValue({ id: 'asset_1', orgId: 'org_1' });
