@@ -3,7 +3,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
 
 import { envValidationSchema } from './env.validation';
 
-/**
+/** 
  * Wraps @nestjs/config with our validation schema and marks it global, so
  * every other module can inject ConfigService without re-importing this
  * module. See docs/architecture/SocialHub_Architecture_Plan.md §7

@@ -29,7 +29,7 @@ class AppShellPlaceholder extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'App shell scaffold — Milestone 0.2',
+              'App shell scaffold ',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
@@ -45,7 +45,7 @@ class AppShellPlaceholder extends ConsumerWidget {
             const SizedBox(height: 24),
             TextButton(
               onPressed: () => context.go('/login'),
-              child: const Text('Go to login (Milestone 1.3)'),
+              child: const Text('Go to login '),
             ),
           ],
         ),
@@ -53,3 +53,4 @@ class AppShellPlaceholder extends ConsumerWidget {
     );
   }
 }
+  

@@ -61,7 +61,7 @@ class AppShell extends ConsumerWidget {
             ),
           ),
         ),
-        drawer: Drawer(
+        drawer: Drawer(   
           child: SafeArea(
             child: NavSidebar(
               currentPath: currentPath,

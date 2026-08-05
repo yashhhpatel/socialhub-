@@ -42,7 +42,7 @@ export class TokenEncryptionService {
 
     if (this.key.length !== KEY_LENGTH_BYTES) {
       // Joi's schema already enforces exactly 64 hex chars at boot (see
-      // env.validation.ts) — this is a defensive second check, not the
+      // env.validation.ts) — this is a defensive second che  ck, not the
       // primary guard, in case this service is ever constructed outside
       // Nest's normal bootstrap (e.g. directly in a script).
       throw new Error(

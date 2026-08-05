@@ -7,9 +7,9 @@ class NavDestinationData {
   const NavDestinationData({
     required this.path,
     required this.label,
-    required this.icon,
+    required this.icon,   
     required this.selectedIcon,
-  });
+  }); 
 
   final String path;
   final String label;

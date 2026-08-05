@@ -11,6 +11,7 @@ void main() {
       expect(result, '/login');
     });
 
+
     test('authenticated user hitting /login is bounced to /dashboard', () {
       final result = authRedirect(
         matchedLocation: '/login',
@@ -44,7 +45,7 @@ void main() {
     });
 
     test('unauthenticated user hitting the neutral root is NOT redirected', () {
-      final result = authRedirect(
+      final result = authRedirect(  
         matchedLocation: '/',
         isAuthenticated: false,
       );
