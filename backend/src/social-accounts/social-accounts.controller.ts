@@ -163,7 +163,17 @@ export class SocialAccountsController {
 
     if (frontendUrl) {
       const params = new URLSearchParams(result as Record<string, string>);
-      res.redirect(`${frontendUrl}/settings?${params.toString()}`);
+      // `/#/settings`, NOT `/settings`. The Flutter app uses go_router's
+      // default hash URL strategy, so `/settings` is not a real path —
+      // it is a fragment. Redirecting to the bare path hit the static
+      // host's 404 page every time, which meant EVERY OAuth outcome,
+      // success and failure alike, was discarded before the app saw it:
+      // the connected/connectError params below are read by
+      // SocialAccountsScreen (via state.uri.queryParameters) and were
+      // never arriving. It also made platform errors undiagnosable —
+      // the real cause of a failed connect could only be recovered by
+      // reading it out of the 404 page's address bar by hand.
+      res.redirect(`${frontendUrl}/#/settings?${params.toString()}`);
       return;
     }
 
