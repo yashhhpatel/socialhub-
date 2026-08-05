@@ -6,6 +6,7 @@ import { ContentModule } from './content/content.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PublishingModule } from './publishing/publishing.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { UsersModule } from './users/users.module';
 
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     SocialAccountsModule,
     ContentModule,
+    PublishingModule,
   ],
 })
 export class AppModule {}

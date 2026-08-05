@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  PublishRequest,
+  PublishResult,
   PlatformAdapter,
   PlatformCapabilities,
   PlatformName,
@@ -12,6 +14,8 @@ import {
 const AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
 const TOKEN_URL = 'https://api.x.com/2/oauth2/token';
 const ME_URL = 'https://api.x.com/2/users/me';
+const TWEETS_URL = 'https://api.x.com/2/tweets';
+const MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
 
 // offline.access is required to receive a refresh_token at all — without
 // it, the access token simply expires after 2 hours with no way to renew
@@ -192,5 +196,90 @@ export class XAdapter implements PlatformAdapter {
     const clientId = this.configService.getOrThrow<string>('X_CLIENT_ID');
     const clientSecret = this.configService.getOrThrow<string>('X_CLIENT_SECRET');
     return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  }
+
+  /**
+   * X requires the image bytes to be uploaded to ITS servers first — it
+   * will not fetch from a URL the way Instagram does. So this downloads
+   * the Cloudinary rendition, uploads it to X for a media id, then
+   * creates the post referencing that id.
+   *
+   * The extra hop is unavoidable and is the reason the two adapters look
+   * so different despite implementing the same interface: the platform
+   * capability difference is real, and hiding it behind a shared
+   * "upload" abstraction would just relocate the branching.
+   *
+   * No internal retry — see the interface's publish() contract. A retry
+   * after an ambiguous timeout on the tweet-creation step would
+   * double-post.
+   */
+  async publish(request: PublishRequest): Promise<PublishResult> {
+    const mediaId = await this.uploadMedia(request);
+
+    const response = await fetch(TWEETS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${request.accessToken}`,
+      },
+      body: JSON.stringify({
+        text: request.caption,
+        media: { media_ids: [mediaId] },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`X publish failed: ${response.status} ${await response.text()}`);
+    }
+
+    const data = (await response.json()) as { data?: { id?: string } };
+    if (!data.data?.id) {
+      throw new Error('X returned no post id.');
+    }
+    return { externalPostId: data.data.id };
+  }
+
+  /** Downloads the rendition and uploads it to X, returning a media id. */
+  private async uploadMedia(request: PublishRequest): Promise<string> {
+    const imageResponse = await fetch(request.imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(
+        `Could not fetch the rendered image for upload: ${imageResponse.status}`,
+      );
+    }
+    const bytes = await imageResponse.arrayBuffer();
+
+    const form = new FormData();
+    form.append('media', new Blob([bytes], { type: 'image/png' }), 'variant.png');
+    form.append('media_category', 'tweet_image');
+
+    const response = await fetch(MEDIA_UPLOAD_URL, {
+      method: 'POST',
+      // No Content-Type header set deliberately — fetch derives the
+      // multipart boundary itself, and setting it by hand omits the
+      // boundary and makes X reject the body as malformed.
+      headers: { Authorization: `Bearer ${request.accessToken}` },
+      body: form,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `X media upload failed: ${response.status} ${await response.text()}`,
+      );
+    }
+
+    const data = (await response.json()) as {
+      id?: string;
+      media_id_string?: string;
+      data?: { id?: string };
+    };
+    // X has shipped this response under three shapes across API
+    // versions; accept whichever arrives rather than breaking on a
+    // change that carries the same value.
+    const mediaId = data.data?.id ?? data.id ?? data.media_id_string;
+    if (!mediaId) {
+      throw new Error('X returned no media id.');
+    }
+    return mediaId;
   }
 }

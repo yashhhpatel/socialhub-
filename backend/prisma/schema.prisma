@@ -66,6 +66,18 @@ enum VariantStatus {
   failed
 }
 
+/// Lifecycle of one publish attempt. `queued`/`scheduled` exist for
+/// Phase 7's queue; Milestone 4.2 publishes synchronously, so a job goes
+/// processing -> published|failed inside the request.
+enum PublishJobStatus {
+  queued
+  scheduled
+  processing
+  published
+  failed
+  cancelled
+}
+
 enum SocialAccountStatus {
   connected
   expired
@@ -139,6 +151,7 @@ model SocialAccount {
   refreshTokenEnc   String?
   expiresAt         DateTime?
   status            SocialAccountStatus @default(connected)
+  publishJobs       PublishJob[]
   createdAt         DateTime            @default(now())
 
   // Prevents the same external Instagram/X/etc. account being connected
@@ -195,6 +208,7 @@ model ContentVariant {
   caption          String?
   hashtags         String?
   status           VariantStatus @default(pending)
+  publishJobs      PublishJob[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -206,4 +220,34 @@ model ContentVariant {
   @@unique([assetId, platform])
   @@index([assetId])
   @@map("content_variant")
+}
+
+/// One publish attempt of one variant to one connected account
+/// (Milestone 4.2).
+///
+/// A row per ATTEMPT, not per variant — republishing or rescheduling
+/// creates a new job rather than mutating the old one, so the full
+/// history of what was sent where, and what happened, is preserved. That
+/// history is what analytics attribution (Phase 10) walks back through.
+model PublishJob {
+  id              String           @id @default(uuid())
+  variantId       String
+  variant         ContentVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  socialAccountId String
+  // Restrict, not Cascade: disconnecting an account must not silently
+  // delete the record of everything ever published through it.
+  socialAccount   SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Restrict)
+  scheduledAt     DateTime?
+  status          PublishJobStatus @default(queued)
+  attemptCount    Int              @default(0)
+  lastError       String?
+  /// The platform's own id for the created post — the join key analytics
+  /// needs to pull metrics back for it (Phase 10).
+  externalPostId  String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([variantId])
+  @@map("publish_job")
 }

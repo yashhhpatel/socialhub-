@@ -76,6 +76,22 @@ export interface RefreshedTokens {
   expiresAt?: Date;
 }
 
+/** What to publish: one rendered image plus its caption. */
+export interface PublishRequest {
+  /** Publicly-reachable URL of the platform-specific rendition. */
+  imageUrl: string;
+  caption: string;
+  /** The platform's own id for the connected account. */
+  externalAccountId: string;
+  accessToken: string;
+}
+
+export interface PublishResult {
+  /** The platform's id for the created post — the join key analytics
+   * (Phase 10) uses to pull metrics back for it. */
+  externalPostId: string;
+}
+
 export interface PlatformAdapter {
   readonly platform: PlatformName;
 
@@ -120,4 +136,22 @@ export interface PlatformAdapter {
    * accordingly, not retry blindly.
    */
   refresh(refreshToken: string): Promise<RefreshedTokens>;
+
+  /**
+   * Publishes one rendition to the platform (Milestone 4.2 — the method
+   * this interface's original scope note reserved).
+   *
+   * IRREVERSIBLE: a successful call creates a real, publicly visible post
+   * on a real account. Implementations must not retry internally on an
+   * ambiguous failure (a timeout after the post may already have been
+   * created), because a blind retry double-posts. Retry policy belongs to
+   * the caller, which can see the job's attempt history — and from
+   * Phase 7, to the queue.
+   *
+   * Throws on failure with the platform's own error text preserved.
+   * Callers record that verbatim on the job's lastError: a platform
+   * rejection ("caption too long", "media not reachable") is the only
+   * thing that tells a user what to actually change.
+   */
+  publish(request: PublishRequest): Promise<PublishResult>;
 }

@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  PublishRequest,
+  PublishResult,
   PlatformAdapter,
   PlatformCapabilities,
   PlatformName,
@@ -14,6 +16,7 @@ const TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
 const LONG_LIVED_TOKEN_URL = 'https://graph.instagram.com/access_token';
 const REFRESH_URL = 'https://graph.instagram.com/refresh_access_token';
 const PROFILE_URL = 'https://graph.instagram.com/me';
+const GRAPH_BASE = 'https://graph.instagram.com';
 
 // instagram_business_basic: read profile/media.
 // instagram_business_content_publish: required for Phase 4/7's publish
@@ -195,5 +198,84 @@ export class InstagramAdapter implements PlatformAdapter {
     }
 
     return (await response.json()) as InstagramProfileResponse;
+  }
+
+  /**
+   * Two-step publish, which is simply how the Graph API works: create a
+   * media *container* describing the post, then publish that container.
+   *
+   * Instagram cannot accept a binary upload — it fetches the image from a
+   * URL you give it. That constraint is the reason Cloudinary sits in
+   * this pipeline at all (see docs/SocialHub_Architecture_Plan.md
+   * §Platform constraints), and it means `imageUrl` must be publicly
+   * reachable: a localhost URL will fail here even though it works fine
+   * in a browser.
+   *
+   * No internal retry between the two steps. If publish fails after the
+   * container was created, retrying the whole thing creates a NEW
+   * container rather than double-posting the old one — but retrying only
+   * the publish step on an ambiguous timeout could double-post, so that
+   * decision is left to the caller.
+   */
+  async publish(request: PublishRequest): Promise<PublishResult> {
+    const containerId = await this.createMediaContainer(request);
+    return { externalPostId: await this.publishContainer(request, containerId) };
+  }
+
+  private async createMediaContainer(request: PublishRequest): Promise<string> {
+    const body = new URLSearchParams({
+      image_url: request.imageUrl,
+      caption: request.caption,
+      access_token: request.accessToken,
+    });
+
+    const response = await fetch(`${GRAPH_BASE}/${request.externalAccountId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Instagram media container creation failed: ${response.status} ${await response.text()}`,
+      );
+    }
+
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) {
+      throw new Error('Instagram returned no container id.');
+    }
+    return data.id;
+  }
+
+  private async publishContainer(
+    request: PublishRequest,
+    containerId: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      creation_id: containerId,
+      access_token: request.accessToken,
+    });
+
+    const response = await fetch(
+      `${GRAPH_BASE}/${request.externalAccountId}/media_publish`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Instagram publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) {
+      throw new Error('Instagram returned no post id.');
+    }
+    return data.id;
   }
 }
