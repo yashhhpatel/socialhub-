@@ -68,7 +68,13 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
         return GestureDetector(
           onPanStart: (details) {
             controller.selectLayerAt(toArtboardSpace(details.localPosition));
+            // Brackets the drag so the whole thing is ONE undo step
+            // rather than one per pointer frame (see
+            // CanvasController.beginInteraction).
+            controller.beginInteraction();
           },
+          onPanEnd: (_) => controller.endInteraction(),
+          onPanCancel: controller.endInteraction,
           onPanUpdate: (details) {
             // details.delta is already a pixel delta, not an absolute
             // position — dividing by scale converts it to an artboard-

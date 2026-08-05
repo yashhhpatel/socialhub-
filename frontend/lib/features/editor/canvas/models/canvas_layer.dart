@@ -48,6 +48,87 @@ sealed class CanvasLayer {
     double? rotationDegrees,
     double? opacity,
   });
+
+  /// Serializes to the persisted canvas-JSON shape sent to
+  /// `PATCH /content/assets/:id` (Milestone 3.5 autosave).
+  ///
+  /// The backend deliberately validates `layers` only as an array of
+  /// unknown-shaped entries (see backend dto/canvas-json.dto.ts) — the
+  /// layer schema is the editor's contract to own, which is exactly what
+  /// this method and [fromJson] define. Keep the two in lockstep: every
+  /// field written here must be read back there, or a reload silently
+  /// drops user work.
+  Map<String, dynamic> toJson();
+
+  /// Fields shared by every subtype. Subtype [toJson] implementations
+  /// spread this and add their own — so adding a field to the base class
+  /// can't be forgotten in three separate places.
+  Map<String, dynamic> geometryJson(String type) => {
+        'type': type,
+        'id': id,
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+        'rotationDegrees': rotationDegrees,
+        'opacity': opacity,
+      };
+
+  /// Rebuilds a layer from persisted JSON, dispatching on the `type`
+  /// discriminator written by [toJson].
+  ///
+  /// Throws [FormatException] on an unknown type rather than skipping the
+  /// layer: silently dropping one is the worse failure — the user would
+  /// reload a design and find part of it simply gone, with nothing
+  /// indicating why. A loud failure is recoverable; a silent one isn't.
+  static CanvasLayer fromJson(Map<String, dynamic> json) {
+    final type = json['type'];
+    return switch (type) {
+      'image' => ImageCanvasLayer(
+          id: json['id'] as String,
+          x: _double(json['x']),
+          y: _double(json['y']),
+          width: _double(json['width']),
+          height: _double(json['height']),
+          rotationDegrees: _double(json['rotationDegrees']),
+          opacity: _double(json['opacity'], fallback: 1),
+          imageUrl: json['imageUrl'] as String,
+        ),
+      'text' => TextCanvasLayer(
+          id: json['id'] as String,
+          x: _double(json['x']),
+          y: _double(json['y']),
+          width: _double(json['width']),
+          height: _double(json['height']),
+          rotationDegrees: _double(json['rotationDegrees']),
+          opacity: _double(json['opacity'], fallback: 1),
+          text: json['text'] as String,
+          fontSize: _double(json['fontSize'], fallback: 24),
+          color: Color(json['color'] as int),
+          fontFamily: json['fontFamily'] as String?,
+        ),
+      'shape' => ShapeCanvasLayer(
+          id: json['id'] as String,
+          x: _double(json['x']),
+          y: _double(json['y']),
+          width: _double(json['width']),
+          height: _double(json['height']),
+          rotationDegrees: _double(json['rotationDegrees']),
+          opacity: _double(json['opacity'], fallback: 1),
+          shapeKind: ShapeKind.values.byName(json['shapeKind'] as String),
+          fillColor: Color(json['fillColor'] as int),
+        ),
+      _ => throw FormatException('Unknown canvas layer type: $type'),
+    };
+  }
+
+  /// JSON numbers arrive as `int` whenever they happen to be whole (1080,
+  /// not 1080.0), so a blind `as double` cast throws on perfectly valid
+  /// persisted data. Always parse through this.
+  static double _double(Object? value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return fallback;
+  }
 }
 
 class ImageCanvasLayer extends CanvasLayer {
@@ -94,6 +175,12 @@ class ImageCanvasLayer extends CanvasLayer {
         opacity: opacity,
         imageUrl: newImageUrl,
       );
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...geometryJson('image'),
+        'imageUrl': imageUrl,
+      };
 }
 
 class TextCanvasLayer extends CanvasLayer {
@@ -166,6 +253,15 @@ class TextCanvasLayer extends CanvasLayer {
         color: color,
         fontFamily: fontFamily,
       );
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...geometryJson('text'),
+        'text': text,
+        'fontSize': fontSize,
+        'color': color.toARGB32(),
+        'fontFamily': fontFamily,
+      };
 }
 
 enum ShapeKind { rectangle, ellipse }
@@ -218,4 +314,11 @@ class ShapeCanvasLayer extends CanvasLayer {
         shapeKind: shapeKind,
         fillColor: newFillColor,
       );
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...geometryJson('shape'),
+        'shapeKind': shapeKind.name,
+        'fillColor': fillColor.toARGB32(),
+      };
 }

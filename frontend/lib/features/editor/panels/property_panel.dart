@@ -146,7 +146,11 @@ class _PropertyFields extends StatelessWidget {
         _SectionLabel('Opacity'),
         Slider(
           value: layer.opacity.clamp(0.0, 1.0),
+          // Bracketed like the canvas drag: dragging the slider streams
+          // dozens of updates that must collapse into one undo step.
+          onChangeStart: (_) => controller.beginInteraction(),
           onChanged: (v) => controller.updateSelectedLayerGeometry(opacity: v),
+          onChangeEnd: (_) => controller.endInteraction(),
         ),
         if (layer is ShapeCanvasLayer || layer is TextCanvasLayer) ...[
           const SizedBox(height: SpacingTokens.md),

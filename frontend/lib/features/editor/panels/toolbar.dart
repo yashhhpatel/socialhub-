@@ -5,6 +5,7 @@ import '../../../core/theme/tokens/spacing_tokens.dart';
 import '../canvas/models/canvas_document.dart';
 import '../canvas/models/canvas_layer.dart';
 import '../canvas/state/canvas_controller.dart';
+import '../state/autosave_controller.dart';
 
 /// SCOPE NOTE: add-layer actions only, per this milestone. Deliberately
 /// NOT here yet: image upload (needs Milestone 3.2's Cloudinary endpoint
@@ -12,9 +13,15 @@ import '../canvas/state/canvas_controller.dart';
 /// undo/redo (Milestone 3.5), alignment/smart guides (later Phase 3
 /// milestones per the blueprint's phase-level feature list).
 class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
-  const EditorToolbar({super.key, required this.document});
+  const EditorToolbar({super.key, required this.document, this.autosaveStatus});
 
   final CanvasDocument document;
+
+  /// Null when the editor is running without a backing asset (the blank
+  /// scratch document EditorScreen defaults to) — there's nothing to save
+  /// to, so no indicator is shown rather than one permanently reading
+  /// "unsaved".
+  final AutosaveStatus? autosaveStatus;
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -82,9 +89,62 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
+            const VerticalDivider(width: SpacingTokens.md, indent: 12, endIndent: 12),
+            _ToolbarButton(
+              icon: Icons.undo,
+              tooltip: 'Undo (Ctrl+Z)',
+              onPressed: state.canUndo ? controller.undo : null,
+            ),
+            _ToolbarButton(
+              icon: Icons.redo,
+              tooltip: 'Redo (Ctrl+Y)',
+              onPressed: state.canRedo ? controller.redo : null,
+            ),
+            const Spacer(),
+            if (autosaveStatus != null) _AutosaveIndicator(status: autosaveStatus!),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Small textual save-state readout. Text rather than a bare spinner:
+/// "is my work saved" is a question users ask explicitly, and a spinner
+/// alone doesn't distinguish "saving" from "failed to save".
+class _AutosaveIndicator extends StatelessWidget {
+  const _AutosaveIndicator({required this.status});
+
+  final AutosaveStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final (label, color) = switch (status) {
+      AutosaveStatus.idle => ('', theme.colorScheme.onSurfaceVariant),
+      AutosaveStatus.pending => ('Unsaved changes', theme.colorScheme.onSurfaceVariant),
+      AutosaveStatus.saving => ('Saving…', theme.colorScheme.onSurfaceVariant),
+      AutosaveStatus.saved => ('All changes saved', theme.colorScheme.onSurfaceVariant),
+      AutosaveStatus.error => ('Save failed — will retry', theme.colorScheme.error),
+    };
+
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (status == AutosaveStatus.saving)
+          const Padding(
+            padding: EdgeInsets.only(right: SpacingTokens.sm),
+            child: SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        Text(label, style: theme.textTheme.bodySmall?.copyWith(color: color)),
+      ],
     );
   }
 }
@@ -94,7 +154,11 @@ class _ToolbarButton extends StatelessWidget {
 
   final IconData icon;
   final String tooltip;
-  final VoidCallback onPressed;
+
+  /// Nullable so undo/redo can render as genuinely disabled (greyed,
+  /// unclickable) when there's nothing to step to, rather than looking
+  /// available and silently doing nothing.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
