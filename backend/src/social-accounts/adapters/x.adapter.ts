@@ -64,6 +64,14 @@ export class XAdapter implements PlatformAdapter {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 280, // free/basic tier; Pro tier allows up to 25,000
       maxVideoDurationSeconds: 140,
+      imageSpec: {
+        // 16:9 — X crops taller images in the timeline preview, so
+        // rendering to the ratio it actually displays avoids the subject
+        // being cut off before anyone clicks through.
+        width: 1600,
+        height: 900,
+        aspectRatio: '16:9',
+      },
       rateLimit: {
         // See class doc comment — placeholder under the pay-per-use model.
         requests: 50,

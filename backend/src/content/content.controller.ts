@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -18,9 +20,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CloudinaryService } from '../media/cloudinary.service';
 import { ContentService } from './content.service';
 import { ContentAssetDto } from './dto/content-asset.dto';
+import { GenerateVariantsResponseDto } from './dto/content-variant.dto';
 import { CreateContentAssetDto } from './dto/create-content-asset.dto';
+import { GenerateVariantsDto } from './dto/generate-variants.dto';
 import { UpdateContentAssetDto } from './dto/update-content-asset.dto';
 import { UploadMediaResponseDto } from './dto/upload-media-response.dto';
+import { VariantGeneratorService } from './variant-generator.service';
 
 interface AuthenticatedRequest extends Request {
   user: { userId: string; email: string; role: string; orgId: string };
@@ -34,6 +39,7 @@ export class ContentController {
   constructor(
     private readonly contentService: ContentService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly variantGenerator: VariantGeneratorService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -105,6 +111,31 @@ export class ContentController {
     }
 
     const result = await this.cloudinaryService.uploadImage(file);
-    return { url: result.url };
+    return { url: result.url, publicId: result.publicId };
+  }
+
+  /**
+   * Fans one asset out into per-platform renditions (Milestone 4.1).
+   *
+   * 202, not 201, per docs/SocialHub_REST_API_Design.md. Generation is
+   * synchronous today — Cloudinary applies the transform lazily on first
+   * delivery, so there's nothing to wait for — but Phase 7 moves this
+   * onto a queue. Publishing the async-shaped contract now means the
+   * frontend written against it needs no change then, and 202 does not
+   * promise the work is incomplete, only that it was accepted.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/variants')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async generateVariants(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: GenerateVariantsDto,
+  ): Promise<GenerateVariantsResponseDto> {
+    // Scoped lookup first, so an asset belonging to another org 404s
+    // before any generation work is attempted.
+    const asset = await this.contentService.findByIdScoped(id, req.user.orgId);
+    const variants = await this.variantGenerator.generate(asset, dto.platforms);
+    return { variants };
   }
 }

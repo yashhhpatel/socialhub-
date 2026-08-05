@@ -66,6 +66,15 @@ export class InstagramAdapter implements PlatformAdapter {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 2200,
       maxVideoDurationSeconds: 900, // Reels; feed video limits are shorter but this is the ceiling
+      imageSpec: {
+        // Square feed post. Instagram also accepts 4:5 (1080x1350) and
+        // 1.91:1, but 1:1 is the one that displays acceptably in every
+        // surface (feed, profile grid, explore) without being re-cropped
+        // by Instagram itself.
+        width: 1080,
+        height: 1080,
+        aspectRatio: '1:1',
+      },
       rateLimit: {
         // Business Use Case rate limit: 200 calls/hour per user, per
         // Meta's current published limit.

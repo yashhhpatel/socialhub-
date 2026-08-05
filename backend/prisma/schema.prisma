@@ -57,6 +57,15 @@ enum Platform {
   linkedin
 }
 
+/// Lifecycle of a per-platform rendition. `pending` exists because
+/// generation becomes asynchronous in Phase 7 (queue-backed); until then
+/// variants reach `ready` within the same request.
+enum VariantStatus {
+  pending
+  ready
+  failed
+}
+
 enum SocialAccountStatus {
   connected
   expired
@@ -151,11 +160,50 @@ model ContentAsset {
   // at the API boundary (see content/dto/canvas-json.dto.ts), not by
   // the database.
   canvasJson     Json
+  // Flattened render of canvasJson, produced by the editor (which owns
+  // the canvas rendering engine) and uploaded via POST
+  // /content/assets/upload. Variant generation crops/resizes THIS, per
+  // platform — the backend never rasterizes canvasJson itself, which
+  // would mean maintaining a second rendering engine that could
+  // visually diverge from the one users actually see.
+  //
+  // publicId is stored alongside the URL because Cloudinary
+  // transformations are addressed by public id, not by parsing a
+  // delivery URL apart.
+  masterImageUrl      String?
+  masterImagePublicId String?
   approvalStatus ApprovalStatus   @default(draft)
+  variants       ContentVariant[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([orgId])
   @@index([orgId, approvalStatus])
   @@map("content_asset")
+}
+
+/// Per-platform rendition of a ContentAsset — the "publish everywhere"
+/// fan-out described in docs/SocialHub_Database_Design.md §Relationships.
+/// One asset produces N variants, and analytics later attribute back
+/// through this row to the original asset.
+model ContentVariant {
+  id               String        @id @default(uuid())
+  assetId          String
+  asset            ContentAsset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  platform         Platform
+  renderedMediaUrl String?
+  caption          String?
+  hashtags         String?
+  status           VariantStatus @default(pending)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Not in the database-design doc, which specifies only @@index([assetId]).
+  // Added because regenerating variants for an asset must UPDATE the
+  // existing row per platform rather than accumulate duplicates — without
+  // this constraint, pressing "generate" twice would silently create two
+  // Instagram variants and leave publish targeting ambiguous.
+  @@unique([assetId, platform])
+  @@index([assetId])
+  @@map("content_variant")
 }

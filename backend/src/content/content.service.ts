@@ -57,6 +57,15 @@ export class ContentService {
         ...(dto.canvasJson
           ? { canvasJson: dto.canvasJson as unknown as Prisma.InputJsonValue }
           : {}),
+        // Spread conditionally, same as canvasJson: a PATCH that only
+        // autosaves canvas state must not null out an existing master
+        // render just because it didn't mention one.
+        ...(dto.masterImageUrl !== undefined
+          ? { masterImageUrl: dto.masterImageUrl }
+          : {}),
+        ...(dto.masterImagePublicId !== undefined
+          ? { masterImagePublicId: dto.masterImagePublicId }
+          : {}),
       },
     });
   }

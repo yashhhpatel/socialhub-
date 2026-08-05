@@ -29,11 +29,34 @@ export interface PlatformRateLimit {
   windowSeconds: number;
 }
 
+/**
+ * Target pixel dimensions for a published still image on this platform.
+ *
+ * Added in Milestone 4.1: variant generation needs to know what size to
+ * render for each platform, and the capabilities() contract is already
+ * the designated home for "static, platform-specific limits" — putting
+ * dimensions anywhere else would mean two competing sources of truth for
+ * what a platform accepts.
+ *
+ * One canonical size per platform, not a list of every permitted ratio.
+ * Platforms accept several (Instagram alone takes 1:1, 4:5 and 1.91:1);
+ * picking the single safest default keeps this milestone's scope to
+ * "resize per platform spec" rather than a user-facing crop-ratio
+ * chooser, which belongs with the publish preview UI in Milestone 4.3.
+ */
+export interface PlatformImageSpec {
+  width: number;
+  height: number;
+  /** Human-readable, for previews and validation messages (e.g. '1:1'). */
+  aspectRatio: string;
+}
+
 export interface PlatformCapabilities {
   supportedMediaTypes: PlatformMediaType[];
   maxCaptionLength: number;
   /** Undefined for platforms with no video support at all. */
   maxVideoDurationSeconds?: number;
+  imageSpec: PlatformImageSpec;
   rateLimit: PlatformRateLimit;
 }
 
