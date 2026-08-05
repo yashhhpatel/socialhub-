@@ -1,0 +1,273 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/api_error_message.dart';
+import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../domain/entities/publish_models.dart';
+import '../state/publish_controller.dart';
+
+/// Publish modal (Milestone 4.3) — pick a rendition + destination, see a
+/// preview of exactly what will be posted, publish, and watch the result.
+///
+/// Shows the real rendered variant image rather than the editor canvas:
+/// the whole point of per-platform variants is that Instagram gets 1:1
+/// and X gets 16:9, so a preview of the un-cropped design would hide the
+/// one thing the user most needs to check before posting publicly.
+Future<void> showPublishModal(BuildContext context, String assetId) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
+        child: _PublishModal(assetId: assetId),
+      ),
+    ),
+  );
+}
+
+class _PublishModal extends ConsumerStatefulWidget {
+  const _PublishModal({required this.assetId});
+
+  final String assetId;
+
+  @override
+  ConsumerState<_PublishModal> createState() => _PublishModalState();
+}
+
+class _PublishModalState extends ConsumerState<_PublishModal> {
+  int? _selectedPairIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = ref.watch(publishOptionsProvider(widget.assetId));
+    final publish = ref.watch(publishControllerProvider);
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Publish', style: theme.textTheme.headlineSmall)),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: publish.inFlight ? null : () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Flexible(
+            child: switch (publish.phase) {
+              PublishPhase.succeeded => _PublishSucceeded(job: publish.job!),
+              PublishPhase.failed => _PublishFailed(
+                  error: publish.error ?? 'Publish failed.',
+                  onRetry: () => ref.read(publishControllerProvider.notifier).reset(),
+                ),
+              _ => options.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text(describeApiError(e))),
+                  data: (data) => _PairPicker(
+                    options: data,
+                    selectedIndex: _selectedPairIndex,
+                    onSelect: (i) => setState(() => _selectedPairIndex = i),
+                  ),
+                ),
+            },
+          ),
+          if (publish.phase == PublishPhase.idle ||
+              publish.phase == PublishPhase.publishing) ...[
+            const SizedBox(height: SpacingTokens.lg),
+            options.maybeWhen(
+              data: (data) {
+                final pairs = data.publishablePairs;
+                final canPublish = _selectedPairIndex != null && !publish.inFlight;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: canPublish
+                          ? () {
+                              final pair = pairs[_selectedPairIndex!];
+                              ref.read(publishControllerProvider.notifier).publish(
+                                    variantId: pair.variant.id,
+                                    socialAccountId: pair.target.id,
+                                  );
+                            }
+                          : null,
+                      icon: publish.inFlight
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send, size: 18),
+                      label: Text(publish.inFlight ? 'Publishing…' : 'Publish now'),
+                    ),
+                  ],
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PairPicker extends StatelessWidget {
+  const _PairPicker({
+    required this.options,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+
+  final PublishOptions options;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final pairs = options.publishablePairs;
+    final theme = Theme.of(context);
+
+    if (pairs.isEmpty) {
+      // Be specific about WHICH precondition is missing — "nothing to
+      // publish" leaves the user guessing between two very different
+      // fixes.
+      final hasReadyVariant = options.variants.any((v) => v.isReady);
+      final hasConnectedAccount = options.targets.any((t) => t.isConnected);
+      final reason = !hasReadyVariant
+          ? 'This design has no platform variants yet. Export it, then use '
+              '"Generate variants" in the editor.'
+          : !hasConnectedAccount
+              ? 'No connected accounts. Connect one under Settings first.'
+              : 'Your variants and connected accounts are for different '
+                  'platforms. Generate a variant for a platform you have '
+                  'connected.';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: Text(reason, textAlign: TextAlign.center),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      itemCount: pairs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: SpacingTokens.sm),
+      itemBuilder: (context, index) {
+        final pair = pairs[index];
+        final selected = selectedIndex == index;
+        return InkWell(
+          onTap: () => onSelect(index),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.all(SpacingTokens.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected ? theme.colorScheme.primary : theme.dividerColor,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                // The actual rendition that will be posted, at the
+                // platform's own aspect ratio.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    pair.variant.renderedMediaUrl!,
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: Icon(Icons.broken_image_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: SpacingTokens.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(pair.variant.platform, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        'to ${pair.target.externalAccountId}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (selected) Icon(Icons.check_circle, color: theme.colorScheme.primary),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PublishSucceeded extends StatelessWidget {
+  const _PublishSucceeded({required this.job});
+
+  final PublishJob job;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_outline, size: 44, color: theme.colorScheme.primary),
+          const SizedBox(height: SpacingTokens.md),
+          Text('Published', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.xs),
+          if (job.externalPostId != null)
+            Text('Post id: ${job.externalPostId}', style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _PublishFailed extends StatelessWidget {
+  const _PublishFailed({required this.error, required this.onRetry});
+
+  final String error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 44, color: theme.colorScheme.error),
+            const SizedBox(height: SpacingTokens.md),
+            Text('Publish failed', style: theme.textTheme.titleMedium),
+            const SizedBox(height: SpacingTokens.sm),
+            // The platform's own words — "caption too long", "media not
+            // reachable" — are what tell the user what to change.
+            Text(error, textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+            const SizedBox(height: SpacingTokens.md),
+            OutlinedButton(onPressed: onRetry, child: const Text('Back')),
+          ],
+        ),
+      ),
+    );
+  }
+}

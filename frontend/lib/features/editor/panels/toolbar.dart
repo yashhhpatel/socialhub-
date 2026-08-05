@@ -22,6 +22,7 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
     this.onBack,
     this.onExport,
     this.onGenerateVariants,
+    this.onPublish,
   });
 
   final CanvasDocument document;
@@ -32,6 +33,7 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback? onBack;
   final Future<void> Function()? onExport;
   final VoidCallback? onGenerateVariants;
+  final VoidCallback? onPublish;
 
   /// Null when the editor is running without a backing asset (the blank
   /// scratch document EditorScreen defaults to) — there's nothing to save
@@ -146,6 +148,12 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
                       )
                     : const Icon(Icons.auto_awesome_motion, size: 18),
                 label: const Text('Generate variants'),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              FilledButton.icon(
+                onPressed: actionState?.busy == true ? null : onPublish,
+                icon: const Icon(Icons.send, size: 18),
+                label: const Text('Publish'),
               ),
               const SizedBox(width: SpacingTokens.md),
             ],

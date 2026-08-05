@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_error_message.dart';
+import '../publish/presentation/widgets/publish_modal.dart';
 import 'canvas/models/canvas_document.dart';
 import 'canvas/state/canvas_controller.dart';
 import 'canvas/widgets/canvas_surface.dart';
@@ -127,6 +128,7 @@ class _EditorWorkspace extends ConsumerWidget {
             },
             onGenerateVariants: () =>
                 ref.read(editorActionsProvider(assetId).notifier).generateVariants(),
+            onPublish: () => showPublishModal(context, assetId),
           ),
           body: Row(
             children: [
