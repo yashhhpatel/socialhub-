@@ -259,7 +259,14 @@ class TextCanvasLayer extends CanvasLayer {
         ...geometryJson('text'),
         'text': text,
         'fontSize': fontSize,
-        'color': color.toARGB32(),
+        // `.value`, not `.toARGB32()` — the latter only exists from
+        // Flutter 3.27, and pubspec.yaml declares a floor of 3.22.0.
+        // Using it made this file uncompilable on the project's own
+        // minimum supported SDK. `.value` works across the whole
+        // supported range (it carries a deprecation notice on newer
+        // SDKs, but that's an info, not a build failure).
+        // ignore: deprecated_member_use
+        'color': color.value,
         'fontFamily': fontFamily,
       };
 }
@@ -319,6 +326,9 @@ class ShapeCanvasLayer extends CanvasLayer {
   Map<String, dynamic> toJson() => {
         ...geometryJson('shape'),
         'shapeKind': shapeKind.name,
-        'fillColor': fillColor.toARGB32(),
+        // See the note on TextCanvasLayer.toJson — `.value` for 3.22
+        // compatibility.
+        // ignore: deprecated_member_use
+        'fillColor': fillColor.value,
       };
 }
