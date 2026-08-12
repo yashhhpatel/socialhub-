@@ -66,6 +66,16 @@ enum VariantStatus {
   failed
 }
 
+/// AI features metered against an org's plan quota (Milestone 5.2).
+/// Mirrors docs/SocialHub_Database_Design.md §6.
+enum AIFeature {
+  caption
+  hashtags
+  tone
+  viral_score
+  best_time
+}
+
 /// Lifecycle of one publish attempt. `queued`/`scheduled` exist for
 /// Phase 7's queue; Milestone 4.2 publishes synchronously, so a job goes
 /// processing -> published|failed inside the request.
@@ -105,6 +115,7 @@ model Organization {
   users            User[]
   socialAccounts   SocialAccount[]
   contentAssets    ContentAsset[]
+  aiUsageLogs      AIUsageLog[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
@@ -250,4 +261,33 @@ model PublishJob {
   @@index([status, scheduledAt])
   @@index([variantId])
   @@map("publish_job")
+}
+
+/// Per-org AI consumption, one row per generation (Milestone 5.1).
+///
+/// Written on SUCCESS only. A failed provider call costs the org nothing,
+/// so charging quota for it would let an outage silently burn a customer's
+/// monthly allowance — see AiGatewayService.
+///
+/// Token counts are recorded per call rather than derived later: the
+/// provider reports actual usage (including cache reads), and that number
+/// cannot be reconstructed from the prompt afterwards.
+model AIUsageLog {
+  id           String       @id @default(uuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  userId       String?
+  feature      AIFeature
+  inputTokens  Int          @default(0)
+  outputTokens Int          @default(0)
+  /// The model that served the request — kept so a later cost analysis can
+  /// price historical usage correctly after a model migration.
+  model        String
+  createdAt    DateTime     @default(now())
+
+  // Composite, in this order, because every quota question is
+  // "how much has THIS org used SINCE some point" — org first narrows to
+  // the tenant, createdAt then serves the window as a range scan.
+  @@index([orgId, createdAt])
+  @@map("ai_usage_log")
 }
