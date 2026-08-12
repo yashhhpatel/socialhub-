@@ -6,6 +6,7 @@ import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiController } from './ai.controller';
 import { AiGatewayService } from './ai-gateway.service';
 import { CaptionService } from './caption.service';
+import { QuotaGuard } from './quota.guard';
 
 /**
  * ContentModule is imported (not duplicated) because it exports
@@ -17,7 +18,13 @@ import { CaptionService } from './caption.service';
 @Module({
   imports: [ContentModule],
   controllers: [AiController],
-  providers: [AiGatewayService, CaptionService, InstagramAdapter, XAdapter],
+  providers: [
+    AiGatewayService,
+    CaptionService,
+    QuotaGuard,
+    InstagramAdapter,
+    XAdapter,
+  ],
   exports: [AiGatewayService],
 })
 export class AiModule {}

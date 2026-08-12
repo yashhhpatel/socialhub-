@@ -7,6 +7,7 @@ import {
   GenerateCaptionDto,
   GenerateCaptionResponseDto,
 } from './dto/generate-caption.dto';
+import { QuotaGuard } from './quota.guard';
 
 interface AuthenticatedRequest extends Request {
   user: { userId: string; email: string; role: string; orgId: string };
@@ -21,9 +22,12 @@ export class AiController {
    *
    * 200, not 202: unlike variant generation and publishing, this returns
    * the actual result the caller asked for and there is no job to poll.
-   * Quota enforcement (429 with a reset time) arrives in Milestone 5.2.
+   *
+   * QuotaGuard runs after JwtAuthGuard (which populates the `orgId` it
+   * meters on) and before the handler, so an org over its allowance is
+   * turned away with a 429 and a resetAt before any tokens are spent.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, QuotaGuard)
   @Post('caption')
   async generateCaption(
     @Req() req: AuthenticatedRequest,
