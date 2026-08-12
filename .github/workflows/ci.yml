@@ -102,7 +102,13 @@ jobs:
           # `node-version: '20'` resolves to the runner's cached Node 20,
           # so `npm ci` died in preinstall before installing anything.
           # Node 20 also reached end of life in April 2026.
-          node-version: '22'
+          #
+          # Pinned to the minor, not the bare major: setup-node prefers a
+          # matching version already in the runner's tool cache over
+          # downloading the newest, so a floating '22' can still land on
+          # 22.0–22.11 and trip the very same gate. 22.12 is also the
+          # version this project is developed and verified against.
+          node-version: '22.12'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
