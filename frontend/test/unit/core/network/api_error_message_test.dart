@@ -36,10 +36,13 @@ void main() {
     });
 
     test('joins the array class-validator returns for multi-field failures', () {
-      final error = _withBody({
-        'message': ['Select at least one platform.', 'Unknown platform.'],
-        'statusCode': 400,
-      }, status: 400);
+      final error = _withBody(
+        {
+          'message': ['Select at least one platform.', 'Unknown platform.'],
+          'statusCode': 400,
+        },
+        status: 400,
+      );
 
       final result = describeApiError(error);
 

@@ -94,7 +94,7 @@ class _PropertyFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel('Position'),
+        const _SectionLabel('Position'),
         Row(
           children: [
             Expanded(
@@ -115,7 +115,7 @@ class _PropertyFields extends StatelessWidget {
           ],
         ),
         const SizedBox(height: SpacingTokens.md),
-        _SectionLabel('Size'),
+        const _SectionLabel('Size'),
         Row(
           children: [
             Expanded(
@@ -136,14 +136,14 @@ class _PropertyFields extends StatelessWidget {
           ],
         ),
         const SizedBox(height: SpacingTokens.md),
-        _SectionLabel('Rotation'),
+        const _SectionLabel('Rotation'),
         _NumberField(
           label: 'Degrees',
           value: layer.rotationDegrees,
           onChanged: (v) => controller.updateSelectedLayerGeometry(rotationDegrees: v),
         ),
         const SizedBox(height: SpacingTokens.md),
-        _SectionLabel('Opacity'),
+        const _SectionLabel('Opacity'),
         Slider(
           value: layer.opacity.clamp(0.0, 1.0),
           // Bracketed like the canvas drag: dragging the slider streams
@@ -154,7 +154,7 @@ class _PropertyFields extends StatelessWidget {
         ),
         if (layer is ShapeCanvasLayer || layer is TextCanvasLayer) ...[
           const SizedBox(height: SpacingTokens.md),
-          _SectionLabel('Color'),
+          const _SectionLabel('Color'),
           _ColorSwatchRow(
             selectedColor: switch (layer) {
               ShapeCanvasLayer(:final fillColor) => fillColor,
