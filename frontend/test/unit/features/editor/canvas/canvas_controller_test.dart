@@ -9,7 +9,7 @@ void main() {
     late CanvasDocument document;
 
     setUp(() {
-      document = CanvasDocument(
+      document = const CanvasDocument(
         width: 1080,
         height: 1080,
         layers: [

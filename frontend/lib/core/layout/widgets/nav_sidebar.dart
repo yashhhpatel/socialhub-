@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../theme/tokens/spacing_tokens.dart';
 import '../nav_destination_data.dart';

@@ -1,3 +1,7 @@
+// Intentional: this project targets Flutter Web only, and `connect()` needs a
+// true same-tab document navigation that `url_launcher` cannot express. See
+// the class comment below.
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

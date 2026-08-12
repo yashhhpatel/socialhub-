@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:socialhub/features/editor/canvas/hit_testing.dart';
 import 'package:socialhub/features/editor/canvas/models/canvas_layer.dart';
 
 void main() {
   group('layerContainsPoint (unrotated)', () {
-    final layer = ShapeCanvasLayer(
+    const layer = ShapeCanvasLayer(
       id: 'layer_1',
       x: 100,
       y: 100,
@@ -34,7 +33,7 @@ void main() {
     // it's square and centered, rotation doesn't change its footprint —
     // this isolates whether the rotation math is being applied at all
     // without needing to reason about a rotated rectangle's new bounds.
-    final squareLayer = ShapeCanvasLayer(
+    const squareLayer = ShapeCanvasLayer(
       id: 'square',
       x: 80,
       y: 80,
@@ -54,7 +53,7 @@ void main() {
     // ORIGINAL (unrotated) bounds, but is outside the visually-rotated
     // footprint, must miss — and vice versa. This is what actually
     // proves the rotation transform is correct, not just present.
-    final tallLayer = ShapeCanvasLayer(
+    const tallLayer = ShapeCanvasLayer(
       id: 'tall',
       x: 90, // center x = 90 + 10 = 100
       y: 50, // center y = 50 + 50 = 100
@@ -80,14 +79,14 @@ void main() {
 
   group('hitTestLayers', () {
     test('returns null when no layer contains the point', () {
-      final layers = [
+      const layers = [
         ShapeCanvasLayer(id: 'a', x: 0, y: 0, width: 10, height: 10, shapeKind: ShapeKind.rectangle),
       ];
       expect(hitTestLayers(layers, const Offset(500, 500)), isNull);
     });
 
     test('returns the TOPMOST (last in list) layer when overlapping layers both contain the point', () {
-      final bottom = ShapeCanvasLayer(
+      const bottom = ShapeCanvasLayer(
         id: 'bottom',
         x: 0,
         y: 0,
@@ -95,7 +94,7 @@ void main() {
         height: 100,
         shapeKind: ShapeKind.rectangle,
       );
-      final top = ShapeCanvasLayer(
+      const top = ShapeCanvasLayer(
         id: 'top',
         x: 20,
         y: 20,
@@ -109,7 +108,7 @@ void main() {
     });
 
     test('falls through to a lower layer if the point misses the topmost one', () {
-      final bottom = ShapeCanvasLayer(
+      const bottom = ShapeCanvasLayer(
         id: 'bottom',
         x: 0,
         y: 0,
@@ -117,7 +116,7 @@ void main() {
         height: 100,
         shapeKind: ShapeKind.rectangle,
       );
-      final top = ShapeCanvasLayer(
+      const top = ShapeCanvasLayer(
         id: 'top',
         x: 20,
         y: 20,

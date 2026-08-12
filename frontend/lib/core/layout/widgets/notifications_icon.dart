@@ -16,9 +16,9 @@ class NotificationsIcon extends StatelessWidget {
           const SnackBar(content: Text('Notifications are coming soon.')),
         );
       },
-      icon: Badge(
-        label: const Text('3'),
-        child: const Icon(Icons.notifications_outlined),
+      icon: const Badge(
+        label: Text('3'),
+        child: Icon(Icons.notifications_outlined),
       ),
     );
   }
