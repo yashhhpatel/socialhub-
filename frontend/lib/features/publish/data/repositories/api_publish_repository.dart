@@ -34,10 +34,18 @@ class ApiPublishRepository implements PublishRepository {
   Future<PublishJob> publishNow({
     required String variantId,
     required String socialAccountId,
+    String? caption,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/publish/now',
-      data: {'variantId': variantId, 'socialAccountId': socialAccountId},
+      data: {
+        'variantId': variantId,
+        'socialAccountId': socialAccountId,
+        // Omitted when null, not sent as null: ValidationPipe runs with
+        // forbidNonWhitelisted, and the DTO marks caption @IsOptional.
+        // An empty string IS sent — it means "post without a caption".
+        if (caption != null) 'caption': caption,
+      },
     );
 
     // POST /publish/now returns only { jobId, status } — read the full

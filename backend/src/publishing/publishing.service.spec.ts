@@ -98,6 +98,58 @@ describe('PublishingService', () => {
     });
   });
 
+  describe('publishNow — caption resolution (Milestone 5.3)', () => {
+    it('falls back to the variant\'s stored caption when none is supplied', async () => {
+      await service.publishNow('org_1', 'var_1', 'sa_1');
+
+      expect(xAdapter.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ caption: 'Hello world' }),
+      );
+    });
+
+    it('prefers the caption supplied with the request over the stored one', async () => {
+      await service.publishNow('org_1', 'var_1', 'sa_1', 'Freshly generated caption');
+
+      expect(xAdapter.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ caption: 'Freshly generated caption' }),
+      );
+    });
+
+    it('treats an empty caption as a deliberate choice, not a fallback trigger', async () => {
+      // `??` not `||` — clearing the field must post without a caption
+      // rather than silently resurrecting the variant's older text.
+      await service.publishNow('org_1', 'var_1', 'sa_1', '');
+
+      expect(xAdapter.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ caption: '' }),
+      );
+    });
+
+    it('sends an empty string when neither the request nor the variant has one', async () => {
+      prisma.contentVariant.findUnique.mockResolvedValue({
+        ...readyVariant,
+        caption: null,
+      });
+
+      await service.publishNow('org_1', 'var_1', 'sa_1');
+
+      expect(xAdapter.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ caption: '' }),
+      );
+    });
+
+    it('does not write the request caption back onto the variant', async () => {
+      // The caption belongs to this attempt. Persisting it is a separate
+      // concern with its own endpoint, and this service must not quietly
+      // take it on.
+      await service.publishNow('org_1', 'var_1', 'sa_1', 'Just for this post');
+
+      expect(
+        (prisma.contentVariant as unknown as { update?: jest.Mock }).update,
+      ).toBeUndefined();
+    });
+  });
+
   describe('publishNow — failure handling', () => {
     it("records the platform's own error text verbatim, not a generic message", async () => {
       xAdapter.publish.mockRejectedValue(new Error('X publish failed: 403 caption too long'));
