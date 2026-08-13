@@ -17,5 +17,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis backs the BullMQ publish/schedule queues (Milestone 7.1).
+  # appendonly persistence so an enqueued-but-not-yet-processed publish job
+  # survives a Redis restart rather than silently vanishing.
+  redis:
+    image: redis:7-alpine
+    container_name: socialhub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - socialhub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   socialhub_postgres_data:
+  socialhub_redis_data:

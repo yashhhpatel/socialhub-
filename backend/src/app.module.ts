@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
+import { QueueModule } from './queue/queue.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { UsersModule } from './users/users.module';
 
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
   imports: [
     ConfigModule,
     PrismaModule,
+    QueueModule,
     HealthModule,
     UsersModule,
     OrganizationsModule,
