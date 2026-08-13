@@ -308,6 +308,67 @@ export class PublishingService {
   }
 
   /**
+   * The org's publish jobs, newest first, for the scheduler/calendar view
+   * (Milestone 7.4). Org-scoped through the socialAccount relation — the
+   * same tenant boundary every other query enforces. Optional status filter
+   * (e.g. only `scheduled`).
+   */
+  async listJobs(
+    orgId: string,
+    status?: PublishJobStatus,
+  ): Promise<
+    Array<
+      PublishJob & { socialAccount: { platform: Platform; externalAccountId: string } }
+    >
+  > {
+    return this.prisma.publishJob.findMany({
+      where: {
+        socialAccount: { orgId },
+        ...(status ? { status } : {}),
+      },
+      include: {
+        socialAccount: { select: { platform: true, externalAccountId: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  /**
+   * Cancels a still-scheduled job (Milestone 7.4).
+   *
+   * Only a `scheduled` job can be cancelled — once it has been enqueued or
+   * published there is nothing safe to cancel (a `processing` job may already
+   * be mid-post, and cancelling a `published` one cannot unpublish it). The
+   * status guard on updateMany makes the check-and-set atomic against the
+   * cron claiming the same job at the same instant.
+   */
+  async cancelScheduled(jobId: string, orgId: string): Promise<PublishJob> {
+    // Scopes to the org (404s another org's job) before touching anything.
+    const job = await this.findJobScoped(jobId, orgId);
+
+    if (job.status !== PublishJobStatus.scheduled) {
+      throw new UnprocessableEntityException(
+        `This job is ${job.status} and can no longer be cancelled. Only a scheduled post can be.`,
+      );
+    }
+
+    const cancelled = await this.prisma.publishJob.updateMany({
+      where: { id: jobId, status: PublishJobStatus.scheduled },
+      data: { status: PublishJobStatus.cancelled },
+    });
+
+    // The cron claimed it in the gap between the read and here.
+    if (cancelled.count !== 1) {
+      throw new UnprocessableEntityException(
+        'This job just started publishing and can no longer be cancelled.',
+      );
+    }
+
+    return this.findJobScoped(jobId, orgId);
+  }
+
+  /**
    * Enforces the preconditions from the REST design doc: variant must be
    * `ready`, account must be `connected`, and the two must be for the
    * same platform. Runs synchronously in publishNow so an invalid request

@@ -357,4 +357,76 @@ describe('PublishingService', () => {
       await expect(service.findJobScoped('job_1', 'org_1')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('listJobs (Milestone 7.4)', () => {
+    it('scopes to the org through the socialAccount relation, newest first', async () => {
+      prisma.publishJob.findMany.mockResolvedValue([]);
+      await service.listJobs('org_1');
+
+      expect(prisma.publishJob.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { socialAccount: { orgId: 'org_1' } },
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+    });
+
+    it('applies a status filter when given', async () => {
+      prisma.publishJob.findMany.mockResolvedValue([]);
+      await service.listJobs('org_1', 'scheduled' as never);
+
+      expect(prisma.publishJob.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { socialAccount: { orgId: 'org_1' }, status: 'scheduled' },
+        }),
+      );
+    });
+  });
+
+  describe('cancelScheduled (Milestone 7.4)', () => {
+    function scopedJob(status: string) {
+      return { ...jobRow, status, socialAccount: { orgId: 'org_1' } };
+    }
+
+    it('cancels a scheduled job atomically', async () => {
+      prisma.publishJob.findUnique
+        .mockResolvedValueOnce(scopedJob('scheduled')) // findJobScoped (guard)
+        .mockResolvedValueOnce(scopedJob('cancelled')); // findJobScoped (return)
+      prisma.publishJob.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.cancelScheduled('job_1', 'org_1');
+
+      expect(prisma.publishJob.updateMany).toHaveBeenCalledWith({
+        where: { id: 'job_1', status: 'scheduled' },
+        data: { status: 'cancelled' },
+      });
+    });
+
+    it('refuses to cancel a job that is no longer scheduled', async () => {
+      prisma.publishJob.findUnique.mockResolvedValue(scopedJob('published'));
+      await expect(service.cancelScheduled('job_1', 'org_1')).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.publishJob.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('handles the cron claiming the job in the same instant (race)', async () => {
+      prisma.publishJob.findUnique.mockResolvedValue(scopedJob('scheduled'));
+      prisma.publishJob.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.cancelScheduled('job_1', 'org_1')).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('404s another org\'s job without cancelling anything', async () => {
+      prisma.publishJob.findUnique.mockResolvedValue({
+        ...jobRow,
+        status: 'scheduled',
+        socialAccount: { orgId: 'other' },
+      });
+      await expect(service.cancelScheduled('job_1', 'org_1')).rejects.toThrow(NotFoundException);
+      expect(prisma.publishJob.updateMany).not.toHaveBeenCalled();
+    });
+  });
 });

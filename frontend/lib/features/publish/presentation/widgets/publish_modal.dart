@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../scheduler/data/repositories/api_scheduler_repository.dart';
 import '../../domain/entities/publish_models.dart';
 import '../state/caption_controller.dart';
 import '../state/publish_controller.dart';
@@ -149,22 +150,22 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    OutlinedButton.icon(
+                      onPressed: canPublish
+                          ? () => _scheduleSelected(pairs[_selectedPairIndex!])
+                          : null,
+                      icon: const Icon(Icons.schedule, size: 18),
+                      label: const Text('Schedule'),
+                    ),
+                    const SizedBox(width: SpacingTokens.sm),
                     FilledButton.icon(
                       onPressed: canPublish
                           ? () {
                               final pair = pairs[_selectedPairIndex!];
-                              final caption = _captionController.text;
                               ref.read(publishControllerProvider.notifier).publish(
                                     variantId: pair.variant.id,
                                     socialAccountId: pair.target.id,
-                                    // Untouched field => null, so the
-                                    // variant's own caption still applies.
-                                    // Deliberately cleared => '', which the
-                                    // backend honours as "no caption".
-                                    caption: caption.isEmpty &&
-                                            pair.variant.caption == null
-                                        ? null
-                                        : caption,
+                                    caption: _captionArg(pair),
                                   );
                             }
                           : null,
@@ -186,6 +187,61 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
         ],
       ),
     );
+  }
+
+  /// Untouched field => null (the variant's own caption still applies);
+  /// deliberately cleared => '' (the backend honours that as "no caption").
+  String? _captionArg(({PublishableVariant variant, PublishTarget target}) pair) {
+    final caption = _captionController.text;
+    return caption.isEmpty && pair.variant.caption == null ? null : caption;
+  }
+
+  /// Picks a future date + time and schedules the selected pair (Milestone
+  /// 7.4). The caption is resolved the same way an immediate publish does.
+  Future<void> _scheduleSelected(
+    ({PublishableVariant variant, PublishTarget target}) pair,
+  ) async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      initialDate: now.add(const Duration(hours: 1)),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+    );
+    if (time == null || !mounted) return;
+
+    final scheduledAt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
+    try {
+      await ref.read(schedulerRepositoryProvider).schedule(
+            variantId: pair.variant.id,
+            socialAccountId: pair.target.id,
+            scheduledAt: scheduledAt,
+            caption: _captionArg(pair),
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post scheduled. See it on your calendar.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not schedule: ${describeApiError(error)}')),
+      );
+    }
   }
 }
 

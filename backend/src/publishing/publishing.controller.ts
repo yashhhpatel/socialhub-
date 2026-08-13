@@ -1,18 +1,25 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PublishJobDto, PublishNowResponseDto } from './dto/publish-job.dto';
+import { ListJobsDto } from './dto/list-jobs.dto';
+import {
+  PublishJobDto,
+  PublishJobSummaryDto,
+  PublishNowResponseDto,
+} from './dto/publish-job.dto';
 import { PublishNowDto } from './dto/publish-now.dto';
 import { SchedulePublishDto } from './dto/schedule-publish.dto';
 import { PublishingService } from './publishing.service';
@@ -70,6 +77,33 @@ export class PublishingController {
     return { jobId: job.id, status: job.status };
   }
 
+  /**
+   * The org's publish jobs for the scheduler/calendar view (Milestone 7.4).
+   * Optional `?status=` filter. Declared before `jobs/:id` so the literal
+   * path wins over the parameter route.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('jobs')
+  async listJobs(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListJobsDto,
+  ): Promise<PublishJobSummaryDto[]> {
+    const jobs = await this.publishingService.listJobs(
+      req.user.orgId,
+      query.status,
+    );
+    return jobs.map((job) => ({
+      id: job.id,
+      platform: job.socialAccount.platform,
+      status: job.status,
+      scheduledAt: job.scheduledAt,
+      attemptCount: job.attemptCount,
+      lastError: job.lastError,
+      externalPostId: job.externalPostId,
+      createdAt: job.createdAt,
+    }));
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('jobs/:id')
   async getJob(
@@ -77,6 +111,24 @@ export class PublishingController {
     @Param('id') id: string,
   ): Promise<PublishJobDto> {
     const job = await this.publishingService.findJobScoped(id, req.user.orgId);
+    return {
+      id: job.id,
+      status: job.status,
+      attemptCount: job.attemptCount,
+      scheduledAt: job.scheduledAt,
+      lastError: job.lastError,
+      externalPostId: job.externalPostId,
+    };
+  }
+
+  /** Cancels a still-scheduled post (Milestone 7.4). */
+  @UseGuards(JwtAuthGuard)
+  @Delete('jobs/:id')
+  async cancelJob(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<PublishJobDto> {
+    const job = await this.publishingService.cancelScheduled(id, req.user.orgId);
     return {
       id: job.id,
       status: job.status,
