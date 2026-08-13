@@ -1,0 +1,29 @@
+name: _regen-lock (temporary)
+
+# TEMPORARY, one-off. Regenerates backend/package-lock.json ON LINUX so it
+# matches package.json (npm resolves this graph differently per platform).
+# Uploads the corrected lockfile as an artifact to download and commit.
+# Delete once done.
+on:
+  push:
+    branches: [feat/5.3-caption-panel]
+    paths: ['.github/workflows/_regen-lock.yml', 'backend/package.json']
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12'
+      - name: Regenerate lockfile from package.json (Linux resolution)
+        working-directory: backend
+        run: npm install --package-lock-only
+      - name: Prove it is self-consistent here
+        working-directory: backend
+        run: npm ci --dry-run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-package-lock
+          path: backend/package-lock.json
