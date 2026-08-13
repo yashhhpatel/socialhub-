@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
 import { FacebookCallbackQueryDto } from './dto/facebook-callback-query.dto';
 import { InstagramCallbackQueryDto } from './dto/instagram-callback-query.dto';
+import { ThreadsCallbackQueryDto } from './dto/threads-callback-query.dto';
 import { SocialAccountSummaryDto } from './dto/social-account-summary.dto';
 import { XCallbackQueryDto } from './dto/x-callback-query.dto';
 import { SocialAccountsService } from './social-accounts.service';
@@ -180,6 +181,46 @@ export class SocialAccountsController {
 
     try {
       const account = await this.socialAccountsService.handleFacebookCallback(
+        query.code,
+        query.state,
+      );
+      this.respondToCallback(res, { connected: account.platform });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed.';
+      this.respondToCallback(res, { connectError: message });
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('threads/connect')
+  connectThreads(@Req() req: AuthenticatedRequest): ConnectResponseDto {
+    return {
+      redirectUrl: this.socialAccountsService.buildThreadsAuthorizationUrl(
+        req.user.orgId,
+      ),
+    };
+  }
+
+  /** PUBLIC — same reasoning as instagramCallback above. */
+  @Get('threads/callback')
+  async threadsCallback(
+    @Query() query: ThreadsCallbackQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (query.error) {
+      this.respondToCallback(res, {
+        connectError: `Threads authorization was not granted: ${query.error}`,
+      });
+      return;
+    }
+
+    if (!query.code || !query.state) {
+      this.respondToCallback(res, { connectError: 'Missing code or state parameter.' });
+      return;
+    }
+
+    try {
+      const account = await this.socialAccountsService.handleThreadsCallback(
         query.code,
         query.state,
       );

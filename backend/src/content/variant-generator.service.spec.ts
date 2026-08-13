@@ -3,6 +3,7 @@ import { ContentAsset, Platform } from '@prisma/client';
 
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { VariantGeneratorService } from './variant-generator.service';
 
@@ -26,6 +27,7 @@ describe('VariantGeneratorService', () => {
   } as never);
   const xAdapter = new XAdapter({ get: () => 'test' } as never);
   const facebookAdapter = new FacebookAdapter({ get: () => 'test' } as never);
+  const threadsAdapter = new ThreadsAdapter({ get: () => 'test' } as never);
 
   beforeEach(() => {
     prisma = { contentVariant: { upsert: jest.fn((args) => ({ id: 'var_1', ...args.create })) } };
@@ -42,15 +44,16 @@ describe('VariantGeneratorService', () => {
       instagramAdapter,
       xAdapter,
       facebookAdapter,
+      threadsAdapter,
     );
   });
 
   describe('supported platforms', () => {
     it('reports only the platforms that actually have an adapter', () => {
-      // Threads/LinkedIn arrive later in Phase 8 — claiming support before
-      // their adapters exist would produce variants nothing can publish.
+      // LinkedIn arrives later in Phase 8 — claiming support before its
+      // adapter exists would produce variants nothing can publish.
       expect(service.supportedPlatforms.sort()).toEqual(
-        [Platform.instagram, Platform.x, Platform.facebook].sort(),
+        [Platform.instagram, Platform.x, Platform.facebook, Platform.threads].sort(),
       );
     });
 

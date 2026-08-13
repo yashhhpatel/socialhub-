@@ -3,6 +3,7 @@ import { Platform } from '@prisma/client';
 
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { CaptionService } from './caption.service';
 
@@ -31,6 +32,7 @@ describe('CaptionService', () => {
       new InstagramAdapter(config),
       new XAdapter(config),
       new FacebookAdapter(config),
+      new ThreadsAdapter(config),
     );
   });
 

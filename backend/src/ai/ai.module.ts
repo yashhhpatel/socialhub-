@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ContentModule } from '../content/content.module';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiController } from './ai.controller';
 import { AiGatewayService } from './ai-gateway.service';
@@ -26,6 +27,7 @@ import { QuotaGuard } from './quota.guard';
     InstagramAdapter,
     XAdapter,
     FacebookAdapter,
+    ThreadsAdapter,
   ],
   exports: [AiGatewayService],
 })
