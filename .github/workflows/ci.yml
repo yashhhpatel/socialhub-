@@ -29,6 +29,17 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned to the SDK this project is actually developed against
+          # (pubspec declares flutter '>=3.22.0' with no upper bound, so an
+          # unpinned `stable` installed whatever was newest — which is how
+          # `flutter analyze` failed here while passing locally: the 24
+          # withOpacity call sites are fine on 3.22 and deprecated from 3.27
+          # onward, and analyze exits non-zero on infos.
+          #
+          # This pin is a stopgap, not a destination. The real fix is to
+          # migrate off the deprecated APIs (withOpacity -> withValues,
+          # Color.value -> toARGB32) and move back to tracking stable.
+          flutter-version: '3.22.3'
 
       - name: Install dependencies
         if: steps.detect.outputs.exists == 'true'
@@ -57,6 +68,15 @@ jobs:
   backend:
     name: Backend (NestJS)
     runs-on: ubuntu-latest
+    env:
+      # `prisma generate` does not connect to a database, but prisma.config.ts
+      # resolves `env('DATABASE_URL')` while loading, and Prisma 7 throws
+      # PrismaConfigEnvError if the variable is absent. CI has no .env file,
+      # so the value has to come from somewhere — this is a syntactically
+      # valid placeholder that is never dialled, NOT a real credential.
+      # A job needing an actual database (e.g. e2e in a later phase) must
+      # bring its own service container and override this.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +95,20 @@ jobs:
         if: steps.detect.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20: prisma@7.8 runs a preinstall gate that hard-exits on
+          # unsupported runtimes ("Node.js versions 20.19+, 22.12+, 24.0+"),
+          # and @prisma/streams-local — a non-optional dev dependency —
+          # declares "node": ">=22.0.0", which no Node 20 build satisfies.
+          # `node-version: '20'` resolves to the runner's cached Node 20,
+          # so `npm ci` died in preinstall before installing anything.
+          # Node 20 also reached end of life in April 2026.
+          #
+          # Pinned to the minor, not the bare major: setup-node prefers a
+          # matching version already in the runner's tool cache over
+          # downloading the newest, so a floating '22' can still land on
+          # 22.0–22.11 and trip the very same gate. 22.12 is also the
+          # version this project is developed and verified against.
+          node-version: '22.12'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -83,6 +116,17 @@ jobs:
         if: steps.detect.outputs.exists == 'true'
         working-directory: backend
         run: npm ci
+
+      # Required, and easy to miss: @prisma/client v7 dropped the postinstall
+      # that used to generate the client automatically, so `npm ci` alone
+      # leaves node_modules/.prisma absent. Without this step the generated
+      # types don't exist and both `npm run test` and `npm run build` fail on
+      # every model access (`Property 'user' does not exist...`). It never
+      # showed up before because the install step failed first.
+      - name: Generate Prisma Client
+        if: steps.detect.outputs.exists == 'true'
+        working-directory: backend
+        run: npx prisma generate
 
       - name: Lint
         if: steps.detect.outputs.exists == 'true'
