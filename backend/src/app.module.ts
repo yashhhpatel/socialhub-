@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AiModule } from './ai/ai.module';
 import { AuthModule } from './auth/auth.module';
@@ -22,6 +23,9 @@ import { UsersModule } from './users/users.module';
     ConfigModule,
     PrismaModule,
     QueueModule,
+    // Enables @Cron (Milestone 7.3): the scheduled-publish dispatcher scans
+    // for due jobs on an interval.
+    ScheduleModule.forRoot(),
     HealthModule,
     UsersModule,
     OrganizationsModule,

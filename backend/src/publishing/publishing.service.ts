@@ -200,6 +200,98 @@ export class PublishingService {
     }
   }
 
+  /**
+   * Schedules a publish for a future time (Milestone 7.3).
+   *
+   * Validates exactly as publishNow does, then records a `scheduled`
+   * PublishJob with its scheduledAt and caption — but does NOT enqueue it.
+   * The row IS the durable schedule: it survives a Redis restart, unlike a
+   * BullMQ delayed job would, which matters for a post set days out. The
+   * cron (schedule.cron.ts) enqueues it once it comes due.
+   */
+  async schedule(
+    orgId: string,
+    variantId: string,
+    socialAccountId: string,
+    scheduledAt: Date,
+    caption?: string,
+  ): Promise<PublishJob> {
+    if (scheduledAt.getTime() <= Date.now()) {
+      throw new UnprocessableEntityException(
+        'Scheduled time must be in the future. To publish now, use /publish/now.',
+      );
+    }
+
+    // Same preconditions as an immediate publish, checked now so an invalid
+    // schedule is rejected at request time rather than silently failing when
+    // it later comes due.
+    await this.loadAndValidate(orgId, variantId, socialAccountId);
+
+    return this.prisma.publishJob.create({
+      data: {
+        variantId,
+        socialAccountId,
+        scheduledAt,
+        caption,
+        status: PublishJobStatus.scheduled,
+        attemptCount: 0,
+      },
+    });
+  }
+
+  /**
+   * Enqueues every scheduled job that has come due (Milestone 7.3), called
+   * by the cron. Returns how many it dispatched.
+   *
+   * Each job is CLAIMED atomically — an updateMany from `scheduled` to
+   * `queued` gated on the row still being `scheduled` — before it is
+   * enqueued. Two overlapping cron ticks (or two instances) therefore can't
+   * both enqueue the same job: only the tick whose update matched a
+   * still-`scheduled` row proceeds. Enqueue happens after the claim, so a
+   * job is `queued` in the DB exactly when it enters the queue.
+   */
+  async dispatchDueScheduledJobs(now: Date = new Date()): Promise<number> {
+    const due = await this.prisma.publishJob.findMany({
+      where: { status: PublishJobStatus.scheduled, scheduledAt: { lte: now } },
+      include: { socialAccount: { select: { platform: true } } },
+    });
+
+    let dispatched = 0;
+    for (const job of due) {
+      // Claim it. If another tick already did, count is 0 and we skip.
+      const claimed = await this.prisma.publishJob.updateMany({
+        where: { id: job.id, status: PublishJobStatus.scheduled },
+        data: { status: PublishJobStatus.queued },
+      });
+      if (claimed.count !== 1) {
+        continue;
+      }
+
+      const queue = this.queues[job.socialAccount.platform];
+      if (!queue) {
+        // A platform whose queue was removed — mark failed rather than leave
+        // it stuck as queued-but-never-processed.
+        await this.prisma.publishJob.update({
+          where: { id: job.id },
+          data: {
+            status: PublishJobStatus.failed,
+            lastError: `No queue for platform ${job.socialAccount.platform}.`,
+          },
+        });
+        continue;
+      }
+
+      await queue.add(
+        'publish',
+        { publishJobId: job.id, caption: job.caption ?? undefined },
+        PUBLISH_JOB_OPTIONS,
+      );
+      dispatched += 1;
+    }
+
+    return dispatched;
+  }
+
   async findJobScoped(jobId: string, orgId: string): Promise<PublishJob> {
     const job = await this.prisma.publishJob.findUnique({
       where: { id: jobId },

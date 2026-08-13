@@ -10,6 +10,7 @@ import { PublishingService } from './publishing.service';
 import { InstagramPublishProcessor } from './processors/instagram-publish.processor';
 import { XPublishProcessor } from './processors/x-publish.processor';
 import { PUBLISH_QUEUES } from './publish-queue.constants';
+import { ScheduledPublishDispatcher } from './schedule.cron';
 
 /**
  * Adapters and TokenEncryptionService are provided directly rather than
@@ -38,6 +39,7 @@ import { PUBLISH_QUEUES } from './publish-queue.constants';
     XAdapter,
     InstagramPublishProcessor,
     XPublishProcessor,
+    ScheduledPublishDispatcher,
   ],
   exports: [PublishingService],
 })

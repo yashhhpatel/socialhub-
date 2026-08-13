@@ -249,6 +249,13 @@ model PublishJob {
   // delete the record of everything ever published through it.
   socialAccount   SocialAccount    @relation(fields: [socialAccountId], references: [id], onDelete: Restrict)
   scheduledAt     DateTime?
+  // The caption to post with (Milestone 7.3). Persisted on the row because
+  // a scheduled job is not enqueued until it comes due — possibly days
+  // later — so the caption the user chose has to survive here rather than
+  // in a BullMQ payload that doesn't exist yet. The cron reads it when it
+  // enqueues the due job. Null for an immediate publish, whose caption
+  // rides straight in the job data.
+  caption         String?
   status          PublishJobStatus @default(queued)
   attemptCount    Int              @default(0)
   lastError       String?

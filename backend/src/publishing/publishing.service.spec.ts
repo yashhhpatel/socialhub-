@@ -9,7 +9,13 @@ describe('PublishingService', () => {
   let prisma: {
     contentVariant: { findUnique: jest.Mock };
     socialAccount: { findUnique: jest.Mock };
-    publishJob: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
+    publishJob: {
+      create: jest.Mock;
+      update: jest.Mock;
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let instagramAdapter: { publish: jest.Mock };
   let xAdapter: { publish: jest.Mock };
@@ -50,6 +56,8 @@ describe('PublishingService', () => {
         create: jest.fn().mockResolvedValue(jobRow),
         update: jest.fn((args) => ({ ...jobRow, ...args.data })),
         findUnique: jest.fn().mockResolvedValue(jobRow),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     instagramAdapter = { publish: jest.fn() };
@@ -246,6 +254,89 @@ describe('PublishingService', () => {
         );
         expect(xAdapter.publish).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('schedule — future publish (Milestone 7.3)', () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+
+    it('records a scheduled job with its time and caption, and enqueues nothing', async () => {
+      const job = await service.schedule('org_1', 'var_1', 'sa_1', future, 'later');
+
+      expect(prisma.publishJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'scheduled',
+            scheduledAt: future,
+            caption: 'later',
+          }),
+        }),
+      );
+      expect(xQueue.add).not.toHaveBeenCalled();
+      expect(job.status).toBe('queued'); // jobRow stub; real row would be scheduled
+    });
+
+    it('rejects a time in the past', async () => {
+      const past = new Date(Date.now() - 1000);
+      await expect(service.schedule('org_1', 'var_1', 'sa_1', past)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(prisma.publishJob.create).not.toHaveBeenCalled();
+    });
+
+    it('applies the same preconditions as an immediate publish', async () => {
+      prisma.socialAccount.findUnique.mockResolvedValue({
+        ...connectedAccount,
+        status: 'revoked',
+      });
+      await expect(service.schedule('org_1', 'var_1', 'sa_1', future)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+    });
+  });
+
+  describe('dispatchDueScheduledJobs — the cron body (Milestone 7.3)', () => {
+    const dueJob = {
+      id: 'job_due',
+      socialAccountId: 'sa_1',
+      caption: 'scheduled caption',
+      socialAccount: { platform: Platform.x },
+    };
+
+    it('claims a due job atomically and enqueues it onto its platform queue', async () => {
+      prisma.publishJob.findMany.mockResolvedValue([dueJob]);
+      prisma.publishJob.updateMany.mockResolvedValue({ count: 1 });
+
+      const dispatched = await service.dispatchDueScheduledJobs(new Date());
+
+      // Claim was gated on the row still being `scheduled`.
+      expect(prisma.publishJob.updateMany).toHaveBeenCalledWith({
+        where: { id: 'job_due', status: 'scheduled' },
+        data: { status: 'queued' },
+      });
+      expect(xQueue.add).toHaveBeenCalledWith(
+        'publish',
+        { publishJobId: 'job_due', caption: 'scheduled caption' },
+        PUBLISH_JOB_OPTIONS,
+      );
+      expect(dispatched).toBe(1);
+    });
+
+    it('does NOT enqueue a job it failed to claim — another tick got it first', async () => {
+      prisma.publishJob.findMany.mockResolvedValue([dueJob]);
+      prisma.publishJob.updateMany.mockResolvedValue({ count: 0 });
+
+      const dispatched = await service.dispatchDueScheduledJobs(new Date());
+
+      expect(xQueue.add).not.toHaveBeenCalled();
+      expect(dispatched).toBe(0);
+    });
+
+    it('enqueues nothing when nothing is due', async () => {
+      prisma.publishJob.findMany.mockResolvedValue([]);
+      const dispatched = await service.dispatchDueScheduledJobs(new Date());
+      expect(dispatched).toBe(0);
+      expect(xQueue.add).not.toHaveBeenCalled();
     });
   });
 
