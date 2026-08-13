@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/publish_models.dart';
+import '../state/caption_controller.dart';
 import '../state/publish_controller.dart';
+import 'caption_panel.dart';
 
 /// Publish modal (Milestone 4.3) — pick a rendition + destination, see a
 /// preview of exactly what will be posted, publish, and watch the result.
@@ -37,11 +39,34 @@ class _PublishModal extends ConsumerStatefulWidget {
 class _PublishModalState extends ConsumerState<_PublishModal> {
   int? _selectedPairIndex;
 
+  /// The caption that will actually be posted. Owned here rather than in
+  /// CaptionPanel because the publish button needs to read it, and because
+  /// it must survive the panel rebuilding as generation state changes.
+  final _captionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _captionController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final options = ref.watch(publishOptionsProvider(widget.assetId));
     final publish = ref.watch(publishControllerProvider);
     final theme = Theme.of(context);
+
+    // A finished generation overwrites the field — that is what the user
+    // asked for by pressing Generate. Done via listen rather than in the
+    // panel's build so it fires once per generation, not on every rebuild
+    // (which would fight the user's cursor while they type).
+    ref.listen<CaptionState>(captionControllerProvider, (previous, next) {
+      if (next.phase == CaptionPhase.ready &&
+          next.caption != null &&
+          next.caption != previous?.caption) {
+        _captionController.text = next.caption!;
+      }
+    });
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -72,18 +97,55 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                   data: (data) => _PairPicker(
                     options: data,
                     selectedIndex: _selectedPairIndex,
-                    onSelect: (i) => setState(() => _selectedPairIndex = i),
+                    onSelect: (i) => setState(() {
+                      _selectedPairIndex = i;
+                      // Seed from the variant's stored caption, but never
+                      // over text the user has already generated or typed.
+                      final existing = data.publishablePairs[i].variant.caption;
+                      if (_captionController.text.isEmpty && existing != null) {
+                        _captionController.text = existing;
+                      }
+                    }),
                   ),
                 ),
             },
           ),
           if (publish.phase == PublishPhase.idle ||
               publish.phase == PublishPhase.publishing) ...[
-            const SizedBox(height: SpacingTokens.lg),
             options.maybeWhen(
               data: (data) {
                 final pairs = data.publishablePairs;
-                final canPublish = _selectedPairIndex != null && !publish.inFlight;
+                // Index can outlive the list it pointed into if options
+                // refetch while the modal is open.
+                final selected = _selectedPairIndex != null &&
+                        _selectedPairIndex! < pairs.length
+                    ? pairs[_selectedPairIndex!]
+                    : null;
+
+                // Only after a destination is chosen: the caption's length
+                // limit is the platform's, so there is nothing meaningful
+                // to show a counter against until one is picked.
+                if (selected == null) return const SizedBox.shrink();
+
+                return Padding(
+                  padding: const EdgeInsets.only(top: SpacingTokens.md),
+                  child: CaptionPanel(
+                    assetId: widget.assetId,
+                    textController: _captionController,
+                    maxLength: selected.variant.maxCaptionLength,
+                    enabled: !publish.inFlight,
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            options.maybeWhen(
+              data: (data) {
+                final pairs = data.publishablePairs;
+                final canPublish = _selectedPairIndex != null &&
+                    _selectedPairIndex! < pairs.length &&
+                    !publish.inFlight;
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -91,9 +153,18 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                       onPressed: canPublish
                           ? () {
                               final pair = pairs[_selectedPairIndex!];
+                              final caption = _captionController.text;
                               ref.read(publishControllerProvider.notifier).publish(
                                     variantId: pair.variant.id,
                                     socialAccountId: pair.target.id,
+                                    // Untouched field => null, so the
+                                    // variant's own caption still applies.
+                                    // Deliberately cleared => '', which the
+                                    // backend honours as "no caption".
+                                    caption: caption.isEmpty &&
+                                            pair.variant.caption == null
+                                        ? null
+                                        : caption,
                                   );
                             }
                           : null,

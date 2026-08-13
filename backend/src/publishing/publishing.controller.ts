@@ -43,6 +43,7 @@ export class PublishingController {
       req.user.orgId,
       dto.variantId,
       dto.socialAccountId,
+      dto.caption,
     );
     return { jobId: job.id, status: job.status };
   }

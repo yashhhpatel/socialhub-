@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AiModule } from './ai/ai.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { ContentModule } from './content/content.module';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module';
     SocialAccountsModule,
     ContentModule,
     PublishingModule,
+    AiModule,
   ],
 })
 export class AppModule {}

@@ -10,9 +10,15 @@ abstract class PublishRepository {
 
   /// Sends one variant to one account. Irreversible — this creates a real
   /// public post.
+  ///
+  /// [caption] overrides the variant's stored caption for this attempt
+  /// (Milestone 5.3). Null means "use whatever the variant already has";
+  /// an empty string means "post without a caption" — the backend
+  /// distinguishes the two deliberately.
   Future<PublishJob> publishNow({
     required String variantId,
     required String socialAccountId,
+    String? caption,
   });
 
   Future<PublishJob> job(String jobId);

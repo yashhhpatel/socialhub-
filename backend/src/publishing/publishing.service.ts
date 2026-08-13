@@ -50,10 +50,16 @@ export class PublishingService {
 
   private readonly adapters: Partial<Record<Platform, PlatformAdapter>>;
 
+  /**
+   * @param caption Overrides the variant's stored caption for this attempt
+   *   (Milestone 5.3). The publish modal's generated/edited caption belongs
+   *   to the attempt, not to the variant — see PublishNowDto.
+   */
   async publishNow(
     orgId: string,
     variantId: string,
     socialAccountId: string,
+    caption?: string,
   ): Promise<PublishJob> {
     const { variant, account } = await this.loadAndValidate(
       orgId,
@@ -82,7 +88,11 @@ export class PublishingService {
     try {
       const result = await adapter.publish({
         imageUrl: variant.renderedMediaUrl as string,
-        caption: variant.caption ?? '',
+        // Request caption wins, then the variant's stored one, then empty.
+        // `??` and not `||`: an empty string is a deliberate choice to post
+        // without a caption, and must not silently fall back to the
+        // variant's older text.
+        caption: caption ?? variant.caption ?? '',
         externalAccountId: account.externalAccountId,
         accessToken: this.tokenEncryption.decrypt(account.accessTokenEnc),
       });

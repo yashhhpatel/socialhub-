@@ -18,6 +18,21 @@ PublishTarget _target({
     PublishTarget(id: id, platform: platform, externalAccountId: 'ext_1', status: status);
 
 void main() {
+  group('PublishableVariant.maxCaptionLength', () {
+    test('matches each platform adapter\'s capabilities() on the backend', () {
+      // Drift here shows the user a counter against the wrong ceiling, so
+      // these are pinned to the adapters' own numbers.
+      expect(_variant(platform: 'x').maxCaptionLength, 280);
+      expect(_variant(platform: 'instagram').maxCaptionLength, 2200);
+    });
+
+    test('falls back generously for a platform with no configured limit', () {
+      // Advisory counter only — warning about a limit that may not apply
+      // is worse than not warning.
+      expect(_variant(platform: 'threads').maxCaptionLength, 2200);
+    });
+  });
+
   group('PublishableVariant.isReady', () {
     test('ready with a rendered image is publishable', () {
       expect(_variant().isReady, isTrue);

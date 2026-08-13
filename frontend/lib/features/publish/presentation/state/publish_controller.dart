@@ -66,12 +66,14 @@ class PublishController extends StateNotifier<PublishState> {
   Future<void> publish({
     required String variantId,
     required String socialAccountId,
+    String? caption,
   }) async {
     state = const PublishState(phase: PublishPhase.publishing);
     try {
       final job = await _ref.read(publishRepositoryProvider).publishNow(
             variantId: variantId,
             socialAccountId: socialAccountId,
+            caption: caption,
           );
       if (!mounted) return;
       state = job.status == PublishJobStatus.published

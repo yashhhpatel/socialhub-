@@ -1,3 +1,22 @@
+/// Caption ceiling per platform, mirroring each adapter's `capabilities()`
+/// on the backend (instagram.adapter.ts: 2200, x.adapter.ts: 280).
+///
+/// Duplicated here rather than fetched because the publish modal needs it
+/// to render a live character counter as the user types — a round trip per
+/// keystroke is not an option, and the limits change about as often as the
+/// platforms themselves do. The backend remains the enforcing authority;
+/// this only decides when to warn.
+const _maxCaptionLengthByPlatform = <String, int>{
+  'instagram': 2200,
+  'x': 280,
+};
+
+/// Used when a variant's platform has no known limit — a platform added to
+/// the backend enum before this map catches up. Generous on purpose: the
+/// counter is advisory, and warning about a limit that may not exist is
+/// worse than not warning at all.
+const _fallbackMaxCaptionLength = 2200;
+
 /// A rendition that can be published — one platform's version of a design.
 class PublishableVariant {
   const PublishableVariant({
@@ -18,6 +37,10 @@ class PublishableVariant {
   /// preconditions), so the modal disables these rather than letting the
   /// user click into a guaranteed 422.
   bool get isReady => status == 'ready' && renderedMediaUrl != null;
+
+  /// Longest caption this variant's platform will accept.
+  int get maxCaptionLength =>
+      _maxCaptionLengthByPlatform[platform] ?? _fallbackMaxCaptionLength;
 
   factory PublishableVariant.fromJson(Map<String, dynamic> json) => PublishableVariant(
         id: json['id'] as String,
