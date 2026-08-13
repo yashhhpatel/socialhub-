@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -30,6 +31,13 @@ async function bootstrap() {
       transform: true, // payloads become real DTO class instances
     }),
   );
+
+  // Global exception filter (Milestone 6.1). Turns every error — planned
+  // HttpExceptions and unexpected ones alike — into the standard error
+  // envelope, and stops unhandled errors from leaking a stack trace. Must
+  // be registered after the ValidationPipe so validation's own
+  // BadRequestException flows through it too.
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
