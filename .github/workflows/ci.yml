@@ -77,6 +77,20 @@ jobs:
       # A job needing an actual database (e.g. e2e in a later phase) must
       # bring its own service container and override this.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    # Redis for the BullMQ queue integration tests (Milestone 7.1). Mapped to
+    # localhost:6379, which is exactly what the tests default REDIS_HOST/PORT
+    # to, so no extra env is needed. `npm run test` stays green because the
+    # runner now has a Redis to talk to.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -47,4 +47,13 @@ export const envValidationSchema = Joi.object({
   // simply reports nothing. Validated as a URI only when present, so a
   // malformed DSN is caught at boot rather than silently ignored by the SDK.
   SENTRY_DSN: Joi.string().uri().optional(),
+
+  // Redis, backing the BullMQ publish/schedule queues (Milestone 7.1).
+  // Defaulted rather than required: `docker compose up redis` gives exactly
+  // these values, so a local dev needs no .env entry, while staging/prod
+  // override them as real platform env vars. Password is optional — local
+  // Redis has none; a managed instance will.
+  REDIS_HOST: Joi.string().default('localhost'),
+  REDIS_PORT: Joi.number().port().default(6379),
+  REDIS_PASSWORD: Joi.string().allow('').optional(),
 });
