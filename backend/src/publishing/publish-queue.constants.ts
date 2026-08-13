@@ -7,12 +7,13 @@ import { Platform } from '@prisma/client';
  * must not back up X publishing. Separate queues mean separate workers and
  * separate retry timelines, so a failing platform degrades only itself.
  *
- * Only the two MVP platforms exist here; Phase 8 adds facebook/threads/
- * linkedin queues and processors alongside these.
+ * Phase 8 adds facebook (and later threads/linkedin) queues and processors
+ * alongside the two MVP platforms.
  */
 export const PUBLISH_QUEUES = {
   [Platform.instagram]: 'publish-instagram',
   [Platform.x]: 'publish-x',
+  [Platform.facebook]: 'publish-facebook',
 } as const;
 
 export type PublishQueueName =

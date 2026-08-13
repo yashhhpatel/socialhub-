@@ -1,6 +1,7 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { CaptionService } from './caption.service';
@@ -29,6 +30,7 @@ describe('CaptionService', () => {
       contentService as never,
       new InstagramAdapter(config),
       new XAdapter(config),
+      new FacebookAdapter(config),
     );
   });
 

@@ -6,6 +6,7 @@ import {
   PlatformAdapter,
   PlatformCapabilities,
 } from '../social-accounts/adapters/adapter.interface';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,13 +41,16 @@ export class VariantGeneratorService {
     private readonly cloudinary: CloudinaryService,
     instagramAdapter: InstagramAdapter,
     xAdapter: XAdapter,
+    facebookAdapter: FacebookAdapter,
   ) {
     // Direct injection rather than a registry, matching how
-    // SocialAccountsService already composes adapters. A real registry
-    // earns its keep at five adapters (Phase 8), not two.
+    // SocialAccountsService already composes adapters. Phase 8 adds the
+    // remaining platforms here one at a time; if this map grows unwieldy
+    // once all five land, a registry is the refactor to reach for.
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
+      [Platform.facebook]: facebookAdapter,
     };
   }
 

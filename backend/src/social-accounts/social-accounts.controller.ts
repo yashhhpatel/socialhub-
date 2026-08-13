@@ -16,6 +16,7 @@ import { Request, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
+import { FacebookCallbackQueryDto } from './dto/facebook-callback-query.dto';
 import { InstagramCallbackQueryDto } from './dto/instagram-callback-query.dto';
 import { SocialAccountSummaryDto } from './dto/social-account-summary.dto';
 import { XCallbackQueryDto } from './dto/x-callback-query.dto';
@@ -149,9 +150,49 @@ export class SocialAccountsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('facebook/connect')
+  connectFacebook(@Req() req: AuthenticatedRequest): ConnectResponseDto {
+    return {
+      redirectUrl: this.socialAccountsService.buildFacebookAuthorizationUrl(
+        req.user.orgId,
+      ),
+    };
+  }
+
+  /** PUBLIC — same reasoning as instagramCallback above. */
+  @Get('facebook/callback')
+  async facebookCallback(
+    @Query() query: FacebookCallbackQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (query.error) {
+      this.respondToCallback(res, {
+        connectError: `Facebook authorization was not granted: ${query.error}`,
+      });
+      return;
+    }
+
+    if (!query.code || !query.state) {
+      this.respondToCallback(res, { connectError: 'Missing code or state parameter.' });
+      return;
+    }
+
+    try {
+      const account = await this.socialAccountsService.handleFacebookCallback(
+        query.code,
+        query.state,
+      );
+      this.respondToCallback(res, { connected: account.platform });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed.';
+      this.respondToCallback(res, { connectError: message });
+    }
+  }
+
   /**
-   * Shared by both callback handlers. Redirects to the frontend's
-   * Settings screen with a query param it reads on load (see
+   * Shared by every platform's callback handler. Redirects to the
+   * frontend's Settings screen with a query param it reads on load (see
    * frontend/lib/features/social_accounts/) if FRONTEND_URL is
    * configured; otherwise returns the same info as plain JSON.
    */

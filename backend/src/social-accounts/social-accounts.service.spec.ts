@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
+import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
 import { XAdapter } from './adapters/x.adapter';
 import { SocialAccountsService } from './social-accounts.service';
@@ -20,6 +21,7 @@ describe('SocialAccountsService', () => {
   };
   let instagramAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
   let xAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
+  let facebookAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
 
   beforeEach(() => {
     // Generated programmatically — never hand-typed, per the lesson from
@@ -46,12 +48,19 @@ describe('SocialAccountsService', () => {
       connect: jest.fn(),
       getAuthorizationUrl: jest.fn().mockReturnValue('https://x.com/i/oauth2/authorize?mock=1'),
     };
+    facebookAdapter = {
+      connect: jest.fn(),
+      getAuthorizationUrl: jest
+        .fn()
+        .mockReturnValue('https://www.facebook.com/v21.0/dialog/oauth?mock=1'),
+    };
 
     service = new SocialAccountsService(
       prisma as never,
       tokenEncryption,
       instagramAdapter as unknown as InstagramAdapter,
       xAdapter as unknown as XAdapter,
+      facebookAdapter as unknown as FacebookAdapter,
     );
   });
 
@@ -126,6 +135,57 @@ describe('SocialAccountsService', () => {
       await expect(
         service.handleInstagramCallback('code', futureState),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('Facebook flow (Milestone 8.1)', () => {
+    it('buildFacebookAuthorizationUrl encodes a state and returns the adapter URL', () => {
+      const url = service.buildFacebookAuthorizationUrl('org_fb');
+
+      expect(url).toBe('https://www.facebook.com/v21.0/dialog/oauth?mock=1');
+      expect(facebookAdapter.getAuthorizationUrl).toHaveBeenCalledTimes(1);
+      const stateArg = facebookAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+      expect(typeof stateArg).toBe('string');
+      expect(stateArg.length).toBeGreaterThan(0);
+    });
+
+    it('handleFacebookCallback decodes state and upserts with encrypted tokens', async () => {
+      service.buildFacebookAuthorizationUrl('org_fb');
+      const state = facebookAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+
+      facebookAdapter.connect.mockResolvedValue({
+        externalAccountId: 'page_1',
+        accessToken: 'raw_page_token',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      });
+      prisma.socialAccount.upsert.mockResolvedValue({
+        platform: 'facebook',
+        externalAccountId: 'page_1',
+      });
+
+      await service.handleFacebookCallback('auth-code', state);
+
+      const upsertArgs = prisma.socialAccount.upsert.mock.calls[0][0];
+      expect(upsertArgs.where.orgId_platform_externalAccountId).toEqual({
+        orgId: 'org_fb',
+        platform: 'facebook',
+        externalAccountId: 'page_1',
+      });
+      expect(upsertArgs.create.accessTokenEnc).not.toBe('raw_page_token');
+      expect(tokenEncryption.decrypt(upsertArgs.create.accessTokenEnc)).toBe(
+        'raw_page_token',
+      );
+    });
+
+    it('handleFacebookCallback rejects a tampered state', async () => {
+      service.buildFacebookAuthorizationUrl('org_fb');
+      const state = facebookAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+      const tampered = `${state.slice(0, -2)}zz`;
+
+      await expect(
+        service.handleFacebookCallback('code', tampered),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(facebookAdapter.connect).not.toHaveBeenCalled();
     });
   });
 

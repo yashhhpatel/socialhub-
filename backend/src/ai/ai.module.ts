@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { ContentModule } from '../content/content.module';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiController } from './ai.controller';
@@ -24,6 +25,7 @@ import { QuotaGuard } from './quota.guard';
     QuotaGuard,
     InstagramAdapter,
     XAdapter,
+    FacebookAdapter,
   ],
   exports: [AiGatewayService],
 })

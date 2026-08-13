@@ -19,8 +19,10 @@ describe('PublishingService', () => {
   };
   let instagramAdapter: { publish: jest.Mock };
   let xAdapter: { publish: jest.Mock };
+  let facebookAdapter: { publish: jest.Mock };
   let igQueue: { add: jest.Mock };
   let xQueue: { add: jest.Mock };
+  let fbQueue: { add: jest.Mock };
 
   const readyVariant = {
     id: 'var_1',
@@ -62,16 +64,20 @@ describe('PublishingService', () => {
     };
     instagramAdapter = { publish: jest.fn() };
     xAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'tweet_9' }) };
+    facebookAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'fb_9' }) };
     igQueue = { add: jest.fn().mockResolvedValue(undefined) };
     xQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    fbQueue = { add: jest.fn().mockResolvedValue(undefined) };
 
     service = new PublishingService(
       prisma as never,
       { decrypt: (v: string) => v.replace(/^ENC\(|\)$/g, '') } as never,
       instagramAdapter as never,
       xAdapter as never,
+      facebookAdapter as never,
       igQueue as never,
       xQueue as never,
+      fbQueue as never,
     );
   });
 

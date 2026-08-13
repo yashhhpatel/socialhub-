@@ -2,6 +2,7 @@ import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { AIFeature, ContentAsset, Platform } from '@prisma/client';
 
 import { ContentService } from '../content/content.service';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiGatewayService } from './ai-gateway.service';
@@ -32,6 +33,7 @@ export class CaptionService {
     private readonly contentService: ContentService,
     private readonly instagramAdapter: InstagramAdapter,
     private readonly xAdapter: XAdapter,
+    private readonly facebookAdapter: FacebookAdapter,
   ) {}
 
   async generateForAsset(
@@ -76,6 +78,8 @@ export class CaptionService {
             return this.instagramAdapter.capabilities().maxCaptionLength;
           case Platform.x:
             return this.xAdapter.capabilities().maxCaptionLength;
+          case Platform.facebook:
+            return this.facebookAdapter.capabilities().maxCaptionLength;
           default:
             return null;
         }
