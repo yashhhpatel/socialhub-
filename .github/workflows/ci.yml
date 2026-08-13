@@ -115,32 +115,7 @@ jobs:
       - name: Install dependencies
         if: steps.detect.outputs.exists == 'true'
         working-directory: backend
-        # `npm ci` is run unchanged and the step still fails on its exit code.
-        # The surrounding shell only MIRRORS npm's own error lines into GitHub
-        # annotations, because raw step logs require repo-admin rights while
-        # annotations are readable from the public API — and every diagnosis
-        # so far has been blocked on not being able to read npm's actual
-        # `npm error code …` line.
-        #
-        # Nothing is suppressed, retried, ignored, or downgraded: no
-        # continue-on-error, and the final `exit` re-raises npm's own status.
-        # Remove this wrapper once the failure is understood and fixed.
-        run: |
-          set +e
-          npm ci 2>&1 | tee /tmp/npm-ci.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            if grep -qE '^npm error (code|Missing|Invalid)' /tmp/npm-ci.log; then
-              grep -E '^npm error (code|Missing|Invalid)' /tmp/npm-ci.log \
-                | head -20 \
-                | while IFS= read -r line; do echo "::error::${line}"; done
-            else
-              # Unrecognised shape — surface the head of the output verbatim.
-              head -20 /tmp/npm-ci.log \
-                | while IFS= read -r line; do echo "::error::${line}"; done
-            fi
-          fi
-          exit "$code"
+        run: npm ci
 
       # Required, and easy to miss: @prisma/client v7 dropped the postinstall
       # that used to generate the client automatically, so `npm ci` alone
