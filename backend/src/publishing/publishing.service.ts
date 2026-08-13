@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   Injectable,
   NotFoundException,
@@ -10,50 +11,62 @@ import {
   SocialAccountStatus,
   VariantStatus,
 } from '@prisma/client';
+import { Queue } from 'bullmq';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlatformAdapter } from '../social-accounts/adapters/adapter.interface';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
+import {
+  PUBLISH_JOB_OPTIONS,
+  PUBLISH_QUEUES,
+  PublishJobData,
+} from './publish-queue.constants';
 
 /**
- * Synchronous publish for the MVP platforms (Milestone 4.2).
+ * Queue-backed publish (Milestone 7.2 — was synchronous in 4.2).
  *
- * SYNCHRONOUS BY DESIGN, FOR NOW: the blueprint defers the queue to Phase
- * 7. A job therefore goes processing -> published|failed inside the
- * request. The PublishJob row is still written BEFORE the platform call
- * and updated after, rather than only on success — otherwise a crash
- * mid-publish would leave no record that anything was attempted, and the
- * user would have no way to tell "never sent" from "sent and we lost the
- * receipt". That distinction is exactly what makes double-posting
- * avoidable.
+ * publishNow now VALIDATES synchronously (so a bad request still 404s/422s
+ * immediately) and then ENQUEUES onto the target platform's queue, returning
+ * a `queued` job. A per-platform worker (see processors/) later runs
+ * executePublish, which is the actual platform call plus retry bookkeeping.
+ * The API contract is unchanged — POST /publish/now was already async-shaped
+ * (202 + a job to poll) since 4.3, precisely so this move needed no change
+ * on the frontend.
  *
- * NO AUTOMATIC RETRY. A failed publish is recorded with the platform's
- * own error text and left for a human to decide about. Retrying blindly
- * after an ambiguous failure — a timeout that may have landed — is how
- * you post twice.
+ * The PublishJob row is still the source of truth for what happened:
+ * queued -> processing -> published | failed. attemptCount and lastError
+ * track the retry history the queue drives.
  */
 @Injectable()
 export class PublishingService {
+  private readonly adapters: Partial<Record<Platform, PlatformAdapter>>;
+  private readonly queues: Partial<Record<Platform, Queue<PublishJobData>>>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenEncryption: TokenEncryptionService,
     instagramAdapter: InstagramAdapter,
     xAdapter: XAdapter,
+    @InjectQueue(PUBLISH_QUEUES[Platform.instagram])
+    instagramQueue: Queue<PublishJobData>,
+    @InjectQueue(PUBLISH_QUEUES[Platform.x])
+    xQueue: Queue<PublishJobData>,
   ) {
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
     };
+    this.queues = {
+      [Platform.instagram]: instagramQueue,
+      [Platform.x]: xQueue,
+    };
   }
-
-  private readonly adapters: Partial<Record<Platform, PlatformAdapter>>;
 
   /**
    * @param caption Overrides the variant's stored caption for this attempt
-   *   (Milestone 5.3). The publish modal's generated/edited caption belongs
-   *   to the attempt, not to the variant — see PublishNowDto.
+   *   (Milestone 5.3). Carried in the job's data so the worker uses it.
    */
   async publishNow(
     orgId: string,
@@ -61,43 +74,103 @@ export class PublishingService {
     socialAccountId: string,
     caption?: string,
   ): Promise<PublishJob> {
-    const { variant, account } = await this.loadAndValidate(
+    const { account } = await this.loadAndValidate(
       orgId,
       variantId,
       socialAccountId,
     );
 
-    const adapter = this.adapters[account.platform];
-    if (!adapter) {
+    const queue = this.queues[account.platform];
+    if (!queue) {
       throw new UnprocessableEntityException(
         `Publishing to ${account.platform} is not supported yet.`,
       );
     }
 
-    // Written before the platform call — see the class note on why a
-    // record must exist even if this process dies mid-publish.
+    // Recorded as `queued` before enqueuing, so there is a row to move to
+    // processing/failed no matter what the worker does — the same
+    // "a record must exist" guarantee 4.2 had, now across a process boundary.
     const job = await this.prisma.publishJob.create({
       data: {
         variantId,
         socialAccountId,
+        status: PublishJobStatus.queued,
+        attemptCount: 0,
+      },
+    });
+
+    await queue.add(
+      'publish',
+      { publishJobId: job.id, caption },
+      PUBLISH_JOB_OPTIONS,
+    );
+
+    return job;
+  }
+
+  /**
+   * The actual platform call, run by a per-platform worker (processors/).
+   *
+   * Throws on failure so BullMQ applies the backoff/retry policy. The DB row
+   * is updated on every attempt; only once retries are exhausted is it marked
+   * `failed`, so a job mid-retry reads as `processing`, not a premature
+   * failure. Never retries on its own — the retry is the queue's, bounded by
+   * PUBLISH_JOB_OPTIONS.attempts.
+   */
+  async executePublish(
+    data: PublishJobData,
+    ctx: { attemptsMade: number; maxAttempts: number },
+  ): Promise<void> {
+    const job = await this.prisma.publishJob.findUnique({
+      where: { id: data.publishJobId },
+    });
+    // The job was cancelled/deleted between enqueue and now. Nothing to do,
+    // and nothing to retry — returning (not throwing) lets BullMQ complete it.
+    if (!job) {
+      return;
+    }
+
+    const variant = await this.prisma.contentVariant.findUnique({
+      where: { id: job.variantId },
+    });
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: job.socialAccountId },
+    });
+    const adapter = account ? this.adapters[account.platform] : undefined;
+
+    if (!variant || !variant.renderedMediaUrl || !account || !adapter) {
+      // A dependency disappeared after enqueue — terminal, not retryable.
+      await this.prisma.publishJob.update({
+        where: { id: job.id },
+        data: {
+          status: PublishJobStatus.failed,
+          lastError:
+            'The variant or account this job targeted no longer exists.',
+        },
+      });
+      return;
+    }
+
+    await this.prisma.publishJob.update({
+      where: { id: job.id },
+      data: {
         status: PublishJobStatus.processing,
-        attemptCount: 1,
+        attemptCount: ctx.attemptsMade + 1,
       },
     });
 
     try {
       const result = await adapter.publish({
-        imageUrl: variant.renderedMediaUrl as string,
+        imageUrl: variant.renderedMediaUrl,
         // Request caption wins, then the variant's stored one, then empty.
-        // `??` and not `||`: an empty string is a deliberate choice to post
-        // without a caption, and must not silently fall back to the
-        // variant's older text.
-        caption: caption ?? variant.caption ?? '',
+        // `??` not `||`: an empty caption is a deliberate choice to post
+        // without one and must not resurrect the variant's older text.
+        caption: data.caption ?? variant.caption ?? '',
         externalAccountId: account.externalAccountId,
         accessToken: this.tokenEncryption.decrypt(account.accessTokenEnc),
       });
 
-      return await this.prisma.publishJob.update({
+      await this.prisma.publishJob.update({
         where: { id: job.id },
         data: {
           status: PublishJobStatus.published,
@@ -106,18 +179,24 @@ export class PublishingService {
         },
       });
     } catch (error) {
-      // The platform's own message is preserved verbatim: "caption too
-      // long" or "media not reachable" is the only thing that tells the
-      // user what to actually change. A generic "publish failed" would
-      // strip exactly the information that makes the failure actionable.
       const message = error instanceof Error ? error.message : 'Publish failed.';
+      const isFinalAttempt = ctx.attemptsMade + 1 >= ctx.maxAttempts;
 
       await this.prisma.publishJob.update({
         where: { id: job.id },
-        data: { status: PublishJobStatus.failed, lastError: message },
+        data: {
+          // Stay `processing` between retries; only the exhausted attempt is
+          // `failed`, so status never lies about whether more will be tried.
+          status: isFinalAttempt
+            ? PublishJobStatus.failed
+            : PublishJobStatus.processing,
+          lastError: message,
+        },
       });
 
-      throw new UnprocessableEntityException(message);
+      // Rethrow so BullMQ schedules the next attempt (or moves the job to its
+      // failed set once attempts are exhausted).
+      throw error;
     }
   }
 
@@ -139,13 +218,14 @@ export class PublishingService {
   /**
    * Enforces the preconditions from the REST design doc: variant must be
    * `ready`, account must be `connected`, and the two must be for the
-   * same platform.
-   *
-   * The platform match is the one worth being strict about — publishing
-   * a 16:9 X rendition to Instagram would "succeed" and simply look
-   * wrong, which is far harder to notice than an outright failure.
+   * same platform. Runs synchronously in publishNow so an invalid request
+   * is rejected before anything is queued.
    */
-  private async loadAndValidate(orgId: string, variantId: string, socialAccountId: string) {
+  private async loadAndValidate(
+    orgId: string,
+    variantId: string,
+    socialAccountId: string,
+  ) {
     const variant = await this.prisma.contentVariant.findUnique({
       where: { id: variantId },
       include: { asset: { select: { orgId: true } } },

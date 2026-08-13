@@ -1,6 +1,7 @@
 import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 
+import { PUBLISH_JOB_OPTIONS, PUBLISH_QUEUES } from './publish-queue.constants';
 import { PublishingService } from './publishing.service';
 
 describe('PublishingService', () => {
@@ -12,6 +13,8 @@ describe('PublishingService', () => {
   };
   let instagramAdapter: { publish: jest.Mock };
   let xAdapter: { publish: jest.Mock };
+  let igQueue: { add: jest.Mock };
+  let xQueue: { add: jest.Mock };
 
   const readyVariant = {
     id: 'var_1',
@@ -31,245 +34,236 @@ describe('PublishingService', () => {
     accessTokenEnc: 'ENC(token)',
   };
 
+  const jobRow = {
+    id: 'job_1',
+    variantId: 'var_1',
+    socialAccountId: 'sa_1',
+    status: 'queued',
+    attemptCount: 0,
+  };
+
   beforeEach(() => {
     prisma = {
       contentVariant: { findUnique: jest.fn().mockResolvedValue(readyVariant) },
       socialAccount: { findUnique: jest.fn().mockResolvedValue(connectedAccount) },
       publishJob: {
-        create: jest.fn().mockResolvedValue({ id: 'job_1', status: 'processing' }),
-        update: jest.fn((args) => ({ id: 'job_1', ...args.data })),
-        findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue(jobRow),
+        update: jest.fn((args) => ({ ...jobRow, ...args.data })),
+        findUnique: jest.fn().mockResolvedValue(jobRow),
       },
     };
     instagramAdapter = { publish: jest.fn() };
     xAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'tweet_9' }) };
+    igQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    xQueue = { add: jest.fn().mockResolvedValue(undefined) };
 
     service = new PublishingService(
       prisma as never,
       { decrypt: (v: string) => v.replace(/^ENC\(|\)$/g, '') } as never,
       instagramAdapter as never,
       xAdapter as never,
+      igQueue as never,
+      xQueue as never,
     );
   });
 
-  describe('publishNow — happy path', () => {
-    it('publishes through the adapter matching the account platform', async () => {
+  describe('publishNow — validate then enqueue (Milestone 7.2)', () => {
+    it('creates a queued job and enqueues onto the account platform queue', async () => {
+      const job = await service.publishNow('org_1', 'var_1', 'sa_1');
+
+      expect(prisma.publishJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'queued' }) }),
+      );
+      // X account -> X queue only; Instagram queue untouched (isolation).
+      expect(xQueue.add).toHaveBeenCalledTimes(1);
+      expect(igQueue.add).not.toHaveBeenCalled();
+      expect(job.status).toBe('queued');
+    });
+
+    it('does NOT call the platform adapter synchronously — that is the worker\'s job', async () => {
       await service.publishNow('org_1', 'var_1', 'sa_1');
+      expect(xAdapter.publish).not.toHaveBeenCalled();
+    });
+
+    it('enqueues the job id, the request caption, and the retry policy', async () => {
+      await service.publishNow('org_1', 'var_1', 'sa_1', 'Just this post');
+
+      expect(xQueue.add).toHaveBeenCalledWith(
+        'publish',
+        { publishJobId: 'job_1', caption: 'Just this post' },
+        PUBLISH_JOB_OPTIONS,
+      );
+    });
+
+    it('uses the X queue name the processor is bound to', () => {
+      expect(PUBLISH_QUEUES[Platform.x]).toBe('publish-x');
+      expect(PUBLISH_QUEUES[Platform.instagram]).toBe('publish-instagram');
+    });
+
+    describe('preconditions reject before anything is queued', () => {
+      const cases: Array<[string, () => void]> = [
+        ['a variant that is not ready', () =>
+          prisma.contentVariant.findUnique.mockResolvedValue({ ...readyVariant, status: 'pending' })],
+        ['a variant with no rendered image', () =>
+          prisma.contentVariant.findUnique.mockResolvedValue({ ...readyVariant, renderedMediaUrl: null })],
+        ['a disconnected account', () =>
+          prisma.socialAccount.findUnique.mockResolvedValue({ ...connectedAccount, status: 'revoked' })],
+        ['a platform mismatch', () =>
+          prisma.socialAccount.findUnique.mockResolvedValue({ ...connectedAccount, platform: Platform.instagram })],
+      ];
+
+      it.each(cases)('rejects %s and enqueues nothing', async (_label, arrange) => {
+        arrange();
+        await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
+          UnprocessableEntityException,
+        );
+        expect(xQueue.add).not.toHaveBeenCalled();
+        expect(igQueue.add).not.toHaveBeenCalled();
+        expect(prisma.publishJob.create).not.toHaveBeenCalled();
+      });
+
+      it('404s another org\'s variant without probing further', async () => {
+        prisma.contentVariant.findUnique.mockResolvedValue({
+          ...readyVariant,
+          asset: { orgId: 'other_org' },
+        });
+        await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
+          NotFoundException,
+        );
+        expect(xQueue.add).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('executePublish — the worker body (Milestone 7.2)', () => {
+    const ctx = { attemptsMade: 0, maxAttempts: 3 };
+
+    it('publishes through the adapter matching the account platform', async () => {
+      await service.executePublish({ publishJobId: 'job_1' }, ctx);
 
       expect(xAdapter.publish).toHaveBeenCalledTimes(1);
       expect(instagramAdapter.publish).not.toHaveBeenCalled();
     });
 
     it('decrypts the stored token — the adapter must never see ciphertext', async () => {
-      await service.publishNow('org_1', 'var_1', 'sa_1');
-
+      await service.executePublish({ publishJobId: 'job_1' }, ctx);
       expect(xAdapter.publish).toHaveBeenCalledWith(
         expect.objectContaining({ accessToken: 'token' }),
       );
     });
 
-    it('records the job BEFORE calling the platform, so a crash leaves a trace', async () => {
-      const order: string[] = [];
-      prisma.publishJob.create.mockImplementation(async () => {
-        order.push('job-created');
-        return { id: 'job_1' };
-      });
-      xAdapter.publish.mockImplementation(async () => {
-        order.push('platform-called');
-        return { externalPostId: 'tweet_9' };
-      });
-
-      await service.publishNow('org_1', 'var_1', 'sa_1');
-
-      expect(order).toEqual(['job-created', 'platform-called']);
-    });
-
-    it("stores the platform's post id, the join key analytics needs later", async () => {
-      await service.publishNow('org_1', 'var_1', 'sa_1');
-
+    it('marks the job published with the platform post id on success', async () => {
+      await service.executePublish({ publishJobId: 'job_1' }, ctx);
       expect(prisma.publishJob.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            status: 'published',
-            externalPostId: 'tweet_9',
-          }),
-        }),
-      );
-    });
-  });
-
-  describe('publishNow — caption resolution (Milestone 5.3)', () => {
-    it('falls back to the variant\'s stored caption when none is supplied', async () => {
-      await service.publishNow('org_1', 'var_1', 'sa_1');
-
-      expect(xAdapter.publish).toHaveBeenCalledWith(
-        expect.objectContaining({ caption: 'Hello world' }),
-      );
-    });
-
-    it('prefers the caption supplied with the request over the stored one', async () => {
-      await service.publishNow('org_1', 'var_1', 'sa_1', 'Freshly generated caption');
-
-      expect(xAdapter.publish).toHaveBeenCalledWith(
-        expect.objectContaining({ caption: 'Freshly generated caption' }),
-      );
-    });
-
-    it('treats an empty caption as a deliberate choice, not a fallback trigger', async () => {
-      // `??` not `||` — clearing the field must post without a caption
-      // rather than silently resurrecting the variant's older text.
-      await service.publishNow('org_1', 'var_1', 'sa_1', '');
-
-      expect(xAdapter.publish).toHaveBeenCalledWith(
-        expect.objectContaining({ caption: '' }),
-      );
-    });
-
-    it('sends an empty string when neither the request nor the variant has one', async () => {
-      prisma.contentVariant.findUnique.mockResolvedValue({
-        ...readyVariant,
-        caption: null,
-      });
-
-      await service.publishNow('org_1', 'var_1', 'sa_1');
-
-      expect(xAdapter.publish).toHaveBeenCalledWith(
-        expect.objectContaining({ caption: '' }),
-      );
-    });
-
-    it('does not write the request caption back onto the variant', async () => {
-      // The caption belongs to this attempt. Persisting it is a separate
-      // concern with its own endpoint, and this service must not quietly
-      // take it on.
-      await service.publishNow('org_1', 'var_1', 'sa_1', 'Just for this post');
-
-      expect(
-        (prisma.contentVariant as unknown as { update?: jest.Mock }).update,
-      ).toBeUndefined();
-    });
-  });
-
-  describe('publishNow — failure handling', () => {
-    it("records the platform's own error text verbatim, not a generic message", async () => {
-      xAdapter.publish.mockRejectedValue(new Error('X publish failed: 403 caption too long'));
-
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-
-      expect(prisma.publishJob.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            status: 'failed',
-            lastError: 'X publish failed: 403 caption too long',
-          }),
+          data: expect.objectContaining({ status: 'published', externalPostId: 'tweet_9' }),
         }),
       );
     });
 
-    it('does NOT retry — a blind retry after an ambiguous failure double-posts', async () => {
-      xAdapter.publish.mockRejectedValue(new Error('timeout'));
-
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow();
-
-      expect(xAdapter.publish).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('publishNow — preconditions', () => {
-    it('refuses a variant that is not ready', async () => {
-      prisma.contentVariant.findUnique.mockResolvedValue({
-        ...readyVariant,
-        status: 'pending',
+    describe('caption resolution', () => {
+      it('prefers the request caption', async () => {
+        await service.executePublish({ publishJobId: 'job_1', caption: 'Fresh' }, ctx);
+        expect(xAdapter.publish).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: 'Fresh' }),
+        );
       });
 
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-      expect(xAdapter.publish).not.toHaveBeenCalled();
-    });
-
-    it('refuses a variant with no rendered image', async () => {
-      prisma.contentVariant.findUnique.mockResolvedValue({
-        ...readyVariant,
-        renderedMediaUrl: null,
+      it('falls back to the variant caption when none supplied', async () => {
+        await service.executePublish({ publishJobId: 'job_1' }, ctx);
+        expect(xAdapter.publish).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: 'Hello world' }),
+        );
       });
 
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      it('treats an empty request caption as a deliberate "no caption"', async () => {
+        await service.executePublish({ publishJobId: 'job_1', caption: '' }, ctx);
+        expect(xAdapter.publish).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: '' }),
+        );
+      });
     });
 
-    it('refuses a disconnected account', async () => {
-      prisma.socialAccount.findUnique.mockResolvedValue({
-        ...connectedAccount,
-        status: 'revoked',
+    describe('retry and exhaustion', () => {
+      it('on a non-final failure: records the error, stays processing, and rethrows', async () => {
+        xAdapter.publish.mockRejectedValue(new Error('rate limited'));
+
+        await expect(
+          service.executePublish({ publishJobId: 'job_1' }, { attemptsMade: 0, maxAttempts: 3 }),
+        ).rejects.toThrow('rate limited');
+
+        // status must NOT be failed yet — more attempts remain.
+        expect(prisma.publishJob.update).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'processing', lastError: 'rate limited' }),
+          }),
+        );
       });
 
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-      expect(xAdapter.publish).not.toHaveBeenCalled();
+      it('on the final failure: marks failed with the platform error, and rethrows', async () => {
+        xAdapter.publish.mockRejectedValue(new Error('still failing'));
+
+        await expect(
+          service.executePublish({ publishJobId: 'job_1' }, { attemptsMade: 2, maxAttempts: 3 }),
+        ).rejects.toThrow('still failing');
+
+        expect(prisma.publishJob.update).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'failed', lastError: 'still failing' }),
+          }),
+        );
+      });
+
+      it('records the attempt number on each try', async () => {
+        await service.executePublish({ publishJobId: 'job_1' }, { attemptsMade: 1, maxAttempts: 3 });
+        // attemptsMade 1 -> this is attempt #2
+        expect(prisma.publishJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'processing', attemptCount: 2 }),
+          }),
+        );
+      });
     });
 
-    it('refuses a platform mismatch — an X rendition must not go to Instagram', async () => {
-      prisma.socialAccount.findUnique.mockResolvedValue({
-        ...connectedAccount,
-        platform: Platform.instagram,
+    describe('terminal, non-retryable states', () => {
+      it('a vanished job is a no-op, not an error (nothing to retry)', async () => {
+        prisma.publishJob.findUnique.mockResolvedValue(null);
+        await expect(
+          service.executePublish({ publishJobId: 'gone' }, ctx),
+        ).resolves.toBeUndefined();
+        expect(xAdapter.publish).not.toHaveBeenCalled();
       });
 
-      // This one matters: publishing a 16:9 X rendition to Instagram
-      // would "succeed" and merely look wrong, which is far harder to
-      // notice than an outright failure.
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-      expect(instagramAdapter.publish).not.toHaveBeenCalled();
-    });
+      it('a missing variant/account marks the job failed WITHOUT throwing (no point retrying)', async () => {
+        prisma.contentVariant.findUnique.mockResolvedValue(null);
 
-    it("404s a variant belonging to another org, never 403", async () => {
-      prisma.contentVariant.findUnique.mockResolvedValue({
-        ...readyVariant,
-        asset: { orgId: 'other_org' },
+        await expect(
+          service.executePublish({ publishJobId: 'job_1' }, ctx),
+        ).resolves.toBeUndefined();
+
+        expect(prisma.publishJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ status: 'failed' }) }),
+        );
+        expect(xAdapter.publish).not.toHaveBeenCalled();
       });
-
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it("404s an account belonging to another org", async () => {
-      prisma.socialAccount.findUnique.mockResolvedValue({
-        ...connectedAccount,
-        orgId: 'other_org',
-      });
-
-      await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
-        NotFoundException,
-      );
     });
   });
 
   describe('findJobScoped', () => {
-    it('returns a job owned by the caller org', async () => {
+    it('returns a job that belongs to the org', async () => {
       prisma.publishJob.findUnique.mockResolvedValue({
-        id: 'job_1',
+        ...jobRow,
         socialAccount: { orgId: 'org_1' },
       });
-
-      expect((await service.findJobScoped('job_1', 'org_1')).id).toBe('job_1');
+      await expect(service.findJobScoped('job_1', 'org_1')).resolves.toBeTruthy();
     });
 
-    it("404s another org's job rather than revealing it exists", async () => {
+    it('404s a job belonging to another org', async () => {
       prisma.publishJob.findUnique.mockResolvedValue({
-        id: 'job_1',
-        socialAccount: { orgId: 'other_org' },
+        ...jobRow,
+        socialAccount: { orgId: 'other' },
       });
-
-      await expect(service.findJobScoped('job_1', 'org_1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findJobScoped('job_1', 'org_1')).rejects.toThrow(NotFoundException);
     });
   });
 });
