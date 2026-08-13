@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { CloudinaryService } from '../media/cloudinary.service';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { ContentController } from './content.controller';
@@ -24,6 +25,7 @@ import { VariantGeneratorService } from './variant-generator.service';
     VariantGeneratorService,
     InstagramAdapter,
     XAdapter,
+    FacebookAdapter,
   ],
   exports: [ContentService],
 })

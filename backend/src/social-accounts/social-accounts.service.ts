@@ -4,6 +4,7 @@ import { Platform, SocialAccount } from '@prisma/client';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { generatePkcePair } from '../common/crypto/pkce.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
 import { XAdapter } from './adapters/x.adapter';
 
@@ -36,6 +37,7 @@ export class SocialAccountsService {
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly instagramAdapter: InstagramAdapter,
     private readonly xAdapter: XAdapter,
+    private readonly facebookAdapter: FacebookAdapter,
   ) {}
 
   // --- Instagram ---
@@ -70,6 +72,19 @@ export class SocialAccountsService {
     }
     const result = await this.xAdapter.connect(code, codeVerifier);
     return this.upsertAccount(orgId, Platform.x, result);
+  }
+
+  // --- Facebook (Milestone 8.1) ---
+
+  buildFacebookAuthorizationUrl(orgId: string): string {
+    const state = this.encodeState({ orgId, issuedAt: Date.now() });
+    return this.facebookAdapter.getAuthorizationUrl(state);
+  }
+
+  async handleFacebookCallback(code: string, rawState: string): Promise<SocialAccount> {
+    const { orgId } = this.decodeState(rawState);
+    const result = await this.facebookAdapter.connect(code);
+    return this.upsertAccount(orgId, Platform.facebook, result);
   }
 
   // --- Shared: list / disconnect (any platform) ---

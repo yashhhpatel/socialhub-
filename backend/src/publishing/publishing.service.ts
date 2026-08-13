@@ -16,6 +16,7 @@ import { Queue } from 'bullmq';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlatformAdapter } from '../social-accounts/adapters/adapter.interface';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import {
@@ -49,18 +50,23 @@ export class PublishingService {
     private readonly tokenEncryption: TokenEncryptionService,
     instagramAdapter: InstagramAdapter,
     xAdapter: XAdapter,
+    facebookAdapter: FacebookAdapter,
     @InjectQueue(PUBLISH_QUEUES[Platform.instagram])
     instagramQueue: Queue<PublishJobData>,
     @InjectQueue(PUBLISH_QUEUES[Platform.x])
     xQueue: Queue<PublishJobData>,
+    @InjectQueue(PUBLISH_QUEUES[Platform.facebook])
+    facebookQueue: Queue<PublishJobData>,
   ) {
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
+      [Platform.facebook]: facebookAdapter,
     };
     this.queues = {
       [Platform.instagram]: instagramQueue,
       [Platform.x]: xQueue,
+      [Platform.facebook]: facebookQueue,
     };
   }
 

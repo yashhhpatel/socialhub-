@@ -3,10 +3,12 @@ import { Module } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { PublishingController } from './publishing.controller';
 import { PublishingService } from './publishing.service';
+import { FacebookPublishProcessor } from './processors/facebook-publish.processor';
 import { InstagramPublishProcessor } from './processors/instagram-publish.processor';
 import { XPublishProcessor } from './processors/x-publish.processor';
 import { PUBLISH_QUEUES } from './publish-queue.constants';
@@ -29,6 +31,7 @@ import { ScheduledPublishDispatcher } from './schedule.cron';
     BullModule.registerQueue(
       { name: PUBLISH_QUEUES[Platform.instagram] },
       { name: PUBLISH_QUEUES[Platform.x] },
+      { name: PUBLISH_QUEUES[Platform.facebook] },
     ),
   ],
   controllers: [PublishingController],
@@ -37,8 +40,10 @@ import { ScheduledPublishDispatcher } from './schedule.cron';
     TokenEncryptionService,
     InstagramAdapter,
     XAdapter,
+    FacebookAdapter,
     InstagramPublishProcessor,
     XPublishProcessor,
+    FacebookPublishProcessor,
     ScheduledPublishDispatcher,
   ],
   exports: [PublishingService],

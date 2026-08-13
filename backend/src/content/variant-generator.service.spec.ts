@@ -1,6 +1,7 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 import { ContentAsset, Platform } from '@prisma/client';
 
+import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { VariantGeneratorService } from './variant-generator.service';
@@ -24,6 +25,7 @@ describe('VariantGeneratorService', () => {
     get: () => 'test',
   } as never);
   const xAdapter = new XAdapter({ get: () => 'test' } as never);
+  const facebookAdapter = new FacebookAdapter({ get: () => 'test' } as never);
 
   beforeEach(() => {
     prisma = { contentVariant: { upsert: jest.fn((args) => ({ id: 'var_1', ...args.create })) } };
@@ -39,14 +41,17 @@ describe('VariantGeneratorService', () => {
       cloudinary as never,
       instagramAdapter,
       xAdapter,
+      facebookAdapter,
     );
   });
 
   describe('supported platforms', () => {
     it('reports only the platforms that actually have an adapter', () => {
-      // Facebook/Threads/LinkedIn arrive in Phase 8 — claiming support
-      // now would produce variants nothing can publish.
-      expect(service.supportedPlatforms.sort()).toEqual([Platform.instagram, Platform.x].sort());
+      // Threads/LinkedIn arrive later in Phase 8 — claiming support before
+      // their adapters exist would produce variants nothing can publish.
+      expect(service.supportedPlatforms.sort()).toEqual(
+        [Platform.instagram, Platform.x, Platform.facebook].sort(),
+      );
     });
 
     it('rejects a platform with no adapter as 422, not a silent no-op', () => {
@@ -125,7 +130,7 @@ describe('VariantGeneratorService', () => {
 
     it('refuses an unsupported platform before writing ANY variant', async () => {
       await expect(
-        service.generate(asset, [Platform.instagram, Platform.facebook]),
+        service.generate(asset, [Platform.instagram, Platform.linkedin]),
       ).rejects.toThrow(UnprocessableEntityException);
     });
   });
