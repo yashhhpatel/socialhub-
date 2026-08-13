@@ -8,6 +8,7 @@ import {
 } from '../social-accounts/adapters/adapter.interface';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -42,6 +43,7 @@ export class VariantGeneratorService {
     instagramAdapter: InstagramAdapter,
     xAdapter: XAdapter,
     facebookAdapter: FacebookAdapter,
+    threadsAdapter: ThreadsAdapter,
   ) {
     // Direct injection rather than a registry, matching how
     // SocialAccountsService already composes adapters. Phase 8 adds the
@@ -51,6 +53,7 @@ export class VariantGeneratorService {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
       [Platform.facebook]: facebookAdapter,
+      [Platform.threads]: threadsAdapter,
     };
   }
 

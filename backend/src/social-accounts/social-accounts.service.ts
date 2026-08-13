@@ -6,6 +6,7 @@ import { generatePkcePair } from '../common/crypto/pkce.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
+import { ThreadsAdapter } from './adapters/threads.adapter';
 import { XAdapter } from './adapters/x.adapter';
 
 const STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
@@ -38,6 +39,7 @@ export class SocialAccountsService {
     private readonly instagramAdapter: InstagramAdapter,
     private readonly xAdapter: XAdapter,
     private readonly facebookAdapter: FacebookAdapter,
+    private readonly threadsAdapter: ThreadsAdapter,
   ) {}
 
   // --- Instagram ---
@@ -85,6 +87,19 @@ export class SocialAccountsService {
     const { orgId } = this.decodeState(rawState);
     const result = await this.facebookAdapter.connect(code);
     return this.upsertAccount(orgId, Platform.facebook, result);
+  }
+
+  // --- Threads (Milestone 8.2) ---
+
+  buildThreadsAuthorizationUrl(orgId: string): string {
+    const state = this.encodeState({ orgId, issuedAt: Date.now() });
+    return this.threadsAdapter.getAuthorizationUrl(state);
+  }
+
+  async handleThreadsCallback(code: string, rawState: string): Promise<SocialAccount> {
+    const { orgId } = this.decodeState(rawState);
+    const result = await this.threadsAdapter.connect(code);
+    return this.upsertAccount(orgId, Platform.threads, result);
   }
 
   // --- Shared: list / disconnect (any platform) ---

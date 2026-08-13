@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
+import { ThreadsAdapter } from './adapters/threads.adapter';
 import { XAdapter } from './adapters/x.adapter';
 import { SocialAccountsService } from './social-accounts.service';
 
@@ -22,6 +23,7 @@ describe('SocialAccountsService', () => {
   let instagramAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
   let xAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
   let facebookAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
+  let threadsAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
 
   beforeEach(() => {
     // Generated programmatically — never hand-typed, per the lesson from
@@ -54,6 +56,12 @@ describe('SocialAccountsService', () => {
         .fn()
         .mockReturnValue('https://www.facebook.com/v21.0/dialog/oauth?mock=1'),
     };
+    threadsAdapter = {
+      connect: jest.fn(),
+      getAuthorizationUrl: jest
+        .fn()
+        .mockReturnValue('https://threads.net/oauth/authorize?mock=1'),
+    };
 
     service = new SocialAccountsService(
       prisma as never,
@@ -61,6 +69,7 @@ describe('SocialAccountsService', () => {
       instagramAdapter as unknown as InstagramAdapter,
       xAdapter as unknown as XAdapter,
       facebookAdapter as unknown as FacebookAdapter,
+      threadsAdapter as unknown as ThreadsAdapter,
     );
   });
 
@@ -186,6 +195,45 @@ describe('SocialAccountsService', () => {
         service.handleFacebookCallback('code', tampered),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(facebookAdapter.connect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Threads flow (Milestone 8.2)', () => {
+    it('buildThreadsAuthorizationUrl encodes a state and returns the adapter URL', () => {
+      const url = service.buildThreadsAuthorizationUrl('org_th');
+
+      expect(url).toBe('https://threads.net/oauth/authorize?mock=1');
+      expect(threadsAdapter.getAuthorizationUrl).toHaveBeenCalledTimes(1);
+      const stateArg = threadsAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+      expect(typeof stateArg).toBe('string');
+      expect(stateArg.length).toBeGreaterThan(0);
+    });
+
+    it('handleThreadsCallback decodes state and upserts with encrypted tokens', async () => {
+      service.buildThreadsAuthorizationUrl('org_th');
+      const state = threadsAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+
+      threadsAdapter.connect.mockResolvedValue({
+        externalAccountId: 'th_user_1',
+        accessToken: 'raw_threads_token',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      });
+      prisma.socialAccount.upsert.mockResolvedValue({
+        platform: 'threads',
+        externalAccountId: 'th_user_1',
+      });
+
+      await service.handleThreadsCallback('auth-code', state);
+
+      const upsertArgs = prisma.socialAccount.upsert.mock.calls[0][0];
+      expect(upsertArgs.where.orgId_platform_externalAccountId).toEqual({
+        orgId: 'org_th',
+        platform: 'threads',
+        externalAccountId: 'th_user_1',
+      });
+      expect(tokenEncryption.decrypt(upsertArgs.create.accessTokenEnc)).toBe(
+        'raw_threads_token',
+      );
     });
   });
 
