@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/node';
 
 import { AllExceptionsFilter } from './http-exception.filter';
 
@@ -34,10 +35,15 @@ describe('AllExceptionsFilter', () => {
     };
   }
 
+  let captureSpy: jest.SpyInstance;
+
   beforeEach(() => {
     filter = new AllExceptionsFilter();
     // The unhandled-error path logs a stack; keep test output clean.
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    // captureException is a no-op without a DSN, but assert on the intent
+    // rather than the SDK's internal state.
+    captureSpy = jest.spyOn(Sentry, 'captureException').mockReturnValue('evt');
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -118,6 +124,26 @@ describe('AllExceptionsFilter', () => {
       expect(logged).toContain('POST /publish/now');
       expect(logged).toContain(body.requestId as string);
       expect(logged).toContain('boom');
+    });
+
+    it('reports the error to Sentry, tagged with the request id', () => {
+      const error = new Error('boom');
+      const { body } = run(error);
+
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy).toHaveBeenCalledWith(error, {
+        tags: { requestId: body.requestId },
+      });
+    });
+  });
+
+  describe('Sentry reporting scope', () => {
+    it('does NOT report expected HttpExceptions — those are the app working', () => {
+      // A 4xx is by design; sending it to Sentry would be pure noise.
+      run(new ConflictException('dup'));
+      run(new BadRequestException(['bad']));
+
+      expect(captureSpy).not.toHaveBeenCalled();
     });
   });
 });

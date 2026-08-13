@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/node';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 
@@ -70,6 +71,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof Error ? exception.stack : String(exception)
       }`,
     );
+
+    // Report to Sentry (Milestone 6.3). Only unplanned errors are sent —
+    // expected HttpExceptions (4xx) are the app working as designed and
+    // would just be noise. A no-op when SENTRY_DSN is unset; the requestId
+    // is attached so a Sentry event and a log line can be joined.
+    Sentry.captureException(exception, { tags: { requestId } });
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
