@@ -8,7 +8,9 @@ name: _regen-lock (temporary)
 # a human to download and commit. Delete this workflow once the lockfile
 # is fixed.
 on:
-  workflow_dispatch:
+  push:
+    branches: [chore/ci-toolchain-fix]
+    paths: ['.github/workflows/_regen-lock.yml']
 
 jobs:
   regen:
