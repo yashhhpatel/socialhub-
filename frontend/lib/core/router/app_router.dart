@@ -6,7 +6,7 @@ import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
-import '../../features/calendar/presentation/screens/calendar_screen.dart';
+import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/editor/editor_screen.dart';
@@ -108,7 +108,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/calendar',
             name: 'calendar',
-            builder: (context, state) => const CalendarScreen(),
+            builder: (context, state) => const SchedulerScreen(),
           ),
           GoRoute(
             path: '/ai-assistant',
