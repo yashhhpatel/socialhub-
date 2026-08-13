@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { initSentry } from './common/observability/sentry';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -40,6 +41,14 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   const configService = app.get(ConfigService);
+
+  // Error monitoring (Milestone 6.3). Initialised before the server starts
+  // listening so nothing is served un-monitored. No-op without a SENTRY_DSN.
+  initSentry(
+    configService.get<string>('SENTRY_DSN'),
+    configService.get<string>('NODE_ENV', 'development'),
+  );
+
   const port = configService.get<number>('PORT', 3000);
 
   await app.listen(port);

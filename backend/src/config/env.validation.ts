@@ -40,4 +40,11 @@ export const envValidationSchema = Joi.object({
   // reasoning as JWT_ACCESS_SECRET: a missing encryption key must fail
   // boot loudly, never silently fall back to something guessable.
   TOKEN_ENCRYPTION_KEY: Joi.string().hex().length(64).required(),
+
+  // Sentry error monitoring (Milestone 6.3). Deliberately optional and NOT
+  // required at boot — same reasoning as the Cloudinary/OAuth/Anthropic
+  // credentials: a developer without a DSN should still run the app, which
+  // simply reports nothing. Validated as a URI only when present, so a
+  // malformed DSN is caught at boot rather than silently ignored by the SDK.
+  SENTRY_DSN: Joi.string().uri().optional(),
 });
