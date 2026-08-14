@@ -1,4 +1,6 @@
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
+import { GraphQLModule } from '@nestjs/graphql';
 import { ScheduleModule } from '@nestjs/schedule';
 
 import { AiModule } from './ai/ai.module';
@@ -29,6 +31,17 @@ import { UsersModule } from './users/users.module';
     // Enables @Cron (Milestone 7.3): the scheduled-publish dispatcher scans
     // for due jobs on an interval.
     ScheduleModule.forRoot(),
+    // Code-first GraphQL (Milestone 10.3): the schema is generated in memory
+    // from the resolver's decorated types (no checked-in .graphql file).
+    // `context: ({ req }) => ({ req })` hands the HTTP request to
+    // GqlJwtAuthGuard so the same JWT strategy guards GraphQL. Playground off
+    // — this is a machine endpoint, not a public sandbox.
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      autoSchemaFile: true,
+      context: ({ req }: { req: unknown }) => ({ req }),
+      playground: false,
+    }),
     HealthModule,
     UsersModule,
     OrganizationsModule,
