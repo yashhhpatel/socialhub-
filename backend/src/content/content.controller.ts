@@ -15,9 +15,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CloudinaryService } from '../media/cloudinary.service';
 import { VideoProcessingService } from '../media/video-processing.service';
 import { ContentService } from './content.service';
@@ -51,7 +54,8 @@ export class ContentController {
     private readonly variantGenerator: VariantGeneratorService,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post()
   create(
     @Req() req: AuthenticatedRequest,
@@ -90,7 +94,8 @@ export class ContentController {
     return this.contentService.findByIdScopedWithVariants(id, req.user.orgId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Patch(':id')
   update(
     @Req() req: AuthenticatedRequest,
@@ -109,7 +114,8 @@ export class ContentController {
    * editor embeds the returned url inside a layer's own canvasJson via the
    * existing PATCH endpoint.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -159,7 +165,8 @@ export class ContentController {
    * frontend written against it needs no change then, and 202 does not
    * promise the work is incomplete, only that it was accepted.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post(':id/variants')
   @HttpCode(HttpStatus.ACCEPTED)
   async generateVariants(

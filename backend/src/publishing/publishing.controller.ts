@@ -11,9 +11,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { ListJobsDto } from './dto/list-jobs.dto';
 import {
   PublishJobDto,
@@ -37,7 +40,8 @@ export class PublishingController {
    * 7.2). 202 per the REST design doc: the request validates and enqueues,
    * returning a `queued` job the caller polls via GET /publish/jobs/:id.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post('now')
   @HttpCode(HttpStatus.ACCEPTED)
   async publishNow(
@@ -60,7 +64,8 @@ export class PublishingController {
    * cron enqueues it when it comes due, at which point its status walks the
    * usual queued -> processing -> published|failed path.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post('schedule')
   @HttpCode(HttpStatus.ACCEPTED)
   async schedule(
@@ -122,7 +127,8 @@ export class PublishingController {
   }
 
   /** Cancels a still-scheduled post (Milestone 7.4). */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Delete('jobs/:id')
   async cancelJob(
     @Req() req: AuthenticatedRequest,
