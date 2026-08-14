@@ -15,13 +15,13 @@ extension SocialPlatformX on SocialPlatform {
         SocialPlatform.linkedin => 'LinkedIn',
       };
 
-  /// Only Instagram (Milestone 2.2) and X (Milestone 2.3) have a real
-  /// backend adapter/route so far. Facebook/Threads/LinkedIn arrive in
-  /// Phase 8 — shown in this screen as "coming soon" rather than omitted
-  /// entirely, so the UI already communicates the full target platform
-  /// set per the architecture doc's product vision.
-  bool get isConnectable =>
-      this == SocialPlatform.instagram || this == SocialPlatform.x;
+  /// All five platforms now have a real backend adapter + connect/callback
+  /// route (Instagram 2.2, X 2.3, Facebook 8.1, Threads 8.2, LinkedIn 8.3),
+  /// so every one is connectable. Kept as an explicit flag rather than
+  /// inlining `true` at call sites: the connect repository still uses it as
+  /// a defensive guard, and a future platform added to the enum ahead of
+  /// its backend route would set this to false without touching callers.
+  bool get isConnectable => true;
 
   static SocialPlatform fromApiValue(String value) =>
       SocialPlatform.values.byName(value);

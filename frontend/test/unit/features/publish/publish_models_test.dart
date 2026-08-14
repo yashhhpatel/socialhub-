@@ -24,12 +24,15 @@ void main() {
       // these are pinned to the adapters' own numbers.
       expect(_variant(platform: 'x').maxCaptionLength, 280);
       expect(_variant(platform: 'instagram').maxCaptionLength, 2200);
+      expect(_variant(platform: 'facebook').maxCaptionLength, 63206);
+      expect(_variant(platform: 'threads').maxCaptionLength, 500);
+      expect(_variant(platform: 'linkedin').maxCaptionLength, 3000);
     });
 
     test('falls back generously for a platform with no configured limit', () {
       // Advisory counter only — warning about a limit that may not apply
-      // is worse than not warning.
-      expect(_variant(platform: 'threads').maxCaptionLength, 2200);
+      // is worse than not warning. Uses a platform not in the map.
+      expect(_variant(platform: 'pinterest').maxCaptionLength, 2200);
     });
   });
 

@@ -1,5 +1,6 @@
 /// Caption ceiling per platform, mirroring each adapter's `capabilities()`
-/// on the backend (instagram.adapter.ts: 2200, x.adapter.ts: 280).
+/// on the backend (instagram: 2200, x: 280, facebook: 63206, threads: 500,
+/// linkedin: 3000 — see the matching `*.adapter.ts`).
 ///
 /// Duplicated here rather than fetched because the publish modal needs it
 /// to render a live character counter as the user types — a round trip per
@@ -9,6 +10,9 @@
 const _maxCaptionLengthByPlatform = <String, int>{
   'instagram': 2200,
   'x': 280,
+  'facebook': 63206,
+  'threads': 500,
+  'linkedin': 3000,
 };
 
 /// Used when a variant's platform has no known limit — a platform added to

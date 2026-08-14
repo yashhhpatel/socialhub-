@@ -11,12 +11,10 @@ void main() {
       expect(SocialPlatform.linkedin.apiValue, 'linkedin');
     });
 
-    test('only instagram and x are connectable (Milestones 2.2/2.3)', () {
-      expect(SocialPlatform.instagram.isConnectable, isTrue);
-      expect(SocialPlatform.x.isConnectable, isTrue);
-      expect(SocialPlatform.facebook.isConnectable, isFalse);
-      expect(SocialPlatform.threads.isConnectable, isFalse);
-      expect(SocialPlatform.linkedin.isConnectable, isFalse);
+    test('all five platforms are connectable (Phase 8 complete)', () {
+      for (final platform in SocialPlatform.values) {
+        expect(platform.isConnectable, isTrue, reason: '${platform.label} should be connectable');
+      }
     });
 
     test('fromApiValue round-trips correctly for every platform', () {
