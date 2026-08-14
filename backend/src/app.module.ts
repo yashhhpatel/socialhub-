@@ -10,6 +10,7 @@ import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { ContentModule } from './content/content.module';
 import { HealthModule } from './health/health.module';
+import { InvitesModule } from './organizations/invites/invites.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
@@ -45,6 +46,7 @@ import { UsersModule } from './users/users.module';
     HealthModule,
     UsersModule,
     OrganizationsModule,
+    InvitesModule,
     AuthModule,
     SocialAccountsModule,
     ContentModule,

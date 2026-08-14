@@ -118,9 +118,41 @@ model Organization {
   aiUsageLogs      AIUsageLog[]
   brandKit         BrandKit?
   templates        Template[]
+  invites          Invite[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+}
+
+/// A pending invitation for someone to join an org at a given role
+/// (Milestone 11.1).
+///
+/// Only a HASH of the invite token is stored — the raw token lives solely in
+/// the emailed accept link, exactly as RefreshToken does it, so a database
+/// leak never yields a usable invite. Acceptance is single-use (status flips
+/// to accepted) and time-bounded (expiresAt). The role is captured at invite
+/// time, capped to the inviter's own rank by the service.
+model Invite {
+  id           String       @id @default(uuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  email        String
+  role         UserRole
+  tokenHash    String       @unique
+  status       InviteStatus @default(pending)
+  invitedById  String
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([orgId, status])
+  @@map("invite")
 }
 
 model User {
