@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { AiModule } from './ai/ai.module';
 import { AuthModule } from './auth/auth.module';
+import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { ContentModule } from './content/content.module';
 import { HealthModule } from './health/health.module';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
     ContentModule,
     PublishingModule,
     AiModule,
+    BrandKitsModule,
   ],
 })
 export class AppModule {}

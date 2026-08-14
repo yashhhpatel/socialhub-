@@ -23,6 +23,7 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
     this.onExport,
     this.onGenerateVariants,
     this.onPublish,
+    this.onApplyBrandKit,
   });
 
   final CanvasDocument document;
@@ -34,6 +35,10 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
   final Future<void> Function()? onExport;
   final VoidCallback? onGenerateVariants;
   final VoidCallback? onPublish;
+
+  /// Applies the org's brand kit across the whole canvas (Milestone 9.3).
+  /// Null when the editor runs without a backing asset.
+  final VoidCallback? onApplyBrandKit;
 
   /// Null when the editor is running without a backing asset (the blank
   /// scratch document EditorScreen defaults to) — there's nothing to save
@@ -124,6 +129,14 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
               tooltip: 'Redo (Ctrl+Y)',
               onPressed: state.canRedo ? controller.redo : null,
             ),
+            if (onApplyBrandKit != null) ...[
+              const VerticalDivider(width: SpacingTokens.md, indent: 12, endIndent: 12),
+              _ToolbarButton(
+                icon: Icons.palette_outlined,
+                tooltip: 'Apply brand kit',
+                onPressed: actionState?.busy == true ? null : onApplyBrandKit,
+              ),
+            ],
             const Spacer(),
             if (onExport != null) ...[
               OutlinedButton.icon(

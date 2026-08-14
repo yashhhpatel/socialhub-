@@ -116,6 +116,7 @@ model Organization {
   socialAccounts   SocialAccount[]
   contentAssets    ContentAsset[]
   aiUsageLogs      AIUsageLog[]
+  brandKit         BrandKit?
   createdAt        DateTime        @default(now())
 
   @@map("organization")
@@ -297,4 +298,28 @@ model AIUsageLog {
   // the tenant, createdAt then serves the window as a range scan.
   @@index([orgId, createdAt])
   @@map("ai_usage_log")
+}
+
+/// One brand kit per org (Milestone 9.3): the reusable colours, fonts and
+/// logo applied across designs. Modelled 1:1 with Organization (orgId is
+/// unique) because "your brand" is a single thing per tenant, not a
+/// collection — a multi-brand/sub-brand model would be a different feature.
+///
+/// colors/fonts are plain string arrays (hex values and font-family names)
+/// rather than their own tables: they are an unordered-ish small list edited
+/// as a whole in the brand-kit editor, never queried or joined individually,
+/// so a Postgres text[] is the right weight. The logo is a Cloudinary URL +
+/// publicId, the same shape ContentAsset already uses for uploaded media.
+model BrandKit {
+  id           String       @id @default(uuid())
+  orgId        String       @unique
+  organization Organization @relation(fields: [orgId], references: [id])
+  colors       String[]     @default([])
+  fonts        String[]     @default([])
+  logoUrl      String?
+  logoPublicId String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("brand_kit")
 }

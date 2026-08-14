@@ -79,6 +79,12 @@ const List<NavDestinationData> navDestinations = [
     selectedIcon: Icons.apartment,
   ),
   NavDestinationData(
+    path: '/brand-kit',
+    label: 'Brand Kit',
+    icon: Icons.palette_outlined,
+    selectedIcon: Icons.palette,
+  ),
+  NavDestinationData(
     path: '/settings',
     label: 'Settings',
     icon: Icons.settings_outlined,
