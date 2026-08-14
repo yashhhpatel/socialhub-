@@ -7,6 +7,7 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/brand_kit/presentation/screens/brand_kit_screen.dart';
+import '../../features/team/presentation/screens/accept_invite_screen.dart';
 import '../../features/templates/presentation/screens/templates_screen.dart';
 import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
@@ -73,6 +74,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Public (Milestone 11.3): where an invite email link lands. Not in
+      // navDestinations, so authRedirect leaves it reachable while logged out.
+      GoRoute(
+        path: '/accept-invite',
+        name: 'accept-invite',
+        builder: (context, state) =>
+            AcceptInviteScreen(token: state.uri.queryParameters['token']),
       ),
       // Milestone 3.6. Deliberately OUTSIDE the ShellRoute: the editor is
       // a full-bleed workspace with its own toolbar, and keeping the
