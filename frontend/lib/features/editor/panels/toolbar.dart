@@ -25,6 +25,7 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
     this.onPublish,
     this.onApplyBrandKit,
     this.onSaveAsTemplate,
+    this.hasComments = false,
   });
 
   final CanvasDocument document;
@@ -44,6 +45,10 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
   /// Saves the current design as a reusable template (Milestone 9.4). Null
   /// when the editor runs without a backing asset.
   final VoidCallback? onSaveAsTemplate;
+
+  /// Whether a comment sidebar (end-drawer) is available to open
+  /// (Milestone 13.3). Only true for the real asset-backed editor.
+  final bool hasComments;
 
   /// Null when the editor is running without a backing asset (the blank
   /// scratch document EditorScreen defaults to) — there's nothing to save
@@ -224,6 +229,19 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
                 onPressed: actionState?.busy == true ? null : onSaveAsTemplate,
               ),
             const Spacer(),
+            if (hasComments) ...[
+              // Builder so Scaffold.of resolves the editor's Scaffold (this
+              // toolbar is its appBar), letting the button open the comment
+              // end-drawer.
+              Builder(
+                builder: (context) => _ToolbarButton(
+                  icon: Icons.forum_outlined,
+                  tooltip: 'Comments',
+                  onPressed: () => Scaffold.of(context).openEndDrawer(),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+            ],
             if (onExport != null) ...[
               OutlinedButton.icon(
                 onPressed: actionState?.busy == true ? null : () => onExport!(),
