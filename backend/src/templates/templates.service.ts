@@ -27,6 +27,8 @@ export class TemplatesService {
         name: true,
         category: true,
         thumbnailUrl: true,
+        isPublic: true,
+        publishedById: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -53,6 +55,81 @@ export class TemplatesService {
         category: dto.category ?? null,
         thumbnailUrl: dto.thumbnailUrl ?? null,
         canvasJson: dto.canvasJson as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  // --- Marketplace (Milestone 14.1) ---
+
+  /**
+   * Publishes one of the org's OWN templates to the public marketplace. Scoped
+   * so an org can only publish its own template; publishedById records who did.
+   */
+  async publish(orgId: string, templateId: string, userId: string): Promise<Template> {
+    await this.findByIdScoped(templateId, orgId); // 404s another org's template
+    return this.prisma.template.update({
+      where: { id: templateId },
+      data: { isPublic: true, publishedById: userId },
+    });
+  }
+
+  /**
+   * The public marketplace listing — public templates across ALL orgs
+   * (cross-org discovery is the whole point), optionally filtered by a name
+   * search and/or category. canvasJson is omitted from cards, as in [list].
+   */
+  searchMarketplace(query: {
+    search?: string;
+    category?: string;
+  }): Promise<Omit<Template, 'canvasJson'>[]> {
+    return this.prisma.template.findMany({
+      where: {
+        isPublic: true,
+        ...(query.category ? { category: query.category } : {}),
+        ...(query.search
+          ? { name: { contains: query.search, mode: 'insensitive' } }
+          : {}),
+      },
+      select: {
+        id: true,
+        orgId: true,
+        name: true,
+        category: true,
+        thumbnailUrl: true,
+        isPublic: true,
+        publishedById: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  /**
+   * Clones a PUBLIC template into the caller's org (clone-on-use). Deep-copies
+   * the canvas into a brand-new row owned by [orgId] and always private
+   * (isPublic=false) — so the two orgs' copies share no state, and cloning
+   * never re-publishes. Only public templates are clonable; a private one 404s
+   * to a different org exactly like a missing one.
+   */
+  async clone(orgId: string, templateId: string): Promise<Template> {
+    const source = await this.prisma.template.findUnique({ where: { id: templateId } });
+    if (!source || !source.isPublic) {
+      throw new NotFoundException('Template not found in the marketplace.');
+    }
+    return this.prisma.template.create({
+      data: {
+        orgId,
+        name: source.name,
+        category: source.category,
+        thumbnailUrl: source.thumbnailUrl,
+        // Deep-copied so the clone shares no object reference with the source
+        // — the "no shared state between org copies" guarantee, belt-and-
+        // braces on top of the separate DB rows Prisma already creates.
+        canvasJson: structuredClone(source.canvasJson) as Prisma.InputJsonValue,
+        isPublic: false,
+        publishedById: null,
       },
     });
   }

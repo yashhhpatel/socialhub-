@@ -450,9 +450,17 @@ model Template {
   category     String?
   canvasJson   Json
   thumbnailUrl String?
+  // Marketplace (Milestone 14.1). isPublic makes a template discoverable by
+  // any org via GET /templates/marketplace; publishedById records who
+  // published it (provenance — deliberately not exposed cross-org). A clone
+  // is always created private (isPublic=false) in the cloning org.
+  isPublic      Boolean     @default(false)
+  publishedById String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   @@index([orgId, category])
+  // Serves the marketplace listing: public templates, optionally by category.
+  @@index([isPublic, category])
   @@map("template")
 }

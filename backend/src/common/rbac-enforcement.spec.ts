@@ -13,6 +13,7 @@ import {
 import { MembersController } from '../organizations/members/members.controller';
 import { PublishingController } from '../publishing/publishing.controller';
 import { SocialAccountsController } from '../social-accounts/social-accounts.controller';
+import { MarketplaceController } from '../templates/marketplace.controller';
 import { TemplatesController } from '../templates/templates.controller';
 import { ROLES_KEY } from './decorators/roles.decorator';
 
@@ -52,6 +53,8 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['publish schedule', PublishingController, 'schedule', E],
     ['publish cancel', PublishingController, 'cancelJob', E],
     ['template create', TemplatesController, 'create', E],
+    ['marketplace publish', MarketplaceController, 'publish', E],
+    ['marketplace clone', MarketplaceController, 'clone', E],
     // Collaboration — any member (viewer+) can comment.
     ['comment create', CommentsController, 'create', V],
     // Approval — editor+ baseline (approve/reject is admin-enforced in the
