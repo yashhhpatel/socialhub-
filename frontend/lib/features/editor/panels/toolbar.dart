@@ -60,6 +60,76 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
   /// autosave concern).
   String _nextLayerId() => 'layer_${DateTime.now().microsecondsSinceEpoch}';
 
+  /// Prompts for a video URL (and optional poster still) and adds a video
+  /// layer centered on the artboard (Milestone 9.1). A URL rather than a
+  /// file picker keeps this milestone to the canvas engine — the upload +
+  /// transcode pipeline is Milestone 9.2's concern.
+  Future<void> _promptAddVideo(
+    BuildContext context,
+    CanvasController controller,
+    double centerX,
+    double centerY,
+  ) async {
+    final videoController = TextEditingController();
+    final posterController = TextEditingController();
+
+    final urls = await showDialog<({String video, String? poster})?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add video'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: videoController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Video URL'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: posterController,
+              decoration: const InputDecoration(labelText: 'Poster image URL (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final video = videoController.text.trim();
+              if (video.isEmpty) return;
+              final poster = posterController.text.trim();
+              Navigator.pop(
+                context,
+                (video: video, poster: poster.isEmpty ? null : poster),
+              );
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      videoController.dispose();
+      posterController.dispose();
+    });
+
+    if (urls == null) return;
+    controller.addLayer(
+      VideoCanvasLayer(
+        id: _nextLayerId(),
+        x: centerX - 160,
+        y: centerY - 90,
+        width: 320,
+        height: 180,
+        videoUrl: urls.video,
+        posterUrl: urls.poster,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = canvasControllerProvider(document);
@@ -122,6 +192,11 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
                   text: 'Double-click to edit',
                 ),
               ),
+            ),
+            _ToolbarButton(
+              icon: Icons.videocam_outlined,
+              tooltip: 'Add video',
+              onPressed: () => _promptAddVideo(context, controller, centerX, centerY),
             ),
             const VerticalDivider(width: SpacingTokens.md, indent: 12, endIndent: 12),
             _ToolbarButton(

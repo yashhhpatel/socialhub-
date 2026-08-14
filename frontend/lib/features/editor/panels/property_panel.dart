@@ -91,6 +91,9 @@ class _PropertyFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Local copy so `is` checks promote it (a widget field never promotes),
+    // which lets the video-only section read trim fields without a cast.
+    final layer = this.layer;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -160,8 +163,37 @@ class _PropertyFields extends StatelessWidget {
               ShapeCanvasLayer(:final fillColor) => fillColor,
               TextCanvasLayer(:final color) => color,
               ImageCanvasLayer() => null,
+              VideoCanvasLayer() => null,
             },
             onColorSelected: controller.updateSelectedLayerColor,
+          ),
+        ],
+        if (layer is VideoCanvasLayer) ...[
+          const SizedBox(height: SpacingTokens.md),
+          const _SectionLabel('Trim (seconds)'),
+          Row(
+            children: [
+              Expanded(
+                child: _NumberField(
+                  label: 'Start',
+                  value: layer.trimStartSeconds,
+                  onChanged: (v) =>
+                      controller.updateSelectedVideoTrim(start: v < 0 ? 0 : v),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
+                child: _NumberField(
+                  label: 'End',
+                  // 0 renders when the end is open ("to the end"); the
+                  // backend treats <= start as no trim, so it's a safe
+                  // sentinel here.
+                  value: layer.trimEndSeconds ?? 0,
+                  onChanged: (v) =>
+                      controller.updateSelectedVideoTrim(end: v <= 0 ? null : v),
+                ),
+              ),
+            ],
           ),
         ],
       ],

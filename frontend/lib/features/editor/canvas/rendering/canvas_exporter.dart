@@ -97,7 +97,12 @@ class CanvasExporter {
   ) async {
     final urls = <String>{
       for (final layer in document.layers)
-        if (layer is ImageCanvasLayer) layer.imageUrl,
+        if (layer is ImageCanvasLayer)
+          layer.imageUrl
+        // A video layer contributes its poster still to the render (the
+        // painter draws that, since it can't rasterize live video).
+        else if (layer is VideoCanvasLayer && layer.posterUrl != null)
+          layer.posterUrl!,
     };
     if (urls.isEmpty) return;
 

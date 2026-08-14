@@ -97,6 +97,23 @@ class CanvasPainter extends CustomPainter {
         } else {
           canvas.drawRect(bounds, paint);
         }
+
+      case VideoCanvasLayer(:final posterUrl):
+        // A CustomPainter can't play video (see VideoCanvasLayer), so paint
+        // the poster still if there is one, then a play badge so it reads
+        // as a video rather than a plain image.
+        if (posterUrl != null) {
+          imageCache.ensureLoaded(posterUrl);
+          final poster = imageCache.get(posterUrl);
+          if (poster != null) {
+            paintImage(canvas: canvas, rect: bounds, image: poster, fit: BoxFit.cover);
+          } else {
+            canvas.drawRect(bounds, Paint()..color = Colors.black87);
+          }
+        } else {
+          canvas.drawRect(bounds, Paint()..color = Colors.black87);
+        }
+        _paintPlayBadge(canvas, bounds);
     }
 
     if (needsOpacityLayer) {
@@ -104,6 +121,24 @@ class CanvasPainter extends CustomPainter {
     }
 
     canvas.restore(); // matches the translate/rotate save
+  }
+
+  /// Centered translucent circle + play triangle, sized to the layer, so a
+  /// video layer is visually distinct from an image one on the canvas.
+  void _paintPlayBadge(Canvas canvas, Rect bounds) {
+    final center = bounds.center;
+    final radius = math.min(bounds.width, bounds.height) * 0.18;
+    if (radius <= 0) return;
+
+    canvas.drawCircle(center, radius, Paint()..color = Colors.black.withOpacity(0.55));
+
+    final t = radius * 0.5;
+    final triangle = Path()
+      ..moveTo(center.dx - t * 0.6, center.dy - t)
+      ..lineTo(center.dx - t * 0.6, center.dy + t)
+      ..lineTo(center.dx + t, center.dy)
+      ..close();
+    canvas.drawPath(triangle, Paint()..color = Colors.white);
   }
 
   void _paintSelectionOutline(Canvas canvas, CanvasLayer layer) {
