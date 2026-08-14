@@ -119,9 +119,32 @@ model Organization {
   brandKit         BrandKit?
   templates        Template[]
   invites          Invite[]
+  ssoConfig        SsoConfig?
   createdAt        DateTime        @default(now())
 
   @@map("organization")
+}
+
+/// SAML SSO configuration for an enterprise org (Milestone 15.1). One per
+/// org (orgId unique). Holds the IdP's SSO URL and signing certificate plus
+/// the SP issuer/entity-id this app presents — everything needed to build a
+/// login redirect and validate the SAMLResponse. `enabled` lets an org keep
+/// config staged without forcing SSO on before it's verified.
+model SsoConfig {
+  id           String       @id @default(uuid())
+  orgId        String       @unique
+  organization Organization @relation(fields: [orgId], references: [id])
+  enabled      Boolean      @default(true)
+  /// IdP Single Sign-On URL (where the login AuthnRequest is sent).
+  entryPoint   String
+  /// IdP X.509 signing certificate (PEM body), used to verify assertions.
+  idpCert      String
+  /// This app's SP entity id / issuer, as registered with the IdP.
+  issuer       String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("sso_config")
 }
 
 enum InviteStatus {

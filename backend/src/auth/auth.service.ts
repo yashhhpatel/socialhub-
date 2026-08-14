@@ -154,6 +154,21 @@ export class AuthService {
     });
   }
 
+  /**
+   * Issues a full SocialHub session for an already-authenticated user —
+   * used by the SSO flow (Milestone 15.1), which authenticates via the IdP
+   * rather than a password and then needs the same token pair every other
+   * login path returns.
+   */
+  issueSession(
+    userId: string,
+    email: string,
+    role: UserRole,
+    orgId: string,
+  ): Promise<AuthResponseDto> {
+    return this.issueTokenPair(userId, email, role, orgId);
+  }
+
   private async issueTokenPair(
     userId: string,
     email: string,
