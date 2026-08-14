@@ -32,6 +32,7 @@ CanvasDocument applyBrandKit(CanvasDocument document, BrandKit kit) {
         ShapeCanvasLayer shape =>
           accent == null ? shape : shape.copyWithFillColor(accent),
         ImageCanvasLayer image => image,
+        VideoCanvasLayer video => video,
       },
   ];
 

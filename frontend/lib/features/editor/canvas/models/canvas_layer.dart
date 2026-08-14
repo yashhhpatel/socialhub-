@@ -118,6 +118,20 @@ sealed class CanvasLayer {
           shapeKind: ShapeKind.values.byName(json['shapeKind'] as String),
           fillColor: Color(json['fillColor'] as int),
         ),
+      'video' => VideoCanvasLayer(
+          id: json['id'] as String,
+          x: _double(json['x']),
+          y: _double(json['y']),
+          width: _double(json['width']),
+          height: _double(json['height']),
+          rotationDegrees: _double(json['rotationDegrees']),
+          opacity: _double(json['opacity'], fallback: 1),
+          videoUrl: json['videoUrl'] as String,
+          posterUrl: json['posterUrl'] as String?,
+          trimStartSeconds: _double(json['trimStartSeconds']),
+          trimEndSeconds:
+              json['trimEndSeconds'] == null ? null : _double(json['trimEndSeconds']),
+        ),
       _ => throw FormatException('Unknown canvas layer type: $type'),
     };
   }
@@ -344,5 +358,93 @@ class ShapeCanvasLayer extends CanvasLayer {
         // compatibility.
         // ignore: deprecated_member_use
         'fillColor': fillColor.value,
+      };
+}
+
+/// A video layer (Milestone 9.1).
+///
+/// A CustomPainter can't play video, so on the canvas this renders its
+/// [posterUrl] (a still frame / thumbnail) with a play badge — enough to
+/// position and size it like any other layer, and what the exported master
+/// render captures. Live playback and the actual transcode/trim happen off
+/// the canvas (trim is applied by the backend pipeline in Milestone 9.2,
+/// driven by [trimStartSeconds]/[trimEndSeconds]).
+class VideoCanvasLayer extends CanvasLayer {
+  const VideoCanvasLayer({
+    required super.id,
+    required super.x,
+    required super.y,
+    required super.width,
+    required super.height,
+    super.rotationDegrees,
+    super.opacity,
+    required this.videoUrl,
+    this.posterUrl,
+    this.trimStartSeconds = 0,
+    this.trimEndSeconds,
+  });
+
+  final String videoUrl;
+
+  /// Still frame shown on the canvas and baked into the master render.
+  final String? posterUrl;
+
+  /// Trim window, in seconds. [trimEndSeconds] null means "to the end" —
+  /// the real duration isn't known until the video loads/transcodes, so the
+  /// end is left open rather than guessed.
+  final double trimStartSeconds;
+  final double? trimEndSeconds;
+
+  @override
+  VideoCanvasLayer copyWithGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  }) =>
+      VideoCanvasLayer(
+        id: id,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+        opacity: opacity ?? this.opacity,
+        videoUrl: videoUrl,
+        posterUrl: posterUrl,
+        trimStartSeconds: trimStartSeconds,
+        trimEndSeconds: trimEndSeconds,
+      );
+
+  /// Sets the trim window. Passing nothing for a bound leaves it unchanged;
+  /// pass `clearEnd: true` to reset the end back to "to the end".
+  VideoCanvasLayer copyWithTrim({
+    double? trimStartSeconds,
+    double? trimEndSeconds,
+    bool clearEnd = false,
+  }) =>
+      VideoCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+        videoUrl: videoUrl,
+        posterUrl: posterUrl,
+        trimStartSeconds: trimStartSeconds ?? this.trimStartSeconds,
+        trimEndSeconds: clearEnd ? null : (trimEndSeconds ?? this.trimEndSeconds),
+      );
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...geometryJson('video'),
+        'videoUrl': videoUrl,
+        'posterUrl': posterUrl,
+        'trimStartSeconds': trimStartSeconds,
+        'trimEndSeconds': trimEndSeconds,
       };
 }

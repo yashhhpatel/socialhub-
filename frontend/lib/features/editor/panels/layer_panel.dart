@@ -76,6 +76,7 @@ class _LayerRow extends StatelessWidget {
         ImageCanvasLayer() => Icons.image_outlined,
         TextCanvasLayer() => Icons.text_fields,
         ShapeCanvasLayer() => Icons.category_outlined,
+        VideoCanvasLayer() => Icons.videocam_outlined,
       };
 
   String get _label => switch (layer) {
@@ -83,6 +84,7 @@ class _LayerRow extends StatelessWidget {
         TextCanvasLayer(:final text) => text.isEmpty ? 'Text' : text,
         ShapeCanvasLayer(:final shapeKind) =>
           shapeKind == ShapeKind.ellipse ? 'Ellipse' : 'Rectangle',
+        VideoCanvasLayer() => 'Video',
       };
 
   @override

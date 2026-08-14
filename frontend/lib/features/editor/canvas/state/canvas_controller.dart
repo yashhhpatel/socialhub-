@@ -140,7 +140,26 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
             ShapeCanvasLayer s => s.copyWithFillColor(color),
             TextCanvasLayer t => t.copyWithColor(color),
             ImageCanvasLayer img => img,
+            VideoCanvasLayer v => v,
           }
+        else
+          layer,
+    ];
+
+    _applyDocument(state.document.copyWithLayers(updatedLayers), selectedId);
+  }
+
+  /// Sets the trim window on the selected video layer (Milestone 9.1).
+  /// No-ops for any other layer type — trim only applies to video, and the
+  /// property panel only shows the control for a video selection.
+  void updateSelectedVideoTrim({double? start, double? end}) {
+    final selectedId = state.selectedLayerId;
+    if (selectedId == null) return;
+
+    final updatedLayers = [
+      for (final layer in state.document.layers)
+        if (layer.id == selectedId && layer is VideoCanvasLayer)
+          layer.copyWithTrim(trimStartSeconds: start, trimEndSeconds: end)
         else
           layer,
     ];
