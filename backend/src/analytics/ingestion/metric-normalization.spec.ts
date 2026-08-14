@@ -1,8 +1,11 @@
 import { Platform } from '@prisma/client';
 
 import {
+  normalizeFacebook,
   normalizeInstagram,
+  normalizeLinkedIn,
   normalizeMetrics,
+  normalizeThreads,
   normalizeX,
 } from './metric-normalization';
 
@@ -89,16 +92,102 @@ describe('metric normalization', () => {
     });
   });
 
-  describe('normalizeMetrics dispatch', () => {
-    it('routes to the platform normalizer', () => {
-      const ig = normalizeMetrics(Platform.instagram, {
-        data: [{ name: 'likes', values: [{ value: 1 }] }],
+  describe('normalizeFacebook', () => {
+    it('combines insights with the object engagement summaries', () => {
+      const raw = {
+        insights: {
+          data: [
+            { name: 'post_impressions', values: [{ value: 2000 }] },
+            { name: 'post_impressions_unique', values: [{ value: 1500 }] },
+            { name: 'post_clicks', values: [{ value: 33 }] },
+          ],
+        },
+        likes: { summary: { total_count: 120 } },
+        comments: { summary: { total_count: 18 } },
+        shares: { count: 6 },
+      };
+
+      expect(normalizeFacebook(raw)).toEqual({
+        impressions: 2000,
+        reach: 1500,
+        likes: 120,
+        comments: 18,
+        shares: 6,
+        clicks: 33,
       });
-      expect(ig.likes).toBe(1);
     });
 
-    it('throws for a platform whose ingestion is not wired yet', () => {
-      expect(() => normalizeMetrics(Platform.linkedin, {})).toThrow(/not implemented/i);
+    it('is defensive when engagement edges are absent', () => {
+      expect(normalizeFacebook({ insights: { data: [] } })).toMatchObject({
+        likes: 0,
+        shares: 0,
+      });
+    });
+  });
+
+  describe('normalizeThreads', () => {
+    it('reads lifetime total_value metrics and folds reposts + quotes into shares', () => {
+      const raw = {
+        data: [
+          { name: 'views', total_value: { value: 800 } },
+          { name: 'likes', total_value: { value: 40 } },
+          { name: 'replies', total_value: { value: 6 } },
+          { name: 'reposts', total_value: { value: 3 } },
+          { name: 'quotes', total_value: { value: 2 } },
+        ],
+      };
+
+      expect(normalizeThreads(raw)).toEqual({
+        impressions: 800,
+        reach: 0,
+        likes: 40,
+        comments: 6,
+        shares: 5,
+        clicks: 0,
+      });
+    });
+  });
+
+  describe('normalizeLinkedIn', () => {
+    it('maps socialActions summaries; impressions stay 0 (not available)', () => {
+      const raw = {
+        likesSummary: { totalLikes: 55 },
+        commentsSummary: { aggregatedTotalComments: 9 },
+      };
+
+      expect(normalizeLinkedIn(raw)).toEqual({
+        impressions: 0,
+        reach: 0,
+        likes: 55,
+        comments: 9,
+        shares: 0,
+        clicks: 0,
+      });
+    });
+
+    it('falls back to commentsSummary.count when aggregated is absent', () => {
+      expect(normalizeLinkedIn({ commentsSummary: { count: 4 } }).comments).toBe(4);
+    });
+  });
+
+  describe('normalizeMetrics dispatch', () => {
+    it('routes to each platform normalizer', () => {
+      expect(
+        normalizeMetrics(Platform.instagram, {
+          data: [{ name: 'likes', values: [{ value: 1 }] }],
+        }).likes,
+      ).toBe(1);
+      expect(
+        normalizeMetrics(Platform.facebook, { likes: { summary: { total_count: 2 } } }).likes,
+      ).toBe(2);
+      expect(
+        normalizeMetrics(Platform.threads, {
+          data: [{ name: 'likes', total_value: { value: 3 } }],
+        }).likes,
+      ).toBe(3);
+      expect(
+        normalizeMetrics(Platform.linkedin, { likesSummary: { totalLikes: 4 } }).likes,
+      ).toBe(4);
     });
   });
 });

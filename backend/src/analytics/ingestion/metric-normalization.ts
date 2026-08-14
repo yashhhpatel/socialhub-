@@ -34,20 +34,33 @@ function num(value: unknown): number {
 }
 
 /**
+ * The Meta insights shape (`{ data: [{ name, values: [{ value }] }] }`),
+ * used by Instagram, Facebook, and Threads. Threads reports lifetime metrics
+ * under `total_value.value` instead of `values[0].value`, so both are read.
+ * Returns a name→value map; order is never assumed.
+ */
+function metaInsightsByName(data: unknown): Map<string, unknown> {
+  const byName = new Map<string, unknown>();
+  if (!Array.isArray(data)) return byName;
+  for (const entry of data as Array<{
+    name?: string;
+    values?: Array<{ value?: unknown }>;
+    total_value?: { value?: unknown };
+  }>) {
+    if (entry?.name) {
+      byName.set(entry.name, entry.total_value?.value ?? entry.values?.[0]?.value);
+    }
+  }
+  return byName;
+}
+
+/**
  * Instagram Graph media insights: `{ data: [{ name, values: [{ value }] }] }`.
  * Mapped by metric name — order isn't guaranteed, and which metrics come
  * back varies by media type, so a missing one simply stays 0.
  */
 export function normalizeInstagram(raw: unknown): CanonicalMetrics {
-  const data = (raw as { data?: Array<{ name?: string; values?: Array<{ value?: unknown }> }> })
-    ?.data;
-  if (!Array.isArray(data)) return { ...ZERO };
-
-  const byName = new Map<string, unknown>();
-  for (const entry of data) {
-    if (entry?.name) byName.set(entry.name, entry.values?.[0]?.value);
-  }
-
+  const byName = metaInsightsByName((raw as { data?: unknown })?.data);
   return {
     impressions: num(byName.get('impressions')),
     reach: num(byName.get('reach')),
@@ -55,6 +68,75 @@ export function normalizeInstagram(raw: unknown): CanonicalMetrics {
     comments: num(byName.get('comments')),
     shares: num(byName.get('shares')),
     clicks: 0, // Instagram doesn't expose post-level link clicks here.
+  };
+}
+
+/**
+ * Facebook Page post: insights (impressions/reach) come from the
+ * `insights.data` array, while engagement counts come from the object's
+ * own summary edges — so ingestion requests them together and this maps the
+ * combined payload:
+ * `{ insights: { data: [...] }, likes: { summary: { total_count } },
+ *    comments: { summary: { total_count } }, shares: { count } }`.
+ */
+export function normalizeFacebook(raw: unknown): CanonicalMetrics {
+  const r = raw as {
+    insights?: { data?: unknown };
+    likes?: { summary?: { total_count?: unknown } };
+    comments?: { summary?: { total_count?: unknown } };
+    shares?: { count?: unknown };
+  } | null;
+  const insights = metaInsightsByName(r?.insights?.data);
+
+  return {
+    impressions: num(insights.get('post_impressions')),
+    reach: num(insights.get('post_impressions_unique')),
+    likes: num(r?.likes?.summary?.total_count),
+    comments: num(r?.comments?.summary?.total_count),
+    shares: num(r?.shares?.count),
+    clicks: num(insights.get('post_clicks')),
+  };
+}
+
+/**
+ * Threads media insights: `views`, `likes`, `replies`, `reposts`, `quotes`
+ * (lifetime values under `total_value`). Shares combines reposts + quotes,
+ * the two re-share paths; Threads reports no distinct "reach".
+ */
+export function normalizeThreads(raw: unknown): CanonicalMetrics {
+  const byName = metaInsightsByName((raw as { data?: unknown })?.data);
+  return {
+    impressions: num(byName.get('views')),
+    reach: 0,
+    likes: num(byName.get('likes')),
+    comments: num(byName.get('replies')),
+    shares: num(byName.get('reposts')) + num(byName.get('quotes')),
+    clicks: 0,
+  };
+}
+
+/**
+ * LinkedIn socialActions on a share:
+ * `{ likesSummary: { totalLikes }, commentsSummary: { aggregatedTotalComments } }`.
+ * Member-post impressions/reach aren't available without organization-level
+ * analytics (an approved-app, org-context API), so they stay 0 here —
+ * honestly absent rather than faked. Extending to org analytics is future
+ * work.
+ */
+export function normalizeLinkedIn(raw: unknown): CanonicalMetrics {
+  const r = raw as {
+    likesSummary?: { totalLikes?: unknown };
+    commentsSummary?: { aggregatedTotalComments?: unknown; count?: unknown };
+  } | null;
+  return {
+    impressions: 0,
+    reach: 0,
+    likes: num(r?.likesSummary?.totalLikes),
+    comments: num(
+      r?.commentsSummary?.aggregatedTotalComments ?? r?.commentsSummary?.count,
+    ),
+    shares: 0,
+    clicks: 0,
   };
 }
 
@@ -91,7 +173,11 @@ export function normalizeMetrics(platform: Platform, raw: unknown): CanonicalMet
       return normalizeInstagram(raw);
     case Platform.x:
       return normalizeX(raw);
-    default:
-      throw new Error(`Metric normalization for ${platform} is not implemented yet.`);
+    case Platform.facebook:
+      return normalizeFacebook(raw);
+    case Platform.threads:
+      return normalizeThreads(raw);
+    case Platform.linkedin:
+      return normalizeLinkedIn(raw);
   }
 }
