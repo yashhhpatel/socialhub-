@@ -62,16 +62,15 @@ class EditorActionsController extends StateNotifier<EditorActionState> {
     }
   }
 
-  /// Generates Instagram + X renditions. Only those two are requested:
-  /// the other platforms have no adapter until Phase 8, and the backend
-  /// correctly 422s for them rather than producing a variant nothing can
-  /// publish.
+  /// Generates renditions for all five supported platforms. Every platform
+  /// now has a backend adapter (Phase 8), so each produces a variant that
+  /// can actually be published — a platform without one would 422.
   Future<void> generateVariants() async {
     state = const EditorActionState(status: EditorActionStatus.generating);
     try {
       final variants = await _ref.read(contentRepositoryProvider).generateVariants(
         assetId: _assetId,
-        platforms: const ['instagram', 'x'],
+        platforms: const ['instagram', 'x', 'facebook', 'threads', 'linkedin'],
       );
       if (!mounted) return;
       state = EditorActionState(
