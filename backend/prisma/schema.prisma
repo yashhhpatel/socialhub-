@@ -267,9 +267,61 @@ model PublishJob {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  postMetric      PostMetric?
+
   @@index([status, scheduledAt])
   @@index([variantId])
   @@map("publish_job")
+}
+
+/// A normalized snapshot of one published post's performance (Phase 10).
+///
+/// One row per published post (unique publishJobId), refreshed in place on
+/// each scheduled pull — capturedAt records when it was last read. The
+/// fields are CANONICAL: each platform's insights payload is mapped into
+/// this one shape by the ingestion normalizers, so the dashboard queries a
+/// single schema regardless of which network a post lives on. Snapshots
+/// (rather than time-series history) keep the table bounded; trend-over-time
+/// is a later refinement.
+model PostMetric {
+  id           String     @id @default(uuid())
+  publishJobId String     @unique
+  publishJob   PublishJob @relation(fields: [publishJobId], references: [id], onDelete: Cascade)
+  impressions  Int        @default(0)
+  reach        Int        @default(0)
+  likes        Int        @default(0)
+  comments     Int        @default(0)
+  shares       Int        @default(0)
+  clicks       Int        @default(0)
+  /// When these numbers were last pulled from the platform.
+  capturedAt   DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("post_metric")
+}
+
+enum IngestionStatus {
+  running
+  success
+  failed
+}
+
+/// Tracks each scheduled analytics pull (Phase 10): when it ran, how many
+/// posts it refreshed or failed on, and any fatal error. Gives the
+/// dashboard a trustworthy "last updated" and makes a broken pull
+/// diagnosable instead of silent.
+model IngestionRun {
+  id             String          @id @default(uuid())
+  status         IngestionStatus @default(running)
+  postsProcessed Int             @default(0)
+  postsFailed    Int             @default(0)
+  error          String?
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+
+  @@index([startedAt])
+  @@map("ingestion_run")
 }
 
 /// Per-org AI consumption, one row per generation (Milestone 5.1).
