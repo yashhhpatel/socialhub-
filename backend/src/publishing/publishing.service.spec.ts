@@ -21,10 +21,12 @@ describe('PublishingService', () => {
   let xAdapter: { publish: jest.Mock };
   let facebookAdapter: { publish: jest.Mock };
   let threadsAdapter: { publish: jest.Mock };
+  let linkedinAdapter: { publish: jest.Mock };
   let igQueue: { add: jest.Mock };
   let xQueue: { add: jest.Mock };
   let fbQueue: { add: jest.Mock };
   let thQueue: { add: jest.Mock };
+  let liQueue: { add: jest.Mock };
 
   const readyVariant = {
     id: 'var_1',
@@ -68,10 +70,12 @@ describe('PublishingService', () => {
     xAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'tweet_9' }) };
     facebookAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'fb_9' }) };
     threadsAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'th_9' }) };
+    linkedinAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'li_9' }) };
     igQueue = { add: jest.fn().mockResolvedValue(undefined) };
     xQueue = { add: jest.fn().mockResolvedValue(undefined) };
     fbQueue = { add: jest.fn().mockResolvedValue(undefined) };
     thQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    liQueue = { add: jest.fn().mockResolvedValue(undefined) };
 
     service = new PublishingService(
       prisma as never,
@@ -80,10 +84,12 @@ describe('PublishingService', () => {
       xAdapter as never,
       facebookAdapter as never,
       threadsAdapter as never,
+      linkedinAdapter as never,
       igQueue as never,
       xQueue as never,
       fbQueue as never,
       thQueue as never,
+      liQueue as never,
     );
   });
 

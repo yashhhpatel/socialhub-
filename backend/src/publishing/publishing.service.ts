@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PlatformAdapter } from '../social-accounts/adapters/adapter.interface';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import {
@@ -53,6 +54,7 @@ export class PublishingService {
     xAdapter: XAdapter,
     facebookAdapter: FacebookAdapter,
     threadsAdapter: ThreadsAdapter,
+    linkedinAdapter: LinkedInAdapter,
     @InjectQueue(PUBLISH_QUEUES[Platform.instagram])
     instagramQueue: Queue<PublishJobData>,
     @InjectQueue(PUBLISH_QUEUES[Platform.x])
@@ -61,18 +63,22 @@ export class PublishingService {
     facebookQueue: Queue<PublishJobData>,
     @InjectQueue(PUBLISH_QUEUES[Platform.threads])
     threadsQueue: Queue<PublishJobData>,
+    @InjectQueue(PUBLISH_QUEUES[Platform.linkedin])
+    linkedinQueue: Queue<PublishJobData>,
   ) {
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
       [Platform.facebook]: facebookAdapter,
       [Platform.threads]: threadsAdapter,
+      [Platform.linkedin]: linkedinAdapter,
     };
     this.queues = {
       [Platform.instagram]: instagramQueue,
       [Platform.x]: xQueue,
       [Platform.facebook]: facebookQueue,
       [Platform.threads]: threadsQueue,
+      [Platform.linkedin]: linkedinQueue,
     };
   }
 

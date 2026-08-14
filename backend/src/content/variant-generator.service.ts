@@ -8,6 +8,7 @@ import {
 } from '../social-accounts/adapters/adapter.interface';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { PrismaService } from '../prisma/prisma.service';
@@ -44,16 +45,18 @@ export class VariantGeneratorService {
     xAdapter: XAdapter,
     facebookAdapter: FacebookAdapter,
     threadsAdapter: ThreadsAdapter,
+    linkedinAdapter: LinkedInAdapter,
   ) {
     // Direct injection rather than a registry, matching how
-    // SocialAccountsService already composes adapters. Phase 8 adds the
-    // remaining platforms here one at a time; if this map grows unwieldy
-    // once all five land, a registry is the refactor to reach for.
+    // SocialAccountsService already composes adapters. All five platforms
+    // now land here; if this pattern grows another entry, a registry keyed
+    // by `adapter.platform` is the refactor to reach for.
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
       [Platform.x]: xAdapter,
       [Platform.facebook]: facebookAdapter,
       [Platform.threads]: threadsAdapter,
+      [Platform.linkedin]: linkedinAdapter,
     };
   }
 

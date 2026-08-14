@@ -6,6 +6,7 @@ import { generatePkcePair } from '../common/crypto/pkce.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
+import { LinkedInAdapter } from './adapters/linkedin.adapter';
 import { ThreadsAdapter } from './adapters/threads.adapter';
 import { XAdapter } from './adapters/x.adapter';
 
@@ -40,6 +41,7 @@ export class SocialAccountsService {
     private readonly xAdapter: XAdapter,
     private readonly facebookAdapter: FacebookAdapter,
     private readonly threadsAdapter: ThreadsAdapter,
+    private readonly linkedinAdapter: LinkedInAdapter,
   ) {}
 
   // --- Instagram ---
@@ -100,6 +102,19 @@ export class SocialAccountsService {
     const { orgId } = this.decodeState(rawState);
     const result = await this.threadsAdapter.connect(code);
     return this.upsertAccount(orgId, Platform.threads, result);
+  }
+
+  // --- LinkedIn (Milestone 8.3) ---
+
+  buildLinkedInAuthorizationUrl(orgId: string): string {
+    const state = this.encodeState({ orgId, issuedAt: Date.now() });
+    return this.linkedinAdapter.getAuthorizationUrl(state);
+  }
+
+  async handleLinkedInCallback(code: string, rawState: string): Promise<SocialAccount> {
+    const { orgId } = this.decodeState(rawState);
+    const result = await this.linkedinAdapter.connect(code);
+    return this.upsertAccount(orgId, Platform.linkedin, result);
   }
 
   // --- Shared: list / disconnect (any platform) ---
