@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
@@ -6,7 +6,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { AiSuiteService } from './ai-suite.service';
+import { BestTimeService } from './best-time.service';
+import { BestTimeSlot } from './best-time-ranking';
 import { CaptionService } from './caption.service';
+import { ViralScoreService } from './viral-score.service';
 import {
   ConvertToneDto,
   ConvertToneResponseDto,
@@ -19,6 +22,7 @@ import {
   GenerateHashtagsDto,
   GenerateHashtagsResponseDto,
 } from './dto/generate-hashtags.dto';
+import { ViralScoreDto, ViralScoreResponseDto } from './dto/viral-score.dto';
 import { QuotaGuard } from './quota.guard';
 
 interface AuthenticatedRequest extends Request {
@@ -30,6 +34,8 @@ export class AiController {
   constructor(
     private readonly captionService: CaptionService,
     private readonly aiSuiteService: AiSuiteService,
+    private readonly viralScoreService: ViralScoreService,
+    private readonly bestTimeService: BestTimeService,
   ) {}
 
   /**
@@ -94,5 +100,34 @@ export class AiController {
       dto.tone,
     );
     return { text };
+  }
+
+  /** Estimates a design's viral potential 0–100 (Milestone 12.2). LLM-backed,
+   * so editor+ and quota-metered like the generative features. */
+  @UseGuards(JwtAuthGuard, RolesGuard, QuotaGuard)
+  @Roles(UserRole.editor)
+  @Post('viral-score')
+  async viralScore(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: ViralScoreDto,
+  ): Promise<ViralScoreResponseDto> {
+    return this.viralScoreService.scoreAsset(
+      req.user.orgId,
+      req.user.userId,
+      dto.assetId,
+      dto.caption,
+    );
+  }
+
+  /**
+   * Best times to post, ranked from the org's own history (Milestone 12.2).
+   * editor+ but NOT quota-metered — it makes no model call, so there is no
+   * per-generation cost to meter (see BestTimeService).
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
+  @Get('best-time')
+  bestTime(@Req() req: AuthenticatedRequest): Promise<BestTimeSlot[]> {
+    return this.bestTimeService.recommend(req.user.orgId);
   }
 }
