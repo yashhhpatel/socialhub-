@@ -7,6 +7,8 @@ import type { SignOptions } from 'jsonwebtoken';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SsoController } from './sso/sso.controller';
+import { SsoService } from './sso/sso.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -32,7 +34,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [AuthController, SsoController],
+  providers: [AuthService, JwtStrategy, SsoService],
 })
 export class AuthModule {}

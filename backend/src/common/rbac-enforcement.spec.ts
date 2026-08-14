@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { UserRole } from '@prisma/client';
 
 import { AiController } from '../ai/ai.controller';
+import { SsoController } from '../auth/sso/sso.controller';
 import { BrandKitsController } from '../brand-kits/brand-kits.controller';
 import { ApprovalController } from '../content/approval.controller';
 import { CommentsController } from '../content/comments/comments.controller';
@@ -71,6 +72,7 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['connect linkedin', SocialAccountsController, 'connectLinkedIn', A],
     ['invite create', InvitesAdminController, 'invite', A],
     ['invite revoke', InvitesAdminController, 'revoke', A],
+    ['sso config', SsoController, 'setConfig', A],
     ['member role change', MembersController, 'changeRole', A],
   ];
 
