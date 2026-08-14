@@ -39,6 +39,8 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['AI caption', AiController, 'generateCaption', E],
     ['AI hashtags', AiController, 'generateHashtags', E],
     ['AI tone', AiController, 'convertTone', E],
+    ['AI viral score', AiController, 'viralScore', E],
+    ['AI best time', AiController, 'bestTime', E],
     ['content create', ContentController, 'create', E],
     ['content update', ContentController, 'update', E],
     ['content upload', ContentController, 'uploadMedia', E],
