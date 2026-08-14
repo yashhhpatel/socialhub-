@@ -6,6 +6,7 @@ import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/data/repositories/api_content_repository.dart';
 import '../../../editor/canvas/models/canvas_document.dart';
+import '../../../marketplace/data/repositories/api_marketplace_repository.dart';
 import '../../data/repositories/api_templates_repository.dart';
 import '../../domain/entities/template.dart';
 import '../state/templates_controller.dart';
@@ -46,6 +47,20 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
     }
   }
 
+  Future<void> _publish(TemplateSummary template) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(marketplaceRepositoryProvider).publish(template.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('“${template.name}” published to the marketplace.')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not publish: ${describeApiError(error)}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final templatesAsync = ref.watch(templatesProvider);
@@ -83,6 +98,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                     template: templates[i],
                     starting: _startingId == templates[i].id,
                     onUse: () => _startFrom(templates[i]),
+                    onPublish: () => _publish(templates[i]),
                   ),
                 );
               },
@@ -99,11 +115,15 @@ class _TemplateCard extends StatelessWidget {
     required this.template,
     required this.starting,
     required this.onUse,
+    required this.onPublish,
   });
 
   final TemplateSummary template;
   final bool starting;
   final VoidCallback onUse;
+
+  /// Publishes this template to the public marketplace (Milestone 14.2).
+  final VoidCallback onPublish;
 
   @override
   Widget build(BuildContext context) {
@@ -145,18 +165,26 @@ class _TemplateCard extends StatelessWidget {
                 if (template.category != null)
                   Text(template.category!, style: theme.textTheme.bodySmall),
                 const SizedBox(height: SpacingTokens.sm),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: starting ? null : onUse,
-                    child: starting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Use template'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: starting ? null : onUse,
+                        child: starting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Use template'),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Publish to marketplace',
+                      onPressed: onPublish,
+                      icon: const Icon(Icons.storefront_outlined),
+                    ),
+                  ],
                 ),
               ],
             ),

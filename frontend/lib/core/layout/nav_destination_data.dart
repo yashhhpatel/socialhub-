@@ -85,6 +85,12 @@ const List<NavDestinationData> navDestinations = [
     selectedIcon: Icons.dashboard_customize,
   ),
   NavDestinationData(
+    path: '/marketplace',
+    label: 'Marketplace',
+    icon: Icons.storefront_outlined,
+    selectedIcon: Icons.storefront,
+  ),
+  NavDestinationData(
     path: '/brand-kit',
     label: 'Brand Kit',
     icon: Icons.palette_outlined,
