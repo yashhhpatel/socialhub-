@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../ai_suite/presentation/widgets/ai_tools_panel.dart';
 import '../../../scheduler/data/repositories/api_scheduler_repository.dart';
 import '../../domain/entities/publish_models.dart';
 import '../state/caption_controller.dart';
@@ -130,11 +131,23 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
 
                 return Padding(
                   padding: const EdgeInsets.only(top: SpacingTokens.md),
-                  child: CaptionPanel(
-                    assetId: widget.assetId,
-                    textController: _captionController,
-                    maxLength: selected.variant.maxCaptionLength,
-                    enabled: !publish.inFlight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CaptionPanel(
+                        assetId: widget.assetId,
+                        textController: _captionController,
+                        maxLength: selected.variant.maxCaptionLength,
+                        enabled: !publish.inFlight,
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                      AiToolsPanel(
+                        assetId: widget.assetId,
+                        captionController: _captionController,
+                        enabled: !publish.inFlight,
+                      ),
+                    ],
                   ),
                 );
               },

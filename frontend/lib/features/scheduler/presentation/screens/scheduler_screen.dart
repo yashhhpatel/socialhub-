@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../ai_suite/data/repositories/api_ai_suite_repository.dart';
 import '../../domain/entities/scheduled_job.dart';
 import '../state/scheduler_controller.dart';
 
@@ -78,7 +79,9 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
               ),
             ],
           ),
-          const SizedBox(height: SpacingTokens.lg),
+          const SizedBox(height: SpacingTokens.md),
+          const _BestTimesBar(),
+          const SizedBox(height: SpacingTokens.md),
           Expanded(
             child: jobsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -95,6 +98,47 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// AI best-time-to-post suggestions (Milestone 12.3): a compact row of the
+/// org's historically strongest posting slots. Silent until there's enough
+/// history to recommend from — an empty result, an error, or the loading
+/// state all render nothing rather than nagging.
+class _BestTimesBar extends ConsumerWidget {
+  const _BestTimesBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final slots = ref.watch(bestTimesProvider);
+
+    return slots.maybeWhen(
+      data: (list) {
+        if (list.isEmpty) return const SizedBox.shrink();
+        return Wrap(
+          spacing: SpacingTokens.sm,
+          runSpacing: SpacingTokens.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule, size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: SpacingTokens.xs),
+                Text('Best times to post', style: theme.textTheme.labelLarge),
+              ],
+            ),
+            for (final slot in list)
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text(slot.localLabel),
+              ),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }
