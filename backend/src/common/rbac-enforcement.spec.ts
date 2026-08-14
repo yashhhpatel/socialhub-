@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 
 import { AiController } from '../ai/ai.controller';
 import { BrandKitsController } from '../brand-kits/brand-kits.controller';
+import { CommentsController } from '../content/comments/comments.controller';
 import { ContentController } from '../content/content.controller';
 import {
   InvitesAdminController,
@@ -31,6 +32,7 @@ function roleOf(controller: new (...args: never[]) => object, method: string): U
  * route is added without a role, or a read route is over-restricted.
  */
 describe('RBAC enforcement across mutating endpoints', () => {
+  const V = UserRole.viewer;
   const E = UserRole.editor;
   const A = UserRole.admin;
 
@@ -49,6 +51,8 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['publish schedule', PublishingController, 'schedule', E],
     ['publish cancel', PublishingController, 'cancelJob', E],
     ['template create', TemplatesController, 'create', E],
+    // Collaboration — any member (viewer+) can comment.
+    ['comment create', CommentsController, 'create', V],
     // Settings / team — admin+.
     ['brand kit edit', BrandKitsController, 'update', A],
     ['account disconnect', SocialAccountsController, 'disconnect', A],
