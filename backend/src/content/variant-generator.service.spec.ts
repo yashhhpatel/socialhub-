@@ -3,6 +3,7 @@ import { ContentAsset, Platform } from '@prisma/client';
 
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { VariantGeneratorService } from './variant-generator.service';
@@ -28,6 +29,7 @@ describe('VariantGeneratorService', () => {
   const xAdapter = new XAdapter({ get: () => 'test' } as never);
   const facebookAdapter = new FacebookAdapter({ get: () => 'test' } as never);
   const threadsAdapter = new ThreadsAdapter({ get: () => 'test' } as never);
+  const linkedinAdapter = new LinkedInAdapter({ get: () => 'test' } as never);
 
   beforeEach(() => {
     prisma = { contentVariant: { upsert: jest.fn((args) => ({ id: 'var_1', ...args.create })) } };
@@ -45,20 +47,27 @@ describe('VariantGeneratorService', () => {
       xAdapter,
       facebookAdapter,
       threadsAdapter,
+      linkedinAdapter,
     );
   });
 
   describe('supported platforms', () => {
-    it('reports only the platforms that actually have an adapter', () => {
-      // LinkedIn arrives later in Phase 8 — claiming support before its
-      // adapter exists would produce variants nothing can publish.
+    it('reports every platform that has an adapter (all five, as of Phase 8)', () => {
       expect(service.supportedPlatforms.sort()).toEqual(
-        [Platform.instagram, Platform.x, Platform.facebook, Platform.threads].sort(),
+        [
+          Platform.instagram,
+          Platform.x,
+          Platform.facebook,
+          Platform.threads,
+          Platform.linkedin,
+        ].sort(),
       );
     });
 
     it('rejects a platform with no adapter as 422, not a silent no-op', () => {
-      expect(() => service.capabilitiesFor(Platform.linkedin)).toThrow(
+      // All five real platforms now have adapters; a synthetic unknown value
+      // still exercises the guard against an unmapped platform.
+      expect(() => service.capabilitiesFor('myspace' as Platform)).toThrow(
         UnprocessableEntityException,
       );
     });
@@ -133,7 +142,7 @@ describe('VariantGeneratorService', () => {
 
     it('refuses an unsupported platform before writing ANY variant', async () => {
       await expect(
-        service.generate(asset, [Platform.instagram, Platform.linkedin]),
+        service.generate(asset, [Platform.instagram, 'myspace' as Platform]),
       ).rejects.toThrow(UnprocessableEntityException);
     });
   });

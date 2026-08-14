@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
+import { LinkedInAdapter } from './adapters/linkedin.adapter';
 import { ThreadsAdapter } from './adapters/threads.adapter';
 import { XAdapter } from './adapters/x.adapter';
 import { SocialAccountsService } from './social-accounts.service';
@@ -24,6 +25,7 @@ describe('SocialAccountsService', () => {
   let xAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
   let facebookAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
   let threadsAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
+  let linkedinAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
 
   beforeEach(() => {
     // Generated programmatically — never hand-typed, per the lesson from
@@ -62,6 +64,12 @@ describe('SocialAccountsService', () => {
         .fn()
         .mockReturnValue('https://threads.net/oauth/authorize?mock=1'),
     };
+    linkedinAdapter = {
+      connect: jest.fn(),
+      getAuthorizationUrl: jest
+        .fn()
+        .mockReturnValue('https://www.linkedin.com/oauth/v2/authorization?mock=1'),
+    };
 
     service = new SocialAccountsService(
       prisma as never,
@@ -70,6 +78,7 @@ describe('SocialAccountsService', () => {
       xAdapter as unknown as XAdapter,
       facebookAdapter as unknown as FacebookAdapter,
       threadsAdapter as unknown as ThreadsAdapter,
+      linkedinAdapter as unknown as LinkedInAdapter,
     );
   });
 
@@ -233,6 +242,50 @@ describe('SocialAccountsService', () => {
       });
       expect(tokenEncryption.decrypt(upsertArgs.create.accessTokenEnc)).toBe(
         'raw_threads_token',
+      );
+    });
+  });
+
+  describe('LinkedIn flow (Milestone 8.3)', () => {
+    it('buildLinkedInAuthorizationUrl encodes a state and returns the adapter URL', () => {
+      const url = service.buildLinkedInAuthorizationUrl('org_li');
+
+      expect(url).toBe('https://www.linkedin.com/oauth/v2/authorization?mock=1');
+      expect(linkedinAdapter.getAuthorizationUrl).toHaveBeenCalledTimes(1);
+      const stateArg = linkedinAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+      expect(typeof stateArg).toBe('string');
+      expect(stateArg.length).toBeGreaterThan(0);
+    });
+
+    it('handleLinkedInCallback decodes state and upserts with encrypted tokens', async () => {
+      service.buildLinkedInAuthorizationUrl('org_li');
+      const state = linkedinAdapter.getAuthorizationUrl.mock.calls[0][0] as string;
+
+      linkedinAdapter.connect.mockResolvedValue({
+        externalAccountId: 'member_1',
+        accessToken: 'raw_li_token',
+        refreshToken: 'raw_li_refresh',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      });
+      prisma.socialAccount.upsert.mockResolvedValue({
+        platform: 'linkedin',
+        externalAccountId: 'member_1',
+      });
+
+      await service.handleLinkedInCallback('auth-code', state);
+
+      const upsertArgs = prisma.socialAccount.upsert.mock.calls[0][0];
+      expect(upsertArgs.where.orgId_platform_externalAccountId).toEqual({
+        orgId: 'org_li',
+        platform: 'linkedin',
+        externalAccountId: 'member_1',
+      });
+      expect(tokenEncryption.decrypt(upsertArgs.create.accessTokenEnc)).toBe(
+        'raw_li_token',
+      );
+      // The refresh token, when present, is encrypted too.
+      expect(tokenEncryption.decrypt(upsertArgs.create.refreshTokenEnc)).toBe(
+        'raw_li_refresh',
       );
     });
   });

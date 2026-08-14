@@ -4,6 +4,7 @@ import { AIFeature, ContentAsset, Platform } from '@prisma/client';
 import { ContentService } from '../content/content.service';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
+import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiGatewayService } from './ai-gateway.service';
@@ -36,6 +37,7 @@ export class CaptionService {
     private readonly xAdapter: XAdapter,
     private readonly facebookAdapter: FacebookAdapter,
     private readonly threadsAdapter: ThreadsAdapter,
+    private readonly linkedinAdapter: LinkedInAdapter,
   ) {}
 
   async generateForAsset(
@@ -84,6 +86,8 @@ export class CaptionService {
             return this.facebookAdapter.capabilities().maxCaptionLength;
           case Platform.threads:
             return this.threadsAdapter.capabilities().maxCaptionLength;
+          case Platform.linkedin:
+            return this.linkedinAdapter.capabilities().maxCaptionLength;
           default:
             return null;
         }

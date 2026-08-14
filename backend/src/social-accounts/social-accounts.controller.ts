@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
 import { FacebookCallbackQueryDto } from './dto/facebook-callback-query.dto';
 import { InstagramCallbackQueryDto } from './dto/instagram-callback-query.dto';
+import { LinkedInCallbackQueryDto } from './dto/linkedin-callback-query.dto';
 import { ThreadsCallbackQueryDto } from './dto/threads-callback-query.dto';
 import { SocialAccountSummaryDto } from './dto/social-account-summary.dto';
 import { XCallbackQueryDto } from './dto/x-callback-query.dto';
@@ -221,6 +222,46 @@ export class SocialAccountsController {
 
     try {
       const account = await this.socialAccountsService.handleThreadsCallback(
+        query.code,
+        query.state,
+      );
+      this.respondToCallback(res, { connected: account.platform });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed.';
+      this.respondToCallback(res, { connectError: message });
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('linkedin/connect')
+  connectLinkedIn(@Req() req: AuthenticatedRequest): ConnectResponseDto {
+    return {
+      redirectUrl: this.socialAccountsService.buildLinkedInAuthorizationUrl(
+        req.user.orgId,
+      ),
+    };
+  }
+
+  /** PUBLIC — same reasoning as instagramCallback above. */
+  @Get('linkedin/callback')
+  async linkedinCallback(
+    @Query() query: LinkedInCallbackQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (query.error) {
+      this.respondToCallback(res, {
+        connectError: `LinkedIn authorization was not granted: ${query.error}`,
+      });
+      return;
+    }
+
+    if (!query.code || !query.state) {
+      this.respondToCallback(res, { connectError: 'Missing code or state parameter.' });
+      return;
+    }
+
+    try {
+      const account = await this.socialAccountsService.handleLinkedInCallback(
         query.code,
         query.state,
       );
