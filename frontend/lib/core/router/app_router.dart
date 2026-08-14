@@ -8,6 +8,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/brand_kit/presentation/screens/brand_kit_screen.dart';
 import '../../features/team/presentation/screens/accept_invite_screen.dart';
+import '../../features/marketplace/presentation/screens/marketplace_screen.dart';
 import '../../features/templates/presentation/screens/templates_screen.dart';
 import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
@@ -150,6 +151,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/templates',
             name: 'templates',
             builder: (context, state) => const TemplatesScreen(),
+          ),
+          GoRoute(
+            path: '/marketplace',
+            name: 'marketplace',
+            builder: (context, state) => const MarketplaceScreen(),
           ),
           GoRoute(
             path: '/brand-kit',
