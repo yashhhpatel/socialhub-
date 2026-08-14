@@ -7,6 +7,8 @@ import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter'
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
+import { ApprovalController } from './approval.controller';
+import { ApprovalService } from './approval.service';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { VariantGeneratorService } from './variant-generator.service';
@@ -21,8 +23,9 @@ import { VariantGeneratorService } from './variant-generator.service';
  * widening SocialAccountsModule's public surface just for this.
  */
 @Module({
-  controllers: [ContentController],
+  controllers: [ContentController, ApprovalController],
   providers: [
+    ApprovalService,
     ContentService,
     CloudinaryService,
     VideoProcessingService,

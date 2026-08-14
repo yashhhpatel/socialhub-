@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 
 import { AiController } from '../ai/ai.controller';
 import { BrandKitsController } from '../brand-kits/brand-kits.controller';
+import { ApprovalController } from '../content/approval.controller';
 import { CommentsController } from '../content/comments/comments.controller';
 import { ContentController } from '../content/content.controller';
 import {
@@ -53,6 +54,10 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['template create', TemplatesController, 'create', E],
     // Collaboration — any member (viewer+) can comment.
     ['comment create', CommentsController, 'create', V],
+    // Approval — editor+ baseline (approve/reject is admin-enforced in the
+    // service); the org-wide policy toggle is admin+.
+    ['approval transition', ApprovalController, 'changeApproval', E],
+    ['approval policy set', ApprovalController, 'setPolicy', A],
     // Settings / team — admin+.
     ['brand kit edit', BrandKitsController, 'update', A],
     ['account disconnect', SocialAccountsController, 'disconnect', A],

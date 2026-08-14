@@ -34,7 +34,14 @@ describe('PublishingService', () => {
     status: 'ready',
     renderedMediaUrl: 'https://cdn.test/var_1.png',
     caption: 'Hello world',
-    asset: { orgId: 'org_1' },
+    // approvalStatus + org.requiresApproval drive the approval gate (13.2);
+    // the default org here does NOT require approval, so publishing is
+    // unaffected unless a test opts in.
+    asset: {
+      orgId: 'org_1',
+      approvalStatus: 'draft',
+      organization: { requiresApproval: false },
+    },
   };
 
   const connectedAccount = {
@@ -151,12 +158,54 @@ describe('PublishingService', () => {
       it('404s another org\'s variant without probing further', async () => {
         prisma.contentVariant.findUnique.mockResolvedValue({
           ...readyVariant,
-          asset: { orgId: 'other_org' },
+          asset: {
+            orgId: 'other_org',
+            approvalStatus: 'draft',
+            organization: { requiresApproval: false },
+          },
         });
         await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
           NotFoundException,
         );
         expect(xQueue.add).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('approval gate (Milestone 13.2)', () => {
+      it('blocks an unapproved design when the org requires approval', async () => {
+        prisma.contentVariant.findUnique.mockResolvedValue({
+          ...readyVariant,
+          asset: {
+            orgId: 'org_1',
+            approvalStatus: 'pending_approval',
+            organization: { requiresApproval: true },
+          },
+        });
+        await expect(service.publishNow('org_1', 'var_1', 'sa_1')).rejects.toThrow(
+          /must be approved/i,
+        );
+        expect(xQueue.add).not.toHaveBeenCalled();
+        expect(prisma.publishJob.create).not.toHaveBeenCalled();
+      });
+
+      it('allows an approved design in an approval-required org', async () => {
+        prisma.contentVariant.findUnique.mockResolvedValue({
+          ...readyVariant,
+          asset: {
+            orgId: 'org_1',
+            approvalStatus: 'approved',
+            organization: { requiresApproval: true },
+          },
+        });
+        const job = await service.publishNow('org_1', 'var_1', 'sa_1');
+        expect(job.status).toBe('queued');
+        expect(xQueue.add).toHaveBeenCalledTimes(1);
+      });
+
+      it('ignores approval status entirely when the org does not require it', async () => {
+        // readyVariant defaults to requiresApproval:false + draft — publishes fine.
+        const job = await service.publishNow('org_1', 'var_1', 'sa_1');
+        expect(job.status).toBe('queued');
       });
     });
   });
