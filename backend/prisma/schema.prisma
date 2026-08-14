@@ -164,11 +164,31 @@ model User {
   organization  Organization   @relation(fields: [orgId], references: [id])
   refreshTokens RefreshToken[]
   createdAssets ContentAsset[] @relation("CreatedAssets")
+  comments      Comment[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([orgId])
   @@map("user")
+}
+
+/// A comment on a design (Milestone 13.1) — the collaboration thread teams
+/// use to give feedback before approving. Cascade-deleted with the asset;
+/// the author is Restrict-deleted (kept in the schema via onDelete default)
+/// so a comment's attribution survives, and org-scoping is enforced through
+/// the asset (a comment has no orgId of its own — it belongs to exactly one
+/// asset, which belongs to one org).
+model Comment {
+  id        String       @id @default(uuid())
+  assetId   String
+  asset     ContentAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime     @default(now())
+
+  @@index([assetId, createdAt])
+  @@map("comment")
 }
 
 model RefreshToken {
@@ -232,6 +252,7 @@ model ContentAsset {
   masterImagePublicId String?
   approvalStatus ApprovalStatus   @default(draft)
   variants       ContentVariant[]
+  comments       Comment[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

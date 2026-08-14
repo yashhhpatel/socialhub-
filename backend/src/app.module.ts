@@ -8,6 +8,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
+import { CommentsModule } from './content/comments/comments.module';
 import { ContentModule } from './content/content.module';
 import { HealthModule } from './health/health.module';
 import { InvitesModule } from './organizations/invites/invites.module';
@@ -50,6 +51,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     SocialAccountsModule,
     ContentModule,
+    CommentsModule,
     PublishingModule,
     AiModule,
     BrandKitsModule,
