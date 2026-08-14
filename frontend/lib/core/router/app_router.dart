@@ -7,6 +7,7 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/brand_kit/presentation/screens/brand_kit_screen.dart';
+import '../../features/templates/presentation/screens/templates_screen.dart';
 import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -135,6 +136,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/organizations',
             name: 'organizations',
             builder: (context, state) => const OrganizationsScreen(),
+          ),
+          GoRoute(
+            path: '/templates',
+            name: 'templates',
+            builder: (context, state) => const TemplatesScreen(),
           ),
           GoRoute(
             path: '/brand-kit',

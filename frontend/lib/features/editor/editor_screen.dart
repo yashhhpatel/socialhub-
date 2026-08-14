@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/network/api_error_message.dart';
 import '../brand_kit/data/repositories/api_brand_kit_repository.dart';
 import '../publish/presentation/widgets/publish_modal.dart';
+import '../templates/data/repositories/api_templates_repository.dart';
 import 'canvas/brand_kit_application.dart';
 import 'canvas/models/canvas_document.dart';
 import 'canvas/state/canvas_controller.dart';
@@ -155,6 +156,27 @@ class _EditorWorkspace extends ConsumerWidget {
                 );
               }
             },
+            onSaveAsTemplate: () async {
+              await ref.read(autosaveControllerProvider(assetId).notifier).flush();
+              if (!context.mounted) return;
+              final details = await _promptTemplateDetails(context);
+              if (details == null || !context.mounted) return;
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await ref.read(templatesRepositoryProvider).create(
+                      name: details.name,
+                      category: details.category,
+                      document: ref.read(provider).document,
+                    );
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Saved as a template.')),
+                );
+              } catch (error) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Could not save template: ${describeApiError(error)}')),
+                );
+              }
+            },
           ),
           body: Row(
             children: [
@@ -174,4 +196,57 @@ class _EditorWorkspace extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Prompts for a template name (required) and optional category when saving
+/// the current design as a template (Milestone 9.4). Returns null if the
+/// user cancels or leaves the name blank.
+Future<({String name, String? category})?> _promptTemplateDetails(
+  BuildContext context,
+) {
+  final nameController = TextEditingController();
+  final categoryController = TextEditingController();
+
+  return showDialog<({String name, String? category})?>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Save as template'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameController,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Template name'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: categoryController,
+            decoration: const InputDecoration(labelText: 'Category (optional)'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final name = nameController.text.trim();
+            if (name.isEmpty) return; // name is required; keep the dialog open
+            final category = categoryController.text.trim();
+            Navigator.pop(
+              context,
+              (name: name, category: category.isEmpty ? null : category),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  ).whenComplete(() {
+    nameController.dispose();
+    categoryController.dispose();
+  });
 }
