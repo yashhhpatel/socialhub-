@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  ApprovalStatus,
   Platform,
   PublishJob,
   PublishJobStatus,
@@ -399,11 +400,33 @@ export class PublishingService {
   ) {
     const variant = await this.prisma.contentVariant.findUnique({
       where: { id: variantId },
-      include: { asset: { select: { orgId: true } } },
+      include: {
+        asset: {
+          select: {
+            orgId: true,
+            // Approval gate (Milestone 13.2): both the asset's status and
+            // whether its org even requires approval are needed to decide.
+            approvalStatus: true,
+            organization: { select: { requiresApproval: true } },
+          },
+        },
+      },
     });
 
     if (!variant || variant.asset.orgId !== orgId) {
       throw new NotFoundException('Content variant not found.');
+    }
+
+    // In an org that requires approval, an unapproved design cannot be
+    // published — the core guarantee of the approval workflow. Orgs with
+    // requiresApproval=false (the default) are unaffected.
+    if (
+      variant.asset.organization.requiresApproval &&
+      variant.asset.approvalStatus !== ApprovalStatus.approved
+    ) {
+      throw new UnprocessableEntityException(
+        'This design must be approved before it can be published.',
+      );
     }
 
     const account = await this.prisma.socialAccount.findUnique({
