@@ -37,6 +37,8 @@ describe('RBAC enforcement across mutating endpoints', () => {
   const matrix: Array<[string, new (...args: never[]) => object, string, UserRole]> = [
     // Content authoring / publishing — editor+.
     ['AI caption', AiController, 'generateCaption', E],
+    ['AI hashtags', AiController, 'generateHashtags', E],
+    ['AI tone', AiController, 'convertTone', E],
     ['content create', ContentController, 'create', E],
     ['content update', ContentController, 'update', E],
     ['content upload', ContentController, 'uploadMedia', E],

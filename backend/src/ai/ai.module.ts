@@ -8,6 +8,7 @@ import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
 import { AiController } from './ai.controller';
 import { AiGatewayService } from './ai-gateway.service';
+import { AiSuiteService } from './ai-suite.service';
 import { CaptionService } from './caption.service';
 import { QuotaGuard } from './quota.guard';
 
@@ -24,6 +25,7 @@ import { QuotaGuard } from './quota.guard';
   providers: [
     AiGatewayService,
     CaptionService,
+    AiSuiteService,
     QuotaGuard,
     InstagramAdapter,
     XAdapter,
