@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
 import { QueueModule } from './queue/queue.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
+import { TemplatesModule } from './templates/templates.module';
 import { UsersModule } from './users/users.module';
 
 /**
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     PublishingModule,
     AiModule,
     BrandKitsModule,
+    TemplatesModule,
   ],
 })
 export class AppModule {}

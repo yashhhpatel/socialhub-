@@ -117,6 +117,7 @@ model Organization {
   contentAssets    ContentAsset[]
   aiUsageLogs      AIUsageLog[]
   brandKit         BrandKit?
+  templates        Template[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
@@ -322,4 +323,31 @@ model BrandKit {
   updatedAt    DateTime     @updatedAt
 
   @@map("brand_kit")
+}
+
+/// A reusable design an org can start new content from (Milestone 9.4).
+///
+/// canvasJson is the same editor-owned payload ContentAsset stores — a
+/// template is essentially a saved starting canvas. "Start from template"
+/// copies this into a new ContentAsset via the existing content-creation
+/// endpoint, so templates need no rendering/publishing machinery of their
+/// own; they are a source to clone, not a thing that gets published.
+///
+/// Org-scoped (each tenant curates its own library). thumbnailUrl is an
+/// optional preview render; category is a freeform grouping label for the
+/// gallery, indexed with orgId so "this org's templates in this category"
+/// is a single range scan.
+model Template {
+  id           String       @id @default(uuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+  name         String
+  category     String?
+  canvasJson   Json
+  thumbnailUrl String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([orgId, category])
+  @@map("template")
 }
