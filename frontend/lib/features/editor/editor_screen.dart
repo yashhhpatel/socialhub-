@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_error_message.dart';
+import '../brand_kit/data/repositories/api_brand_kit_repository.dart';
 import '../publish/presentation/widgets/publish_modal.dart';
+import 'canvas/brand_kit_application.dart';
 import 'canvas/models/canvas_document.dart';
 import 'canvas/state/canvas_controller.dart';
 import 'canvas/widgets/canvas_surface.dart';
@@ -129,6 +131,30 @@ class _EditorWorkspace extends ConsumerWidget {
             onGenerateVariants: () =>
                 ref.read(editorActionsProvider(assetId).notifier).generateVariants(),
             onPublish: () => showPublishModal(context, assetId),
+            onApplyBrandKit: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                final kit = await ref.read(brandKitRepositoryProvider).get();
+                if (kit.isEmpty) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Your brand kit is empty — set colours or fonts first.'),
+                    ),
+                  );
+                  return;
+                }
+                controller.replaceDocument(
+                  applyBrandKit(ref.read(provider).document, kit),
+                );
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Brand kit applied to this design.')),
+                );
+              } catch (error) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Could not apply brand kit: ${describeApiError(error)}')),
+                );
+              }
+            },
           ),
           body: Row(
             children: [

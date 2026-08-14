@@ -157,6 +157,16 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     );
   }
 
+  /// Replaces the entire document in one undoable edit — used by
+  /// whole-canvas transforms like "apply brand kit" (Milestone 9.3), where
+  /// many layers change at once and there is no single selected layer the
+  /// change belongs to. Selection is cleared for the same reason undo does
+  /// it: the previously-selected layer may have been restyled out from
+  /// under the property panel.
+  void replaceDocument(CanvasDocument document) {
+    _applyDocument(document, null);
+  }
+
   /// Steps back one edit (Ctrl+Z). No-ops when there's nothing to undo.
   ///
   /// Selection is intentionally cleared on undo: the restored document

@@ -240,6 +240,20 @@ class TextCanvasLayer extends CanvasLayer {
         fontFamily: fontFamily,
       );
 
+  TextCanvasLayer copyWithFontFamily(String? newFontFamily) => TextCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+        text: text,
+        fontSize: fontSize,
+        color: color,
+        fontFamily: newFontFamily,
+      );
+
   TextCanvasLayer copyWithText(String newText) => TextCanvasLayer(
         id: id,
         x: x,
