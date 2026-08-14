@@ -19,6 +19,7 @@ import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CloudinaryService } from '../media/cloudinary.service';
+import { VideoProcessingService } from '../media/video-processing.service';
 import { ContentService } from './content.service';
 import { ContentAssetDetailDto, ContentAssetDto } from './dto/content-asset.dto';
 import { GenerateVariantsResponseDto } from './dto/content-variant.dto';
@@ -34,13 +35,19 @@ interface AuthenticatedRequest extends Request {
 }
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
+const ALLOWED_VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
+const ALLOWED_MIME_TYPES = [...ALLOWED_IMAGE_MIME_TYPES, ...ALLOWED_VIDEO_MIME_TYPES];
+// Raised from the image-only 10MB now that video (Milestone 9.2) shares
+// this route — a short clip needs the headroom. The mime filter still gates
+// what actually gets through.
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
 
 @Controller('content/assets')
 export class ContentController {
   constructor(
     private readonly contentService: ContentService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly videoProcessingService: VideoProcessingService,
     private readonly variantGenerator: VariantGeneratorService,
   ) {}
 
@@ -94,13 +101,13 @@ export class ContentController {
   }
 
   /**
-   * Image-only for this milestone — video upload/processing is Phase 9's
-   * job (a real transcoding pipeline, not a plain Cloudinary passthrough).
-   * Returns a bare hosted URL, deliberately not tied to any specific
-   * ContentAsset — the editor calls this per-image as the user adds one
-   * to the canvas, then embeds the returned url inside a layer's own
-   * canvasJson via the existing PATCH endpoint, which already accepts
-   * arbitrary layer content (see dto/canvas-json.dto.ts).
+   * Uploads a single media file for use on the canvas. Images go through
+   * CloudinaryService; videos (Milestone 9.2) go through
+   * VideoProcessingService, which also yields a poster still the canvas
+   * video layer displays. Returns a bare hosted URL (+ publicId, + poster
+   * for video), deliberately not tied to any specific ContentAsset — the
+   * editor embeds the returned url inside a layer's own canvasJson via the
+   * existing PATCH endpoint.
    */
   @UseGuards(JwtAuthGuard)
   @Post('upload')
@@ -108,10 +115,10 @@ export class ContentController {
     FileInterceptor('file', {
       limits: { fileSize: MAX_UPLOAD_BYTES },
       fileFilter: (req, file, callback) => {
-        if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
           callback(
             new BadRequestException(
-              `Unsupported file type. Allowed: ${ALLOWED_IMAGE_MIME_TYPES.join(', ')}.`,
+              `Unsupported file type. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}.`,
             ),
             false,
           );
@@ -126,6 +133,16 @@ export class ContentController {
   ): Promise<UploadMediaResponseDto> {
     if (!file) {
       throw new BadRequestException('No file provided under the "file" field.');
+    }
+
+    if (ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype)) {
+      const result = await this.videoProcessingService.uploadVideo(file);
+      return {
+        url: result.url,
+        publicId: result.publicId,
+        // The frame at 0s, so the editor has a poster to show immediately.
+        posterUrl: this.videoProcessingService.buildPosterUrl(result.publicId),
+      };
     }
 
     const result = await this.cloudinaryService.uploadImage(file);
