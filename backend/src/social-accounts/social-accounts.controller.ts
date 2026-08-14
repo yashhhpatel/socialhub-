@@ -12,9 +12,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { UserRole } from '@prisma/client';
 import { Request, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
 import { FacebookCallbackQueryDto } from './dto/facebook-callback-query.dto';
 import { InstagramCallbackQueryDto } from './dto/instagram-callback-query.dto';
@@ -51,7 +54,8 @@ export class SocialAccountsController {
     }));
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   async disconnect(
@@ -61,7 +65,8 @@ export class SocialAccountsController {
     await this.socialAccountsService.disconnect(id, req.user.orgId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Post('instagram/connect')
   connectInstagram(@Req() req: AuthenticatedRequest): ConnectResponseDto {
     return {
@@ -114,7 +119,8 @@ export class SocialAccountsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Post('x/connect')
   connectX(@Req() req: AuthenticatedRequest): ConnectResponseDto {
     return {
@@ -152,7 +158,8 @@ export class SocialAccountsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Post('facebook/connect')
   connectFacebook(@Req() req: AuthenticatedRequest): ConnectResponseDto {
     return {
@@ -192,7 +199,8 @@ export class SocialAccountsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Post('threads/connect')
   connectThreads(@Req() req: AuthenticatedRequest): ConnectResponseDto {
     return {
@@ -232,7 +240,8 @@ export class SocialAccountsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Post('linkedin/connect')
   connectLinkedIn(@Req() req: AuthenticatedRequest): ConnectResponseDto {
     return {

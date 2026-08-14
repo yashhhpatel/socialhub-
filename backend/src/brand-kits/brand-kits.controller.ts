@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
-import { BrandKit } from '@prisma/client';
+import { BrandKit, UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { BrandKitsService } from './brand-kits.service';
 import { BrandKitDto } from './dto/brand-kit.dto';
 import { UpdateBrandKitDto } from './dto/update-brand-kit.dto';
@@ -31,7 +33,8 @@ export class BrandKitsController {
     return this.toDto(await this.brandKitsService.getForOrg(req.user.orgId));
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.admin)
   @Patch()
   async update(
     @Req() req: AuthenticatedRequest,

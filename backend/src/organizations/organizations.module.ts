@@ -1,15 +1,18 @@
 import { Module } from '@nestjs/common';
 
+import { MembersController } from './members/members.controller';
+import { MembersService } from './members/members.service';
 import { OrganizationsService } from './organizations.service';
 
 /**
- * No controller yet — this milestone only needs org creation as an
- * internal building block for registration (see AuthService.register).
- * REST endpoints (invite, role management, white-labeling) are added by
- * the specific milestones that need them (11.1, 11.2, 15.4).
+ * OrganizationsService is the internal building block registration uses
+ * (see AuthService.register). Milestone 11.2 adds the team roster + role
+ * management endpoints (MembersController); invites live in their own
+ * InvitesModule.
  */
 @Module({
-  providers: [OrganizationsService],
+  controllers: [MembersController],
+  providers: [OrganizationsService, MembersService],
   exports: [OrganizationsService],
 })
 export class OrganizationsModule {}

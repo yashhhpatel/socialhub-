@@ -1,7 +1,10 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { TemplateDetailDto, TemplateSummaryDto } from './dto/template.dto';
 import { TemplatesService } from './templates.service';
@@ -50,7 +53,8 @@ export class TemplatesController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
   @Post()
   async create(
     @Req() req: AuthenticatedRequest,

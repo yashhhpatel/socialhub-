@@ -1,7 +1,10 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CaptionService } from './caption.service';
 import {
   GenerateCaptionDto,
@@ -27,7 +30,8 @@ export class AiController {
    * meters on) and before the handler, so an org over its allowance is
    * turned away with a 429 and a resetAt before any tokens are spent.
    */
-  @UseGuards(JwtAuthGuard, QuotaGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, QuotaGuard)
+  @Roles(UserRole.editor)
   @Post('caption')
   async generateCaption(
     @Req() req: AuthenticatedRequest,
