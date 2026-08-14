@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { CloudinaryService } from '../media/cloudinary.service';
+import { VideoProcessingService } from '../media/video-processing.service';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
@@ -24,6 +25,7 @@ import { VariantGeneratorService } from './variant-generator.service';
   providers: [
     ContentService,
     CloudinaryService,
+    VideoProcessingService,
     VariantGeneratorService,
     InstagramAdapter,
     XAdapter,

@@ -1,7 +1,14 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { ContentAsset, ContentVariant, Platform, VariantStatus } from '@prisma/client';
+import {
+  ContentAsset,
+  ContentAssetType,
+  ContentVariant,
+  Platform,
+  VariantStatus,
+} from '@prisma/client';
 
 import { CloudinaryService } from '../media/cloudinary.service';
+import { VideoProcessingService } from '../media/video-processing.service';
 import {
   PlatformAdapter,
   PlatformCapabilities,
@@ -41,6 +48,7 @@ export class VariantGeneratorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    private readonly videoProcessing: VideoProcessingService,
     instagramAdapter: InstagramAdapter,
     xAdapter: XAdapter,
     facebookAdapter: FacebookAdapter,
@@ -93,14 +101,29 @@ export class VariantGeneratorService {
     this.assertRenderable(asset);
 
     const variants: ContentVariant[] = [];
+    const isVideo = asset.type === ContentAssetType.video;
 
     for (const platform of platforms) {
-      const { imageSpec } = this.capabilitiesFor(platform);
+      const caps = this.capabilitiesFor(platform);
+      const { imageSpec } = caps;
 
-      const renderedMediaUrl = this.cloudinary.buildTransformedUrl(
-        asset.masterImagePublicId as string,
-        { width: imageSpec.width, height: imageSpec.height },
-      );
+      // A video asset is transcoded/trimmed per platform (Milestone 9.2);
+      // an image asset is cropped/resized as before (4.1). Both target the
+      // platform's frame size, and both are Cloudinary delivery URLs
+      // computed from the asset's master media public id.
+      const renderedMediaUrl = isVideo
+        ? this.videoProcessing.buildTransformedVideoUrl(
+            asset.masterImagePublicId as string,
+            {
+              width: imageSpec.width,
+              height: imageSpec.height,
+              maxDurationSeconds: caps.maxVideoDurationSeconds,
+            },
+          )
+        : this.cloudinary.buildTransformedUrl(asset.masterImagePublicId as string, {
+            width: imageSpec.width,
+            height: imageSpec.height,
+          });
 
       variants.push(
         await this.prisma.contentVariant.upsert({

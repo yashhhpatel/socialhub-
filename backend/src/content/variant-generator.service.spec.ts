@@ -12,6 +12,7 @@ describe('VariantGeneratorService', () => {
   let service: VariantGeneratorService;
   let prisma: { contentVariant: { upsert: jest.Mock } };
   let cloudinary: { buildTransformedUrl: jest.Mock };
+  let videoProcessing: { buildTransformedVideoUrl: jest.Mock };
 
   const asset = {
     id: 'asset_1',
@@ -39,10 +40,19 @@ describe('VariantGeneratorService', () => {
           `https://cdn.test/${publicId}_${d.width}x${d.height}.png`,
       ),
     };
+    videoProcessing = {
+      buildTransformedVideoUrl: jest.fn(
+        (
+          publicId: string,
+          s: { width: number; height: number; maxDurationSeconds?: number },
+        ) => `https://cdn.test/${publicId}_${s.width}x${s.height}_d${s.maxDurationSeconds}.mp4`,
+      ),
+    };
 
     service = new VariantGeneratorService(
       prisma as never,
       cloudinary as never,
+      videoProcessing as never,
       instagramAdapter,
       xAdapter,
       facebookAdapter,
@@ -118,6 +128,26 @@ describe('VariantGeneratorService', () => {
 
       const args = prisma.contentVariant.upsert.mock.calls[0][0];
       expect(args.create.status).toBe('ready');
+    });
+
+    it('transcodes/trims a video asset per platform, capped to its video ceiling', async () => {
+      const videoAsset = {
+        ...asset,
+        type: 'video',
+        canvasJson: { width: 1080, height: 1080, layers: [{ type: 'video', id: 'v1' }] },
+      } as unknown as ContentAsset;
+
+      await service.generate(videoAsset, [Platform.instagram]);
+
+      // Video path, not the image path.
+      expect(videoProcessing.buildTransformedVideoUrl).toHaveBeenCalledWith(
+        'socialhub/master',
+        { width: 1080, height: 1080, maxDurationSeconds: 900 }, // IG's 900s ceiling
+      );
+      expect(cloudinary.buildTransformedUrl).not.toHaveBeenCalled();
+
+      const args = prisma.contentVariant.upsert.mock.calls[0][0];
+      expect(args.create.renderedMediaUrl).toContain('.mp4');
     });
 
     it('refuses (422) when the asset has no master render yet', async () => {

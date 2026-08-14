@@ -12,4 +12,11 @@ export class UploadMediaResponseDto {
    * via PATCH /content/assets/:id.
    */
   publicId: string;
+
+  /**
+   * A still frame for a video upload (Milestone 9.2) — the poster the
+   * canvas video layer shows and the master render bakes in. Null for an
+   * image upload, which is its own poster.
+   */
+  posterUrl?: string;
 }
