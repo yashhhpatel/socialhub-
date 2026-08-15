@@ -1,11 +1,14 @@
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ScheduleModule } from '@nestjs/schedule';
 
 import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { CommentsModule } from './content/comments/comments.module';
@@ -57,6 +60,12 @@ import { UsersModule } from './users/users.module';
     BrandKitsModule,
     TemplatesModule,
     AnalyticsModule,
+    AuditModule,
+  ],
+  providers: [
+    // Global audit trail (Milestone 15.2): records every authenticated
+    // mutation. Registered app-wide so no controller can be forgotten.
+    { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })
 export class AppModule {}
