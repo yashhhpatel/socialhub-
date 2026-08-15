@@ -377,6 +377,31 @@ model PostMetric {
   @@map("post_metric")
 }
 
+/// An append-only record of one mutating action (Milestone 15.2). Actor
+/// identity is DENORMALIZED (actorEmail stored, not a User FK) on purpose: an
+/// audit entry is an immutable historical fact that must remain readable and
+/// attributable even after the user or their role is deleted or changed — a
+/// live join would let history rewrite itself. Written by the global
+/// AuditLogInterceptor for every authenticated mutation, so a new endpoint is
+/// covered automatically.
+model AuditLog {
+  id         String   @id @default(uuid())
+  orgId      String
+  actorId    String
+  actorEmail String
+  /// HTTP method — POST/PATCH/PUT/DELETE.
+  method     String
+  /// The matched route pattern, e.g. `/content/assets/:id/comments`.
+  path       String
+  /// The primary route id param, when the route has one.
+  targetId   String?
+  statusCode Int
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("audit_log")
+}
+
 enum IngestionStatus {
   running
   success
