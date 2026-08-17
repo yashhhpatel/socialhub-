@@ -86,7 +86,11 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not disconnect ${account.platform.label}: $e')),
+        SnackBar(
+          content: Text(
+            'Could not disconnect ${account.platform.label}: ${describeApiError(e)}',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _disconnectingAccountId = null);
@@ -128,7 +132,7 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (error, _) => _ErrorState(
-              message: '$error',
+              message: describeApiError(error),
               onRetry: () => ref.read(socialAccountsControllerProvider.notifier).refresh(),
             ),
             data: (accounts) => Column(
