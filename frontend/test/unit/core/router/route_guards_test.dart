@@ -3,14 +3,28 @@ import 'package:socialhub/core/router/route_guards.dart';
 
 void main() {
   group('authRedirect', () {
-    test('unauthenticated user hitting /dashboard is bounced to /login', () {
-      final result = authRedirect(
-        matchedLocation: '/dashboard',
-        isAuthenticated: false,
-      );
-      expect(result, '/login');
-    });
-
+    test(
+      'unauthenticated user can browse a would-be-protected page without being '
+      'bounced (access is gated at the point of use, not on navigation)',
+      () {
+        expect(
+          authRedirect(matchedLocation: '/dashboard', isAuthenticated: false),
+          isNull,
+        );
+        expect(
+          authRedirect(matchedLocation: '/content', isAuthenticated: false),
+          isNull,
+        );
+        expect(
+          authRedirect(matchedLocation: '/team', isAuthenticated: false),
+          isNull,
+        );
+        expect(
+          authRedirect(matchedLocation: '/settings', isAuthenticated: false),
+          isNull,
+        );
+      },
+    );
 
     test('authenticated user hitting /login is bounced to /dashboard', () {
       final result = authRedirect(
@@ -28,7 +42,7 @@ void main() {
       expect(result, '/dashboard');
     });
 
-    test('authenticated user hitting /dashboard is NOT redirected', () {
+    test('authenticated user hitting a normal page is NOT redirected', () {
       final result = authRedirect(
         matchedLocation: '/dashboard',
         isAuthenticated: true,
@@ -44,41 +58,20 @@ void main() {
       expect(result, isNull);
     });
 
-    test('unauthenticated user hitting the neutral root is NOT redirected', () {
-      final result = authRedirect(  
+    test('unauthenticated user hitting the root is NOT redirected', () {
+      final result = authRedirect(
         matchedLocation: '/',
         isAuthenticated: false,
       );
       expect(result, isNull);
     });
 
-    test('authenticated user hitting the neutral root is NOT redirected', () {
+    test('authenticated user hitting the root is NOT redirected by the guard', () {
       final result = authRedirect(
         matchedLocation: '/',
         isAuthenticated: true,
       );
       expect(result, isNull);
     });
-
-    test(
-      'protection is derived from navDestinations, not hardcoded to /dashboard alone',
-      () {
-        // /content, /settings, etc. are only protected because they're
-        // in navDestinations — this proves the derivation actually works,
-        // not just the one route that was hand-tested before.
-        expect(
-          authRedirect(matchedLocation: '/content', isAuthenticated: false),
-          '/login',
-        );
-        expect(
-          authRedirect(matchedLocation: '/settings', isAuthenticated: false),
-          '/login',
-        );
-        expect(
-          authRedirect(matchedLocation: '/team', isAuthenticated: true),
-          isNull,
-        );
-      },
-    );
   });
 }

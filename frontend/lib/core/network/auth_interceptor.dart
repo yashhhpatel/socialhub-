@@ -3,6 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_token_store.dart';
 
+/// Bumped whenever a signed-out (or expired) user tries to *use* a feature
+/// that requires an account — i.e. a mutating request comes back 401 and no
+/// valid session could be established. The app (see app.dart) listens to
+/// this and routes the user to /login.
+///
+/// Kept in core/network, with no dependency on the router or any feature, so
+/// the interceptor stays decoupled: it only signals intent; app.dart owns
+/// the actual navigation.
+final loginRequiredSignalProvider = StateProvider<int>((ref) => 0);
+
+const _mutatingMethods = {'POST', 'PUT', 'PATCH', 'DELETE'};
+
 /// Attaches the current access token to every outgoing request, and
 /// transparently refreshes-and-retries on a 401 — per docs/architecture —
 /// Flutter Web Application Architecture, §10: "a feature's repository code
@@ -55,10 +67,18 @@ class AuthInterceptor extends Interceptor {
 
     final refreshed = await _refreshTokens();
     if (!refreshed) {
-      // Refresh token is itself invalid/expired/revoked — the session is
-      // genuinely over. Clear it so the rest of the app (once route
-      // guards exist) can react, rather than holding onto dead tokens.
+      // No valid session — either the user was never signed in (browsing
+      // freely) or the refresh token is invalid/expired/revoked. Clear any
+      // dead tokens.
       _ref.read(authTokenStoreProvider.notifier).state = null;
+
+      // If they were trying to USE a feature (a mutating request), send them
+      // to log in. A plain GET is left to fail quietly so browsing pages
+      // without an account never yanks the user to /login.
+      if (_isFeatureAction(err.requestOptions)) {
+        _ref.read(loginRequiredSignalProvider.notifier).state++;
+      }
+
       handler.next(err);
       return;
     }
@@ -72,6 +92,14 @@ class AuthInterceptor extends Interceptor {
     } on DioException catch (retryError) {
       handler.next(retryError);
     }
+  }
+
+  /// A mutating request to a non-auth endpoint is treated as "using a
+  /// feature that needs an account". The /auth/* endpoints are excluded so a
+  /// failed login/register (also a 401) doesn't loop back to /login.
+  bool _isFeatureAction(RequestOptions options) {
+    if (options.path.contains('/auth/')) return false;
+    return _mutatingMethods.contains(options.method.toUpperCase());
   }
 
   Future<bool> _refreshTokens() {

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/auth_token_store.dart';
 import '../../data/repositories/api_auth_repository.dart';
+import '../../data/session_profile_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'auth_state.dart';
@@ -14,10 +15,33 @@ import 'auth_state.dart';
 /// `authRepositoryProvider` resolves to the real one).
 class AuthController extends StateNotifier<AuthState> {
   AuthController(this._repository, this._ref)
-      : super(const AuthState.unauthenticated());
+      : super(const AuthState.unauthenticated()) {
+    _restoreSession();
+  }
 
   final AuthRepository _repository;
   final Ref _ref;
+
+  /// On startup, rebuild the authenticated session from what was persisted
+  /// (tokens in core/network's store, profile in SessionProfileStore) so a
+  /// page reload keeps the user signed in with full access — no re-login.
+  /// Both halves must be present; otherwise stay unauthenticated.
+  void _restoreSession() {
+    final tokens = _ref.read(authTokenStoreProvider);
+    final profile = SessionProfileStore.read();
+    if (tokens == null || profile == null) return;
+
+    state = AuthState.authenticated(
+      AuthSession(
+        userId: profile.userId,
+        email: profile.email,
+        role: profile.role,
+        orgId: profile.orgId,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      ),
+    );
+  }
 
   Future<void> login({required String email, required String password}) async {
     state = const AuthState.loading();
@@ -64,6 +88,7 @@ class AuthController extends StateNotifier<AuthState> {
       await _repository.logout(currentSession.refreshToken);
     }
     _ref.read(authTokenStoreProvider.notifier).state = null;
+    SessionProfileStore.clear();
     state = const AuthState.unauthenticated();
   }
 
@@ -79,6 +104,14 @@ class AuthController extends StateNotifier<AuthState> {
     _ref.read(authTokenStoreProvider.notifier).state = AuthTokens(
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
+    );
+    SessionProfileStore.save(
+      SessionProfile(
+        userId: session.userId,
+        email: session.email,
+        role: session.role,
+        orgId: session.orgId,
+      ),
     );
   }
 }

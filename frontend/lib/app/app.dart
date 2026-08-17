@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/network/auth_interceptor.dart';
 import '../core/router/app_router.dart';
 import '../core/theme/dark_theme.dart';
 import '../core/theme/light_theme.dart';
@@ -22,6 +23,14 @@ class SocialHubApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final brandColor =
         ref.watch(whiteLabelProvider).valueOrNull?.primaryColor;
+
+    // When a signed-out (or expired) user tries to use a feature that needs
+    // an account, the AuthInterceptor bumps this signal — send them to log
+    // in. Done here, at the composition root, so the interceptor itself stays
+    // free of any router dependency.
+    ref.listen<int>(loginRequiredSignalProvider, (_, __) {
+      router.go('/login');
+    });
 
     return MaterialApp.router(
       title: 'SocialHub',
