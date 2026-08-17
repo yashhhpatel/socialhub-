@@ -26,4 +26,28 @@ export class OrganizationsService {
   findById(id: string): Promise<Organization | null> {
     return this.prisma.organization.findUnique({ where: { id } });
   }
+
+  /**
+   * Org overview for the Organizations settings page: name, plan, approval
+   * policy, and how many members it has. One extra count query alongside the
+   * org read.
+   */
+  async overview(id: string): Promise<{
+    id: string;
+    name: string;
+    planTier: string;
+    requiresApproval: boolean;
+    memberCount: number;
+  } | null> {
+    const org = await this.prisma.organization.findUnique({ where: { id } });
+    if (!org) return null;
+    const memberCount = await this.prisma.user.count({ where: { orgId: id } });
+    return {
+      id: org.id,
+      name: org.name,
+      planTier: org.planTier,
+      requiresApproval: org.requiresApproval,
+      memberCount,
+    };
+  }
 }
