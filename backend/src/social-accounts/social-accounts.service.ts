@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Platform, SocialAccount } from '@prisma/client';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
@@ -47,8 +52,10 @@ export class SocialAccountsService {
   // --- Instagram ---
 
   buildInstagramAuthorizationUrl(orgId: string): string {
-    const state = this.encodeState({ orgId, issuedAt: Date.now() });
-    return this.instagramAdapter.getAuthorizationUrl(state);
+    return this.buildAuthorizationUrl('Instagram', () => {
+      const state = this.encodeState({ orgId, issuedAt: Date.now() });
+      return this.instagramAdapter.getAuthorizationUrl(state);
+    });
   }
 
   async handleInstagramCallback(code: string, rawState: string): Promise<SocialAccount> {
@@ -60,9 +67,15 @@ export class SocialAccountsService {
   // --- X ---
 
   buildXAuthorizationUrl(orgId: string): string {
-    const { verifier, challenge } = generatePkcePair();
-    const state = this.encodeState({ orgId, issuedAt: Date.now(), codeVerifier: verifier });
-    return this.xAdapter.getAuthorizationUrl(state, challenge);
+    return this.buildAuthorizationUrl('X', () => {
+      const { verifier, challenge } = generatePkcePair();
+      const state = this.encodeState({
+        orgId,
+        issuedAt: Date.now(),
+        codeVerifier: verifier,
+      });
+      return this.xAdapter.getAuthorizationUrl(state, challenge);
+    });
   }
 
   async handleXCallback(code: string, rawState: string): Promise<SocialAccount> {
@@ -81,8 +94,10 @@ export class SocialAccountsService {
   // --- Facebook (Milestone 8.1) ---
 
   buildFacebookAuthorizationUrl(orgId: string): string {
-    const state = this.encodeState({ orgId, issuedAt: Date.now() });
-    return this.facebookAdapter.getAuthorizationUrl(state);
+    return this.buildAuthorizationUrl('Facebook', () => {
+      const state = this.encodeState({ orgId, issuedAt: Date.now() });
+      return this.facebookAdapter.getAuthorizationUrl(state);
+    });
   }
 
   async handleFacebookCallback(code: string, rawState: string): Promise<SocialAccount> {
@@ -94,8 +109,10 @@ export class SocialAccountsService {
   // --- Threads (Milestone 8.2) ---
 
   buildThreadsAuthorizationUrl(orgId: string): string {
-    const state = this.encodeState({ orgId, issuedAt: Date.now() });
-    return this.threadsAdapter.getAuthorizationUrl(state);
+    return this.buildAuthorizationUrl('Threads', () => {
+      const state = this.encodeState({ orgId, issuedAt: Date.now() });
+      return this.threadsAdapter.getAuthorizationUrl(state);
+    });
   }
 
   async handleThreadsCallback(code: string, rawState: string): Promise<SocialAccount> {
@@ -107,8 +124,10 @@ export class SocialAccountsService {
   // --- LinkedIn (Milestone 8.3) ---
 
   buildLinkedInAuthorizationUrl(orgId: string): string {
-    const state = this.encodeState({ orgId, issuedAt: Date.now() });
-    return this.linkedinAdapter.getAuthorizationUrl(state);
+    return this.buildAuthorizationUrl('LinkedIn', () => {
+      const state = this.encodeState({ orgId, issuedAt: Date.now() });
+      return this.linkedinAdapter.getAuthorizationUrl(state);
+    });
   }
 
   async handleLinkedInCallback(code: string, rawState: string): Promise<SocialAccount> {
@@ -139,6 +158,32 @@ export class SocialAccountsService {
   }
 
   // --- Shared internals ---
+
+  /**
+   * Builds a platform's OAuth authorization URL, turning the one failure a
+   * user can actually hit — the platform's OAuth app credentials not being
+   * configured on this server — into a clean, actionable 503 instead of an
+   * opaque 500 stack trace.
+   *
+   * The adapters read their credentials via ConfigService.getOrThrow(),
+   * which throws `Configuration key "..." does not exist` when an env var is
+   * missing. We recognise exactly that message and rethrow a friendly
+   * ServiceUnavailableException; any other error is a real bug and is left
+   * to propagate unchanged.
+   */
+  private buildAuthorizationUrl(label: string, build: () => string): string {
+    try {
+      return build();
+    } catch (err) {
+      if (err instanceof Error && /does not exist/i.test(err.message)) {
+        throw new ServiceUnavailableException(
+          `${label} connecting isn't set up on this server yet. ` +
+            `An administrator needs to add ${label}'s OAuth app credentials first.`,
+        );
+      }
+      throw err;
+    }
+  }
 
   private async upsertAccount(
     orgId: string,

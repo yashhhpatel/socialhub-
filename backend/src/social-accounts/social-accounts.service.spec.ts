@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 
@@ -192,6 +196,29 @@ describe('SocialAccountsService', () => {
       expect(upsertArgs.create.accessTokenEnc).not.toBe('raw_page_token');
       expect(tokenEncryption.decrypt(upsertArgs.create.accessTokenEnc)).toBe(
         'raw_page_token',
+      );
+    });
+
+    it('throws a friendly ServiceUnavailableException (not a raw 500) when the OAuth app credentials are not configured', () => {
+      // The real adapter uses ConfigService.getOrThrow(), which throws
+      // `Configuration key "FACEBOOK_CLIENT_ID" does not exist` when the env
+      // var is missing. Simulate that here.
+      facebookAdapter.getAuthorizationUrl.mockImplementation(() => {
+        throw new Error('Configuration key "FACEBOOK_CLIENT_ID" does not exist');
+      });
+
+      expect(() => service.buildFacebookAuthorizationUrl('org_fb')).toThrow(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('lets an unrelated adapter error propagate unchanged', () => {
+      facebookAdapter.getAuthorizationUrl.mockImplementation(() => {
+        throw new Error('some other unexpected failure');
+      });
+
+      expect(() => service.buildFacebookAuthorizationUrl('org_fb')).toThrow(
+        'some other unexpected failure',
       );
     });
 
