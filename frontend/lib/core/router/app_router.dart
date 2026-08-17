@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/app_shell_placeholder.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -42,14 +41,8 @@ import 'route_guards.dart';
 /// auth change (a common mistake when wiring Riverpod + GoRouter
 /// together) would tear down navigator state — deliberately avoided.
 ///
-/// /settings (Milestone 2.4): now renders SocialAccountsScreen — the
-/// original features/settings/presentation/screens/settings_screen.dart
-/// placeholder is left in place but unreferenced by any route, rather
-/// than deleted. It becomes a real multi-section settings page (of which
-/// Connected Accounts is the first section) once a second real settings
-/// concern exists to sit alongside it — merging them prematurely, with
-/// only one real section, would just be structure with nothing to
-/// organize yet.
+/// /settings renders SocialAccountsScreen, which is now a real
+/// multi-section settings page: Appearance (theme) + Connected accounts.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -62,10 +55,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
+      // Root has no screen of its own: send signed-in users to the
+      // dashboard and everyone else to login. (Replaced the Milestone 0.2
+      // "app shell scaffold" placeholder screen.)
       GoRoute(
         path: '/',
         name: 'root',
-        builder: (context, state) => const AppShellPlaceholder(),
+        redirect: (context, state) =>
+            ref.read(authTokenStoreProvider) != null ? '/dashboard' : '/login',
       ),
       GoRoute(
         path: '/login',
