@@ -16,6 +16,7 @@ import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/editor/editor_screen.dart';
 import '../../features/media_library/presentation/screens/media_library_screen.dart';
 import '../../features/organizations/presentation/screens/organizations_screen.dart';
+import '../../features/settings/white_label_screen.dart';
 import '../../features/social_accounts/presentation/screens/social_accounts_screen.dart';
 import '../../features/team/presentation/screens/team_screen.dart';
 import '../layout/app_shell.dart';
@@ -161,6 +162,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/brand-kit',
             name: 'brand-kit',
             builder: (context, state) => const BrandKitScreen(),
+          ),
+          GoRoute(
+            path: '/white-label',
+            name: 'white-label',
+            builder: (context, state) => const WhiteLabelScreen(),
           ),
           GoRoute(
             path: '/settings',

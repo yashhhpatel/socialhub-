@@ -5,10 +5,14 @@ import '../core/router/app_router.dart';
 import '../core/theme/dark_theme.dart';
 import '../core/theme/light_theme.dart';
 import '../core/theme/theme_mode_controller.dart';
+import '../features/settings/data/api_white_label_repository.dart';
 
-/// Root widget of the application. Composes theme + router. No feature
-/// knowledge lives here — this file should not need to change as features
-/// are added in later milestones.
+/// Root widget of the application. Composes theme + router.
+///
+/// White-labeling (Milestone 15.4): if the signed-in org has a brand colour,
+/// it overrides the theme's primary across the whole app shell. Applied here
+/// so it reaches every screen at once. Absent/loading/error branding falls
+/// back to the default theme — branding is strictly additive.
 class SocialHubApp extends ConsumerWidget {
   const SocialHubApp({super.key});
 
@@ -16,14 +20,23 @@ class SocialHubApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final brandColor =
+        ref.watch(whiteLabelProvider).valueOrNull?.primaryColor;
 
     return MaterialApp.router(
       title: 'SocialHub',
       debugShowCheckedModeBanner: false,
-      theme: lightTheme,
-      darkTheme: darkTheme,
+      theme: _branded(lightTheme, brandColor),
+      darkTheme: _branded(darkTheme, brandColor),
       themeMode: themeMode,
       routerConfig: router,
+    );
+  }
+
+  ThemeData _branded(ThemeData base, Color? primary) {
+    if (primary == null) return base;
+    return base.copyWith(
+      colorScheme: base.colorScheme.copyWith(primary: primary),
     );
   }
 }
