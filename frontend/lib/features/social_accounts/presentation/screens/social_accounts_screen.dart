@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -96,7 +97,18 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Connected Accounts', style: Theme.of(context).textTheme.headlineLarge),
+          Text('Settings', style: Theme.of(context).textTheme.headlineLarge),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            'Manage how SocialHub looks and the accounts it publishes to.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
+                ),
+          ),
+          const SizedBox(height: SpacingTokens.lg),
+          const _AppearanceSection(),
+          const SizedBox(height: SpacingTokens.lg),
+          Text('Connected accounts', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: SpacingTokens.xs),
           Text(
             'Connect your social platforms to publish content directly from SocialHub.',
@@ -104,7 +116,7 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
                 ),
           ),
-          const SizedBox(height: SpacingTokens.lg),
+          const SizedBox(height: SpacingTokens.md),
           accountsState.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: SpacingTokens.xl),
@@ -144,6 +156,63 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
       if (account.platform == platform) return account;
     }
     return null;
+  }
+}
+
+/// Appearance controls — theme mode lives here now (moved out of the old
+/// root "app shell scaffold" placeholder screen).
+class _AppearanceSection extends ConsumerWidget {
+  const _AppearanceSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final mode = ref.watch(themeModeProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Appearance', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            'Choose the theme for SocialHub.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.65),
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(
+                value: ThemeMode.light,
+                icon: Icon(Icons.light_mode_outlined),
+                label: Text('Light'),
+              ),
+              ButtonSegment(
+                value: ThemeMode.dark,
+                icon: Icon(Icons.dark_mode_outlined),
+                label: Text('Dark'),
+              ),
+              ButtonSegment(
+                value: ThemeMode.system,
+                icon: Icon(Icons.brightness_auto_outlined),
+                label: Text('System'),
+              ),
+            ],
+            selected: {mode},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                ref.read(themeModeProvider.notifier).setMode(selection.first),
+          ),
+        ],
+      ),
+    );
   }
 }
 
