@@ -3,14 +3,28 @@ import { AIFeature } from '@prisma/client';
 
 import { AiGatewayService } from './ai-gateway.service';
 
-/** Minimal stand-in for the SDK's Message shape. */
-function anthropicMessage(overrides: Record<string, unknown> = {}) {
+/** Minimal stand-in for the OpenAI ChatCompletion shape. */
+function openAiCompletion(overrides: Record<string, unknown> = {}) {
+  const {
+    content = 'Sunday reset, minimal effort maximum vibe',
+    refusal = null,
+    finish_reason = 'stop',
+    ...rest
+  } = overrides as {
+    content?: string | null;
+    refusal?: string | null;
+    finish_reason?: string;
+  };
   return {
-    model: 'claude-opus-5',
-    stop_reason: 'end_turn',
-    content: [{ type: 'text', text: 'Sunday reset, minimal effort maximum vibe' }],
-    usage: { input_tokens: 120, output_tokens: 18 },
-    ...overrides,
+    model: 'gpt-4o-mini-2024-07-18',
+    choices: [
+      {
+        finish_reason,
+        message: { role: 'assistant', content, refusal },
+      },
+    ],
+    usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
+    ...rest,
   };
 }
 
@@ -29,13 +43,14 @@ describe('AiGatewayService', () => {
   /** Builds the service with the SDK client swapped for a stub. */
   function build(configured = true): AiGatewayService {
     const config = {
-      get: (key: string) => (key === 'ANTHROPIC_API_KEY' && configured ? 'sk-test' : undefined),
+      get: (key: string) =>
+        key === 'OPENAI_API_KEY' && configured ? 'sk-test' : undefined,
     };
     const service = new AiGatewayService(config as never, prisma as never);
     if (configured) {
       // Replace the real SDK client — these tests must never reach the network.
       (service as unknown as { client: unknown }).client = {
-        messages: { create },
+        chat: { completions: { create } },
       };
     }
     return service;
@@ -43,7 +58,7 @@ describe('AiGatewayService', () => {
 
   beforeEach(() => {
     prisma = { aIUsageLog: { create: jest.fn().mockResolvedValue({}) } };
-    create = jest.fn().mockResolvedValue(anthropicMessage());
+    create = jest.fn().mockResolvedValue(openAiCompletion());
   });
 
   describe('configuration', () => {
@@ -59,73 +74,45 @@ describe('AiGatewayService', () => {
   });
 
   describe('generate', () => {
-    it('returns the concatenated text of the response', async () => {
+    it('returns the text of the response', async () => {
       const result = await build().generate(request);
       expect(result.text).toBe('Sunday reset, minimal effort maximum vibe');
     });
 
     it('trims whitespace the model may pad the caption with', async () => {
-      create.mockResolvedValue(
-        anthropicMessage({ content: [{ type: 'text', text: '\n  A caption.  \n' }] }),
-      );
+      create.mockResolvedValue(openAiCompletion({ content: '\n  A caption.  \n' }));
       expect((await build().generate(request)).text).toBe('A caption.');
-    });
-
-    it('joins multiple text blocks rather than dropping all but the first', async () => {
-      create.mockResolvedValue(
-        anthropicMessage({
-          content: [
-            { type: 'text', text: 'Part one ' },
-            { type: 'text', text: 'part two' },
-          ],
-        }),
-      );
-      expect((await build().generate(request)).text).toBe('Part one part two');
-    });
-
-    it('ignores non-text blocks, which carry no caption content', async () => {
-      create.mockResolvedValue(
-        anthropicMessage({
-          content: [
-            { type: 'thinking', thinking: '' },
-            { type: 'text', text: 'The caption.' },
-          ],
-        }),
-      );
-      expect((await build().generate(request)).text).toBe('The caption.');
     });
 
     it('sends the untrusted design content in the USER turn, never the system prompt', async () => {
       await build().generate(request);
 
       const args = create.mock.calls[0][0];
-      expect(args.system).toBe('You write captions.');
-      expect(args.system).not.toContain('<design>');
       expect(args.messages).toEqual([
+        { role: 'system', content: 'You write captions.' },
         { role: 'user', content: '<design>Text: "Hello"</design>' },
       ]);
+      // The design must not have leaked into the system instructions.
+      expect(args.messages[0].content).not.toContain('<design>');
     });
 
-    it('uses Claude Opus 5 at low effort with headroom for thinking', async () => {
+    it('uses gpt-4o-mini with room for the reply', async () => {
       await build().generate(request);
 
       const args = create.mock.calls[0][0];
-      expect(args.model).toBe('claude-opus-5');
-      expect(args.output_config).toEqual({ effort: 'low' });
-      // Thinking is on by default and shares this ceiling with the reply —
-      // a tight limit truncates the caption rather than shortening it.
+      expect(args.model).toBe('gpt-4o-mini');
       expect(args.max_tokens).toBeGreaterThanOrEqual(1024);
     });
   });
 
   describe('failure handling', () => {
     it('does not leak the provider error message to the caller', async () => {
-      create.mockRejectedValue(new Error('overloaded_error: upstream capacity'));
+      create.mockRejectedValue(new Error('rate_limit_exceeded: upstream capacity'));
 
       await expect(build().generate(request)).rejects.toThrow(
         /temporarily unavailable/i,
       );
-      await expect(build().generate(request)).rejects.not.toThrow(/overloaded_error/);
+      await expect(build().generate(request)).rejects.not.toThrow(/rate_limit/);
     });
 
     it('does NOT meter a failed call — an outage must not burn the org quota', async () => {
@@ -136,14 +123,16 @@ describe('AiGatewayService', () => {
     });
 
     it('surfaces a refusal as its own message rather than an empty caption', async () => {
-      create.mockResolvedValue(anthropicMessage({ stop_reason: 'refusal', content: [] }));
+      create.mockResolvedValue(
+        openAiCompletion({ content: null, refusal: 'I cannot help with that.' }),
+      );
 
       await expect(build().generate(request)).rejects.toThrow(/declined/i);
       expect(prisma.aIUsageLog.create).not.toHaveBeenCalled();
     });
 
     it('rejects an empty response instead of returning a blank caption', async () => {
-      create.mockResolvedValue(anthropicMessage({ content: [{ type: 'text', text: '   ' }] }));
+      create.mockResolvedValue(openAiCompletion({ content: '   ' }));
 
       await expect(build().generate(request)).rejects.toThrow(/empty/i);
     });
@@ -160,7 +149,7 @@ describe('AiGatewayService', () => {
           feature: AIFeature.caption,
           inputTokens: 120,
           outputTokens: 18,
-          model: 'claude-opus-5',
+          model: 'gpt-4o-mini-2024-07-18',
         },
       });
     });
