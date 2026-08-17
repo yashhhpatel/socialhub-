@@ -9,6 +9,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { CommentsModule } from './content/comments/comments.module';
@@ -61,6 +62,7 @@ import { UsersModule } from './users/users.module';
     TemplatesModule,
     AnalyticsModule,
     AuditModule,
+    RateLimitModule,
   ],
   providers: [
     // Global audit trail (Milestone 15.2): records every authenticated
