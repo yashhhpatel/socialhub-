@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/tokens/color_tokens.dart';
 import '../../theme/tokens/spacing_tokens.dart';
 import '../nav_destination_data.dart';
 
@@ -27,7 +28,12 @@ class NavSidebar extends StatelessWidget {
 
     return Container(
       width: expanded ? 240 : 76,
-      color: colorScheme.surface,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          right: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -68,11 +74,22 @@ class _Brand extends StatelessWidget {
             expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(8),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: ColorTokens.brandPrimary.withOpacity(0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: const Icon(Icons.hub_outlined, size: 18, color: Colors.white),
           ),
@@ -129,7 +146,9 @@ class _SidebarItem extends StatelessWidget {
                 Icon(
                   selected ? destination.selectedIcon : destination.icon,
                   size: 20,
-                  color: selected ? colorScheme.primary : colorScheme.onSurface,
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
                 ),
                 if (expanded) ...[
                   const SizedBox(width: SpacingTokens.sm),
@@ -137,9 +156,10 @@ class _SidebarItem extends StatelessWidget {
                     child: Text(
                       destination.label,
                       style: TextStyle(
-                        color:
-                            selected ? colorScheme.primary : colorScheme.onSurface,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                        color: selected
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                         fontSize: 14,
                       ),
                       overflow: TextOverflow.ellipsis,

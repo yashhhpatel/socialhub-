@@ -22,6 +22,20 @@ class TypographyTokens {
     height: 1.25,
   );
 
+  static const TextStyle titleLarge = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+  );
+
+  static const TextStyle titleMedium = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+  );
+
   static const TextStyle bodyLarge = TextStyle(
     fontFamily: fontFamily,
     fontSize: 16,

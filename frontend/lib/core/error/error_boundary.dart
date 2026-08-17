@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/tokens/color_tokens.dart';
+
 /// Global error handling for the app (Milestone 6.1).
 ///
 /// Two failure surfaces, handled together here:
@@ -62,13 +64,13 @@ class _ErrorFallback extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
-        color: const Color(0xFFF8F9FB),
+        color: ColorTokens.lavenderLight,
         alignment: Alignment.center,
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 44, color: Color(0xFFB00020)),
+            const Icon(Icons.error_outline, size: 44, color: ColorTokens.error),
             const SizedBox(height: 16),
             const Text(
               'Something went wrong',
@@ -76,7 +78,7 @@ class _ErrorFallback extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2430),
+                color: ColorTokens.neutral900,
               ),
             ),
             const SizedBox(height: 8),
@@ -84,14 +86,14 @@ class _ErrorFallback extends StatelessWidget {
               'This part of the page failed to load. Try again, and if it '
               'keeps happening, reload the app.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Color(0xFF5B6270)),
+              style: TextStyle(fontSize: 14, color: ColorTokens.neutral600),
             ),
             if (kDebugMode) ...[
               const SizedBox(height: 16),
               Text(
                 details.exceptionAsString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF9AA0AC)),
+                style: const TextStyle(fontSize: 12, color: ColorTokens.neutral600),
               ),
             ],
           ],
