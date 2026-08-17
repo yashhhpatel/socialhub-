@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/social_account.dart';
@@ -68,7 +69,11 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start connecting ${platform.label}: $e')),
+        SnackBar(
+          content: Text(
+            'Could not connect ${platform.label}: ${describeApiError(e)}',
+          ),
+        ),
       );
       setState(() => _connectingPlatform = null);
     }
