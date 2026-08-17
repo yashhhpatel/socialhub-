@@ -28,11 +28,12 @@ import 'route_guards.dart';
 /// the router owns URL structure — a feature never hardcodes its own path
 /// elsewhere.
 ///
-/// Authenticated destinations (dashboard + the 8 sidebar sections) are
-/// nested inside a ShellRoute, so AppShell (sidebar/top bar) persists
-/// across navigation between them instead of being rebuilt from scratch
-/// on every route change. /, /login, /register stay outside the shell —
-/// there's no sidebar to show before a session exists.
+/// Destinations are nested inside a ShellRoute, so AppShell (the top nav
+/// bar) persists across navigation between them instead of being rebuilt
+/// from scratch on every route change. `/` lives inside the shell too — it
+/// is the public home (see its route below), so the header shows there even
+/// when logged out, with a Login control. Only /login and /register stay
+/// outside the shell — those are the standalone auth screens.
 ///
 /// Route guard: GoRouter is constructed a single time here, with
 /// `refreshListenable` telling it *when* to re-run `redirect`, and
@@ -55,15 +56,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
-      // Root has no screen of its own: send signed-in users to the
-      // dashboard and everyone else to login. (Replaced the Milestone 0.2
-      // "app shell scaffold" placeholder screen.)
-      GoRoute(
-        path: '/',
-        name: 'root',
-        redirect: (context, state) =>
-            ref.read(authTokenStoreProvider) != null ? '/dashboard' : '/login',
-      ),
       GoRoute(
         path: '/login',
         name: 'login',
@@ -105,6 +97,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: child,
         ),
         routes: [
+          // Root is the public home: it renders the main SocialHub page
+          // (the dashboard overview) inside the shell for everyone, so an
+          // unauthenticated visitor lands here instead of being bounced to
+          // /login. Signed-in users are sent on to /dashboard so the rest of
+          // the authenticated experience is unchanged. `/` itself is not in
+          // navDestinations, so authRedirect leaves it publicly reachable.
+          GoRoute(
+            path: '/',
+            name: 'root',
+            redirect: (context, state) =>
+                ref.read(authTokenStoreProvider) != null ? '/dashboard' : null,
+            builder: (context, state) => const DashboardScreen(),
+          ),
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
