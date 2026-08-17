@@ -75,6 +75,25 @@ export class FacebookAdapter implements PlatformAdapter {
 
   constructor(private readonly configService: ConfigService) {}
 
+  // Meta's dashboard labels these the "App ID" and "App Secret", so
+  // FACEBOOK_APP_ID / FACEBOOK_APP_SECRET is the natural thing to put in
+  // .env — accept those first, falling back to the older *_CLIENT_* names so
+  // existing configs keep working. getOrThrow on the fallback preserves the
+  // clear "not configured" error when neither is set.
+  private clientId(): string {
+    return (
+      this.configService.get<string>('FACEBOOK_APP_ID') ??
+      this.configService.getOrThrow<string>('FACEBOOK_CLIENT_ID')
+    );
+  }
+
+  private clientSecret(): string {
+    return (
+      this.configService.get<string>('FACEBOOK_APP_SECRET') ??
+      this.configService.getOrThrow<string>('FACEBOOK_CLIENT_SECRET')
+    );
+  }
+
   capabilities(): PlatformCapabilities {
     return {
       supportedMediaTypes: ['image', 'video'],
@@ -102,7 +121,7 @@ export class FacebookAdapter implements PlatformAdapter {
 
   getAuthorizationUrl(state: string): string {
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow<string>('FACEBOOK_CLIENT_ID'),
+      client_id: this.clientId(),
       redirect_uri: this.configService.getOrThrow<string>('FACEBOOK_REDIRECT_URI'),
       response_type: 'code',
       scope: SCOPES.join(','),
@@ -144,8 +163,8 @@ export class FacebookAdapter implements PlatformAdapter {
 
   private async exchangeCodeForUserToken(code: string): Promise<string> {
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow<string>('FACEBOOK_CLIENT_ID'),
-      client_secret: this.configService.getOrThrow<string>('FACEBOOK_CLIENT_SECRET'),
+      client_id: this.clientId(),
+      client_secret: this.clientSecret(),
       redirect_uri: this.configService.getOrThrow<string>('FACEBOOK_REDIRECT_URI'),
       code,
     });
@@ -170,8 +189,8 @@ export class FacebookAdapter implements PlatformAdapter {
   ): Promise<FacebookTokenResponse> {
     const params = new URLSearchParams({
       grant_type: 'fb_exchange_token',
-      client_id: this.configService.getOrThrow<string>('FACEBOOK_CLIENT_ID'),
-      client_secret: this.configService.getOrThrow<string>('FACEBOOK_CLIENT_SECRET'),
+      client_id: this.clientId(),
+      client_secret: this.clientSecret(),
       fb_exchange_token: shortLivedToken,
     });
 

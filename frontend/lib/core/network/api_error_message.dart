@@ -20,6 +20,14 @@ import 'package:dio/dio.dart';
 String describeApiError(Object error) {
   if (error is! DioException) return error.toString();
 
+  // A 401 means "you need to be signed in" — the raw backend message
+  // ("Unauthorized") reads like a failure the user caused. Say plainly what
+  // to do instead, so every page that loads account data shows the same
+  // friendly prompt when browsing signed out.
+  if (error.response?.statusCode == 401) {
+    return 'Please log in to view this.';
+  }
+
   final data = error.response?.data;
 
   if (data is Map<String, dynamic>) {

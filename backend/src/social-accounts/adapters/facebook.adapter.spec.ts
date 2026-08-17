@@ -2,13 +2,19 @@ import { ConfigService } from '@nestjs/config';
 
 import { FacebookAdapter } from './facebook.adapter';
 
-function makeAdapter(): FacebookAdapter {
+function makeAdapter(
+  overrides: Record<string, string> = {},
+): FacebookAdapter {
   const configValues: Record<string, string> = {
     FACEBOOK_CLIENT_ID: 'test-client-id',
     FACEBOOK_CLIENT_SECRET: 'test-client-secret',
     FACEBOOK_REDIRECT_URI: 'http://localhost:3000/social-accounts/facebook/callback',
+    ...overrides,
   };
   const configService = {
+    // Non-throwing lookup — returns undefined for unset keys, which is how
+    // the adapter probes the preferred FACEBOOK_APP_ID/SECRET names.
+    get: jest.fn((key: string) => configValues[key]),
     getOrThrow: jest.fn((key: string) => {
       if (!(key in configValues)) throw new Error(`Missing config: ${key}`);
       return configValues[key];
@@ -61,6 +67,15 @@ describe('FacebookAdapter', () => {
       );
       expect(url.searchParams.get('response_type')).toBe('code');
       expect(url.searchParams.get('state')).toBe('test-state-value');
+    });
+
+    it('prefers the FACEBOOK_APP_ID / FACEBOOK_APP_SECRET names when set (Meta terminology)', () => {
+      const adapter = makeAdapter({
+        FACEBOOK_APP_ID: 'app-id-123',
+        FACEBOOK_APP_SECRET: 'app-secret-123',
+      });
+      const url = new URL(adapter.getAuthorizationUrl('s'));
+      expect(url.searchParams.get('client_id')).toBe('app-id-123');
     });
 
     it('requests the page-management scopes needed to publish', () => {

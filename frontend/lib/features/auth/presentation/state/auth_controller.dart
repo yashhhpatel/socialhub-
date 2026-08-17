@@ -17,10 +17,26 @@ class AuthController extends StateNotifier<AuthState> {
   AuthController(this._repository, this._ref)
       : super(const AuthState.unauthenticated()) {
     _restoreSession();
+    _watchTokenStore();
   }
 
   final AuthRepository _repository;
   final Ref _ref;
+
+  /// Keep the UI session in lock-step with the token store. When the
+  /// AuthInterceptor clears the tokens because a session could not be
+  /// refreshed (expired or revoked), reflect that here: drop the session and
+  /// the persisted profile so the app shows a clean signed-out state (the
+  /// header's Log in button, "log in to continue" prompts) instead of a
+  /// stuck "authenticated" UI where every request silently 401s.
+  void _watchTokenStore() {
+    _ref.listen<AuthTokens?>(authTokenStoreProvider, (_, next) {
+      if (next == null && state.status == AuthStatus.authenticated) {
+        SessionProfileStore.clear();
+        state = const AuthState.unauthenticated();
+      }
+    });
+  }
 
   /// On startup, rebuild the authenticated session from what was persisted
   /// (tokens in core/network's store, profile in SessionProfileStore) so a
