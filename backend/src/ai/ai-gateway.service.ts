@@ -28,6 +28,31 @@ export interface AiGenerationResult {
 }
 
 /**
+ * Placeholder outputs used ONLY as a development fallback (see
+ * AiGatewayService.handleUnavailable). Each is shaped so the feature's own
+ * parser accepts it — hashtags need `#` tokens, viral score needs a
+ * `score:`/`reason:` pair — so the whole AI flow works end to end locally
+ * without a billed key. Never returned in production.
+ */
+const DEV_STUB_TEXT: Partial<Record<AIFeature, string>> = {
+  [AIFeature.caption]:
+    '✨ Sample caption from development mode — configure an AI provider ' +
+    '(OPENAI_API_KEY + billing) to generate real captions.',
+  [AIFeature.hashtags]:
+    '#socialhub #sample #devmode #placeholder #contentmarketing ' +
+    '#socialmedia #demo #configureai #stub #comingsoon #marketing #brand',
+  [AIFeature.tone]:
+    'Development-mode rewrite: configure an AI provider to get a real ' +
+    'tone conversion here.',
+  [AIFeature.viral_score]:
+    'score: 72\nreason: Development placeholder — configure an AI provider ' +
+    'for a real estimate.',
+};
+
+const DEV_STUB_DEFAULT =
+  'Development placeholder — configure an AI provider to enable this feature.';
+
+/**
  * The single place this application talks to an LLM (Milestone 5.1).
  *
  * Provider-agnostic by intent, per the blueprint: every AI feature depends
@@ -55,6 +80,15 @@ export class AiGatewayService {
    */
   private static readonly MODEL = 'gpt-4o-mini';
 
+  /**
+   * Whether a development stub may stand in when the real provider is
+   * unavailable. True everywhere EXCEPT production and staging — so a
+   * developer can build the AI flows without a billed key, while a real
+   * deployment (the Dockerfile sets NODE_ENV=production) never fakes a
+   * result and instead returns a clear "configure an AI provider" error.
+   */
+  private readonly allowDevStub: boolean;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -63,10 +97,11 @@ export class AiGatewayService {
 
     // Optional at boot, same reasoning as Cloudinary and the OAuth
     // credentials (Milestones 2.2/3.2): a developer without an OpenAI key
-    // should still be able to run the rest of the app. A call without one
-    // fails with a clear message at request time, not a cryptic crash at
-    // startup.
+    // should still be able to run the rest of the app.
     this.client = apiKey ? new OpenAI({ apiKey }) : null;
+
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.allowDevStub = nodeEnv !== 'production' && nodeEnv !== 'staging';
   }
 
   get isConfigured(): boolean {
@@ -75,9 +110,8 @@ export class AiGatewayService {
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.client) {
-      throw new ServiceUnavailableException(
-        'AI features are not configured on this server (OPENAI_API_KEY is missing).',
-      );
+      // No key configured — not an error the app should crash on.
+      return this.handleUnavailable(request, 'OPENAI_API_KEY is not set');
     }
 
     let response: OpenAI.Chat.Completions.ChatCompletion;
@@ -94,9 +128,18 @@ export class AiGatewayService {
         ],
       });
     } catch (error) {
-      // The provider's own message is logged but NOT returned to the
-      // client: it can echo prompt content, and the caller can't act on a
-      // "rate_limit"/"overloaded" error anyway.
+      // A quota/rate-limit (429) means the provider is reachable but the
+      // account can't serve the call — the common "I have a key but no
+      // billing" case. Treat it like an unavailable provider so development
+      // still works and production gets the actionable message, rather than
+      // a generic "try again".
+      if (this.isQuotaError(error)) {
+        return this.handleUnavailable(request, 'the OpenAI quota is exhausted (429)');
+      }
+
+      // Any other provider error: its own message is logged but NOT returned
+      // to the client (it can echo prompt content, and the caller can't act
+      // on "overloaded" anyway).
       this.logger.error(
         `AI generation failed for ${request.feature}: ${
           error instanceof Error ? error.message : String(error)
@@ -137,6 +180,43 @@ export class AiGatewayService {
       outputTokens: response.usage?.completion_tokens ?? 0,
       model: response.model,
     };
+  }
+
+  /** True for an OpenAI quota/rate-limit error (HTTP 429). */
+  private isQuotaError(error: unknown): boolean {
+    const status = (error as { status?: number } | null)?.status;
+    const code = (error as { code?: string } | null)?.code;
+    return status === 429 || code === 'insufficient_quota';
+  }
+
+  /**
+   * Called when the real provider can't serve a request (no key, or a 429
+   * quota/rate-limit). Outside production/staging it returns a labelled
+   * development stub so the AI flow still works locally without billing; in
+   * production it throws a clear, actionable error instead of ever faking a
+   * result. Never records usage — a stub isn't a real, billable call.
+   */
+  private handleUnavailable(
+    request: AiGenerationRequest,
+    reason: string,
+  ): AiGenerationResult {
+    if (this.allowDevStub) {
+      this.logger.warn(
+        `AI provider unavailable (${reason}) — returning a development stub ` +
+          `for ${request.feature}. This never happens in production.`,
+      );
+      return {
+        text: DEV_STUB_TEXT[request.feature] ?? DEV_STUB_DEFAULT,
+        inputTokens: 0,
+        outputTokens: 0,
+        model: 'dev-stub',
+      };
+    }
+
+    throw new ServiceUnavailableException(
+      'AI is unavailable — configure an AI provider (set OPENAI_API_KEY with ' +
+        'billing) to enable it.',
+    );
   }
 
   /**

@@ -40,11 +40,18 @@ describe('AiGatewayService', () => {
     userPrompt: '<design>Text: "Hello"</design>',
   };
 
-  /** Builds the service with the SDK client swapped for a stub. */
-  function build(configured = true): AiGatewayService {
+  /**
+   * Builds the service with the SDK client swapped for a stub. Defaults to
+   * NODE_ENV=production so tests assert the real (non-faking) behaviour
+   * unless a test explicitly opts into the development fallback.
+   */
+  function build(configured = true, nodeEnv = 'production'): AiGatewayService {
     const config = {
-      get: (key: string) =>
-        key === 'OPENAI_API_KEY' && configured ? 'sk-test' : undefined,
+      get: (key: string, def?: string) => {
+        if (key === 'OPENAI_API_KEY') return configured ? 'sk-test' : undefined;
+        if (key === 'NODE_ENV') return nodeEnv;
+        return def;
+      },
     };
     const service = new AiGatewayService(config as never, prisma as never);
     if (configured) {
@@ -54,6 +61,14 @@ describe('AiGatewayService', () => {
       };
     }
     return service;
+  }
+
+  /** An OpenAI-style 429 quota error. */
+  function quotaError() {
+    return Object.assign(new Error('You exceeded your current quota'), {
+      status: 429,
+      code: 'insufficient_quota',
+    });
   }
 
   beforeEach(() => {
@@ -69,6 +84,48 @@ describe('AiGatewayService', () => {
     it('refuses to generate without a key, rather than failing cryptically', async () => {
       await expect(build(false).generate(request)).rejects.toThrow(
         ServiceUnavailableException,
+      );
+    });
+  });
+
+  describe('development fallback', () => {
+    it('returns a labelled stub (not an error) when no key is set in development', async () => {
+      const result = await build(false, 'development').generate(request);
+
+      expect(result.model).toBe('dev-stub');
+      expect(result.text.length).toBeGreaterThan(0);
+    });
+
+    it('returns a stub when the provider replies 429 quota in development', async () => {
+      create.mockRejectedValue(quotaError());
+
+      const result = await build(true, 'development').generate(request);
+      expect(result.model).toBe('dev-stub');
+    });
+
+    it('never meters a stub — it is not a real, billable call', async () => {
+      await build(false, 'development').generate(request);
+      expect(prisma.aIUsageLog.create).not.toHaveBeenCalled();
+    });
+
+    it('in production, a missing key surfaces the configure-a-provider message, never a stub', async () => {
+      await expect(build(false, 'production').generate(request)).rejects.toThrow(
+        /configure an AI provider/i,
+      );
+    });
+
+    it('in production, a 429 quota surfaces the configure-a-provider message, never a stub', async () => {
+      create.mockRejectedValue(quotaError());
+
+      await expect(build(true, 'production').generate(request)).rejects.toThrow(
+        /configure an AI provider/i,
+      );
+      expect(prisma.aIUsageLog.create).not.toHaveBeenCalled();
+    });
+
+    it('does not fake in staging either', async () => {
+      await expect(build(false, 'staging').generate(request)).rejects.toThrow(
+        /configure an AI provider/i,
       );
     });
   });
