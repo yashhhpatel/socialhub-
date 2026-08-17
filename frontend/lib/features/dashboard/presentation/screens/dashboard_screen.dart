@@ -75,7 +75,6 @@ class DashboardScreen extends ConsumerWidget {
                 value: '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
                 subtitle:
                     '${(summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
-                accentColor: Colors.purpleAccent,
               ),
             ],
           ),

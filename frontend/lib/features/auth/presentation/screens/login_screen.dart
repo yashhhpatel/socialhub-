@@ -6,6 +6,7 @@ import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../state/auth_controller.dart';
 import '../state/auth_state.dart';
 import '../widgets/auth_error_banner.dart';
+import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_submit_button.dart';
 import '../widgets/auth_text_field.dart';
 
@@ -59,56 +60,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.status == AuthStatus.loading;
 
-    return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(SpacingTokens.lg),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Log in to SocialHub',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: SpacingTokens.xl),
-                  if (authState.status == AuthStatus.error)
-                    AuthErrorBanner(message: authState.errorMessage!),
-                  AuthTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    validator: _validateEmail,
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  AuthTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    validator: _validatePassword,
-                  ),
-                  const SizedBox(height: SpacingTokens.lg),
-                  AuthSubmitButton(
-                    label: 'Log in',
-                    isLoading: isLoading,
-                    onPressed: _submit,
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  TextButton(
-                    onPressed: isLoading ? null : () => context.go('/register'),
-                    child: const Text("Don't have an account? Sign up"),
-                  ),
-                ],
-              ),
+    return AuthScaffold(
+      title: 'Welcome back',
+      subtitle: 'Log in to your SocialHub workspace.',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (authState.status == AuthStatus.error)
+              AuthErrorBanner(message: authState.errorMessage!),
+            AuthTextField(
+              controller: _emailController,
+              label: 'Email',
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              validator: _validateEmail,
             ),
-          ),
+            const SizedBox(height: SpacingTokens.md),
+            AuthTextField(
+              controller: _passwordController,
+              label: 'Password',
+              obscureText: true,
+              autofillHints: const [AutofillHints.password],
+              validator: _validatePassword,
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+            AuthSubmitButton(
+              label: 'Log in',
+              isLoading: isLoading,
+              onPressed: _submit,
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            TextButton(
+              onPressed: isLoading ? null : () => context.go('/register'),
+              child: const Text("Don't have an account? Sign up"),
+            ),
+          ],
         ),
       ),
     );

@@ -3,17 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Holds the user's chosen theme mode.
 ///
-/// Defaults to dark — the SaaS dashboard shell (sidebar/top bar/cards)
-/// was explicitly designed for a "professional dark theme" matching
-/// Notion/Linear/Buffer. Light mode remains fully supported and
-/// toggleable; this only changes the first-launch default.
+/// Defaults to light — SocialHub's identity is the light-purple + white
+/// premium design (soft lavender gradients, white surfaces). The dark
+/// variant remains fully supported and toggleable from Settings; this only
+/// sets the first-launch default.
 ///
 /// NOTE: this is in-memory only for Milestone 0.2. Persisting the choice
 /// across reloads requires `core/storage/local_store.dart`, which is
 /// introduced in a later milestone (see docs/architecture — Flutter Web
 /// Application Architecture, §5 and §9). Do not add persistence here yet.
 class ThemeModeController extends StateNotifier<ThemeMode> {
-  ThemeModeController() : super(ThemeMode.dark);
+  ThemeModeController() : super(ThemeMode.light);
 
   void toggle() {
     state = state == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;

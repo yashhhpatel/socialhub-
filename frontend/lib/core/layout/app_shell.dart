@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/state/auth_controller.dart';
+import '../theme/app_background.dart';
 import '../theme/breakpoints.dart';
 import 'nav_destination_data.dart';
 import 'widgets/nav_sidebar.dart';
@@ -61,7 +62,7 @@ class AppShell extends ConsumerWidget {
             ),
           ),
         ),
-        drawer: Drawer(   
+        drawer: Drawer(
           child: SafeArea(
             child: NavSidebar(
               currentPath: currentPath,
@@ -73,7 +74,7 @@ class AppShell extends ConsumerWidget {
             ),
           ),
         ),
-        body: child,
+        body: AppBackground(child: child),
       );
     }
 
@@ -89,6 +90,7 @@ class AppShell extends ConsumerWidget {
           ),
           Expanded(
             child: Scaffold(
+              backgroundColor: Colors.transparent,
               appBar: NavTopBar(
                 title: title,
                 userEmail: email,
@@ -96,7 +98,7 @@ class AppShell extends ConsumerWidget {
                 onLogout: handleLogout,
                 onOpenSettings: handleOpenSettings,
               ),
-              body: child,
+              body: AppBackground(child: child),
             ),
           ),
         ],
