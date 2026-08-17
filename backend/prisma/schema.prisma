@@ -112,6 +112,11 @@ model Organization {
   name             String
   planTier         PlanTier        @default(free)
   requiresApproval Boolean         @default(false)
+  // White-labeling (Milestone 15.4): an enterprise org's own branding for
+  // the app shell its users see — a logo and a primary colour. Null = the
+  // default SocialHub branding.
+  whiteLabelLogoUrl      String?
+  whiteLabelPrimaryColor String?
   users            User[]
   socialAccounts   SocialAccount[]
   contentAssets    ContentAsset[]

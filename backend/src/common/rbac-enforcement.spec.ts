@@ -12,6 +12,7 @@ import {
   InvitesPublicController,
 } from '../organizations/invites/invites.controller';
 import { MembersController } from '../organizations/members/members.controller';
+import { WhiteLabelController } from '../organizations/white-label/white-label.controller';
 import { PublishingController } from '../publishing/publishing.controller';
 import { SocialAccountsController } from '../social-accounts/social-accounts.controller';
 import { MarketplaceController } from '../templates/marketplace.controller';
@@ -74,6 +75,7 @@ describe('RBAC enforcement across mutating endpoints', () => {
     ['invite revoke', InvitesAdminController, 'revoke', A],
     ['sso config', SsoController, 'setConfig', A],
     ['member role change', MembersController, 'changeRole', A],
+    ['white-label set', WhiteLabelController, 'setWhiteLabel', A],
   ];
 
   it.each(matrix)('%s requires %s+', (_label, controller, method, expected) => {

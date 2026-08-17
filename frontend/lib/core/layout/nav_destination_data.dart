@@ -97,6 +97,12 @@ const List<NavDestinationData> navDestinations = [
     selectedIcon: Icons.palette,
   ),
   NavDestinationData(
+    path: '/white-label',
+    label: 'White Label',
+    icon: Icons.format_paint_outlined,
+    selectedIcon: Icons.format_paint,
+  ),
+  NavDestinationData(
     path: '/settings',
     label: 'Settings',
     icon: Icons.settings_outlined,
