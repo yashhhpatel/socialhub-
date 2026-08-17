@@ -4,12 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/state/auth_controller.dart';
 import '../theme/app_background.dart';
+import '../theme/breakpoints.dart';
+import 'widgets/nav_drawer.dart';
 import 'widgets/top_nav_bar.dart';
 
 /// The persistent shell every authenticated route renders inside (via
-/// app_router.dart's ShellRoute): a horizontal top navigation bar above the
-/// routed content. (Previously a left sidebar — the nav moved to the top;
-/// destinations and routing are unchanged.)
+/// app_router.dart's ShellRoute): a grouped horizontal top navigation bar
+/// above the routed content, collapsing to a menu drawer on mobile.
+/// (Previously a left sidebar — the nav moved to the top; destinations and
+/// routing are unchanged.)
 ///
 /// DELIBERATE EXCEPTION to the architecture doc's "core/ never depends
 /// on a feature" rule: this file imports `authControllerProvider` from
@@ -20,8 +23,8 @@ import 'widgets/top_nav_bar.dart';
 /// Milestone 1.3. Something has to compose features into the app, and
 /// the shell (like the router) is exactly that composition root — the
 /// individual widgets it renders (UserProfileMenu, NotificationsIcon,
-/// TopNavBar) all stay dependency-free and presentational precisely so
-/// this exception is contained to one file, not spread throughout core/.
+/// TopNavBar, NavDrawer) all stay dependency-free and presentational
+/// precisely so this exception is contained to one file.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.currentPath, required this.child});
 
@@ -33,6 +36,7 @@ class AppShell extends ConsumerWidget {
     final session = ref.watch(authControllerProvider).session;
     final email = session?.email ?? '';
     final role = session?.role ?? '';
+    final isMobile = Breakpoints.isMobile(context);
 
     void handleLogout() => ref.read(authControllerProvider.notifier).logout();
     void handleDestinationSelected(String path) => context.go(path);
@@ -40,6 +44,12 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      drawer: isMobile
+          ? NavDrawer(
+              currentPath: currentPath,
+              onDestinationSelected: handleDestinationSelected,
+            )
+          : null,
       appBar: TopNavBar(
         currentPath: currentPath,
         userEmail: email,
@@ -47,6 +57,7 @@ class AppShell extends ConsumerWidget {
         onLogout: handleLogout,
         onOpenSettings: handleOpenSettings,
         onDestinationSelected: handleDestinationSelected,
+        isMobile: isMobile,
       ),
       body: AppBackground(child: child),
     );
