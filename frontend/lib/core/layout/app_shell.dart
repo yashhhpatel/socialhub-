@@ -36,24 +36,32 @@ class AppShell extends ConsumerWidget {
     final session = ref.watch(authControllerProvider).session;
     final email = session?.email ?? '';
     final role = session?.role ?? '';
+    final isAuthenticated = session != null;
     final isMobile = Breakpoints.isMobile(context);
+
+    // The public home lives at `/` but shows the dashboard overview, so
+    // highlight the Dashboard nav item there too.
+    final highlightPath = currentPath == '/' ? '/dashboard' : currentPath;
 
     void handleLogout() => ref.read(authControllerProvider.notifier).logout();
     void handleDestinationSelected(String path) => context.go(path);
     void handleOpenSettings() => context.go('/settings');
+    void handleLogin() => context.go('/login');
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       drawer: isMobile
           ? NavDrawer(
-              currentPath: currentPath,
+              currentPath: highlightPath,
               onDestinationSelected: handleDestinationSelected,
             )
           : null,
       appBar: TopNavBar(
-        currentPath: currentPath,
+        currentPath: highlightPath,
         userEmail: email,
         userRole: role,
+        isAuthenticated: isAuthenticated,
+        onLogin: handleLogin,
         onLogout: handleLogout,
         onOpenSettings: handleOpenSettings,
         onDestinationSelected: handleDestinationSelected,

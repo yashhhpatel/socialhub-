@@ -18,6 +18,8 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     required this.currentPath,
     required this.userEmail,
     required this.userRole,
+    required this.isAuthenticated,
+    required this.onLogin,
     required this.onLogout,
     required this.onOpenSettings,
     required this.onDestinationSelected,
@@ -27,6 +29,8 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final String currentPath;
   final String userEmail;
   final String userRole;
+  final bool isAuthenticated;
+  final VoidCallback onLogin;
   final VoidCallback onLogout;
   final VoidCallback onOpenSettings;
   final ValueChanged<String> onDestinationSelected;
@@ -47,50 +51,91 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         child: SizedBox(
           height: 64,
-          child: Row(
-            children: [
-              if (isMobile)
-                Builder(
-                  builder: (context) => IconButton(
-                    tooltip: 'Menu',
-                    icon: const Icon(Icons.menu),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                  ),
-                )
-              else
-                const SizedBox(width: SpacingTokens.md),
-              const _Brand(),
-              if (!isMobile) ...[
-                const SizedBox(width: SpacingTokens.md),
-                Container(width: 1, height: 28, color: theme.dividerColor),
-                const SizedBox(width: SpacingTokens.xs),
-                Expanded(
-                  child: Row(
-                    children: [
-                      for (final category in navMenu)
-                        _CategoryEntry(
-                          category: category,
-                          currentPath: currentPath,
-                          onSelect: onDestinationSelected,
-                        ),
-                    ],
-                  ),
-                ),
-              ] else
-                const Spacer(),
-              const NotificationsIcon(),
-              const SizedBox(width: SpacingTokens.xs),
-              UserProfileMenu(
-                email: userEmail,
-                role: userRole,
-                onLogout: onLogout,
-                onOpenSettings: onOpenSettings,
-              ),
-              const SizedBox(width: SpacingTokens.md),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+            child: isMobile ? _buildMobile(context) : _buildDesktop(context),
           ),
         ),
       ),
+    );
+  }
+
+  /// Three balanced sections via equal-flex left/right, so the center
+  /// navigation stays visually centered in the header at any desktop width.
+  /// Left and right hold their content against the outer edges; the center
+  /// keeps its natural width between them. No fixed/absolute positioning.
+  Widget _buildDesktop(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Align(alignment: Alignment.centerLeft, child: _Brand()),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final category in navMenu)
+              _CategoryEntry(
+                category: category,
+                currentPath: currentPath,
+                onSelect: onDestinationSelected,
+              ),
+          ],
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _rightControls(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
+    return Row(
+      children: [
+        Builder(
+          builder: (context) => IconButton(
+            tooltip: 'Menu',
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        const SizedBox(width: SpacingTokens.xs),
+        const _Brand(),
+        const Spacer(),
+        _rightControls(context),
+      ],
+    );
+  }
+
+  /// Right section: notifications, then either the Login control (logged
+  /// out) or the existing user/profile menu (logged in).
+  Widget _rightControls(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const NotificationsIcon(),
+        const SizedBox(width: SpacingTokens.sm),
+        if (isAuthenticated)
+          UserProfileMenu(
+            email: userEmail,
+            role: userRole,
+            onLogout: onLogout,
+            onOpenSettings: onOpenSettings,
+          )
+        else
+          FilledButton(
+            onPressed: onLogin,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpacingTokens.md,
+                vertical: 10,
+              ),
+            ),
+            child: const Text('Log in'),
+          ),
+      ],
     );
   }
 }
@@ -244,7 +289,7 @@ class _NavTrigger extends StatelessWidget {
     final color = active ? colorScheme.primary : colorScheme.onSurfaceVariant;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 12),
       child: Material(
         color: active
             ? colorScheme.primary.withOpacity(0.12)
@@ -255,7 +300,7 @@ class _NavTrigger extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.sm + 2,
+              horizontal: SpacingTokens.sm,
               vertical: 9,
             ),
             child: Row(
