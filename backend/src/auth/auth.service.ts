@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +12,7 @@ import { createHash, randomBytes } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AccountService } from './account.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
@@ -19,11 +21,14 @@ const REFRESH_TOKEN_BYTES = 64;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly accountService: AccountService,
   ) {}
 
   async register(params: {
@@ -63,6 +68,19 @@ export class AuthService {
 
       return { user, organization };
     });
+
+    // Fire the verification email, but never let it break registration — a
+    // transient email-provider failure shouldn't cost the user their account.
+    // The user can always re-request from the resend endpoint.
+    try {
+      await this.accountService.sendVerificationEmail(user.id, user.email);
+    } catch (err) {
+      this.logger.error(
+        `Failed to send verification email for ${user.email}: ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
 
     return this.issueTokenPair(user.id, user.email, user.role, organization.id);
   }

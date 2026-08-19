@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/state/auth_controller.dart';
+import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../theme/app_background.dart';
 import '../theme/breakpoints.dart';
 import 'widgets/app_footer.dart';
@@ -77,6 +78,7 @@ class AppShell extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const EmailVerificationBanner(),
                 ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: child,

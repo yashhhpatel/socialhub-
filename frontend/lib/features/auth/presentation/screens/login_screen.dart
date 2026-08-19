@@ -94,6 +94,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: SpacingTokens.sm),
             TextButton(
+              onPressed:
+                  isLoading ? null : () => context.go('/forgot-password'),
+              child: const Text('Forgot your password?'),
+            ),
+            TextButton(
               onPressed: isLoading ? null : () => context.go('/register'),
               child: const Text("Don't have an account? Sign up"),
             ),

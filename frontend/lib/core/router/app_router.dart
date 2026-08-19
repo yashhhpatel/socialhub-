@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
+import '../../features/auth/presentation/screens/verify_email_screen.dart';
 import '../../features/brand_kit/presentation/screens/brand_kit_screen.dart';
 import '../../features/team/presentation/screens/accept_invite_screen.dart';
 import '../../features/marketplace/presentation/screens/marketplace_screen.dart';
@@ -82,6 +85,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Public account-lifecycle screens (Phase 17.1). Standalone (outside the
+      // shell, like /login) and not in navDestinations, so they're reachable
+      // whether or not the user is signed in — the reset/verify links arrive
+      // by email and carry their own token.
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        name: 'reset-password',
+        builder: (context, state) =>
+            ResetPasswordScreen(token: state.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        name: 'verify-email',
+        builder: (context, state) =>
+            VerifyEmailScreen(token: state.uri.queryParameters['token']),
       ),
       // Public (Milestone 11.3): where an invite email link lands. Not in
       // navDestinations, so authRedirect leaves it reachable while logged out.

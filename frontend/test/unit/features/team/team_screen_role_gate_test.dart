@@ -9,7 +9,7 @@ import 'package:socialhub/features/team/presentation/screens/team_screen.dart';
 import 'package:socialhub/features/team/presentation/state/team_controller.dart';
 
 CurrentUser _user(AppRole role) =>
-    CurrentUser(id: 'u1', email: 'me@ex.com', role: role, orgId: 'org_1');
+    CurrentUser(id: 'u1', email: 'me@ex.com', role: role, orgId: 'org_1', emailVerified: true);
 
 Future<void> _pump(WidgetTester tester, AppRole role) {
   return tester.pumpWidget(
