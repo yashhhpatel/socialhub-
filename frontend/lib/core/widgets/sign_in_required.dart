@@ -60,7 +60,12 @@ class SignInRequired extends StatelessWidget {
               ),
               const SizedBox(height: SpacingTokens.md),
               FilledButton(
-                onPressed: () => context.go('/login'),
+                onPressed: () {
+                  // Remember where we are so login can bring the user back
+                  // here afterwards.
+                  final from = GoRouterState.of(context).uri.toString();
+                  context.go('/login?from=${Uri.encodeComponent(from)}');
+                },
                 child: const Text('Log in'),
               ),
             ],
