@@ -4,7 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { SignOptions } from 'jsonwebtoken';
 
+import { EmailModule } from '../common/email/email.module';
 import { UsersModule } from '../users/users.module';
+import { AccountService } from './account.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SsoController } from './sso/sso.controller';
@@ -14,6 +16,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 @Module({
   imports: [
     UsersModule,
+    EmailModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -35,6 +38,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController, SsoController],
-  providers: [AuthService, JwtStrategy, SsoService],
+  providers: [AuthService, AccountService, JwtStrategy, SsoService],
 })
 export class AuthModule {}

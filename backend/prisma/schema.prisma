@@ -191,13 +191,42 @@ model User {
   orgId         String
   organization  Organization   @relation(fields: [orgId], references: [id])
   refreshTokens RefreshToken[]
+  tokens        UserToken[]
   createdAssets ContentAsset[] @relation("CreatedAssets")
   comments      Comment[]
+  /// Null until the user confirms ownership of their email via the
+  /// verification link (Phase 17.1). Timestamp, not a bare bool, so we keep
+  /// *when* it happened for support/audit without a second column.
+  emailVerifiedAt DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([orgId])
   @@map("user")
+}
+
+/// One-time, single-use tokens for email verification and password reset
+/// (Phase 17.1). Like RefreshToken, only the SHA-256 hash of the token is
+/// stored — the raw high-entropy value lives only in the emailed link, so a
+/// database read never yields a usable token. `consumedAt` makes redemption
+/// single-use; expired or consumed rows are simply ignored (and swept later).
+model UserToken {
+  id         String        @id @default(uuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       UserTokenType
+  tokenHash  String        @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([userId, type])
+  @@map("user_token")
+}
+
+enum UserTokenType {
+  email_verification
+  password_reset
 }
 
 /// A comment on a design (Milestone 13.1) — the collaboration thread teams

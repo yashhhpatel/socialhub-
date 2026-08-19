@@ -7,11 +7,13 @@ import * as bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AccountService } from './account.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
   let usersService: jest.Mocked<Pick<UsersService, 'findByEmail'>>;
+  let accountService: jest.Mocked<Pick<AccountService, 'sendVerificationEmail'>>;
   let prisma: {
     $transaction: jest.Mock;
     refreshToken: {
@@ -27,6 +29,9 @@ describe('AuthService', () => {
   beforeEach(async () => {
     usersService = {
       findByEmail: jest.fn(),
+    };
+    accountService = {
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     txOrganizationCreate = jest.fn();
@@ -61,6 +66,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: usersService },
         { provide: PrismaService, useValue: prisma },
+        { provide: AccountService, useValue: accountService },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(30) },
@@ -118,6 +124,40 @@ describe('AuthService', () => {
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+
+      // A verification email is dispatched for the new account.
+      expect(accountService.sendVerificationEmail).toHaveBeenCalledWith(
+        'usr_1',
+        'jane@example.com',
+      );
+    });
+
+    it('still returns a session if the verification email fails to send', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+      txOrganizationCreate.mockResolvedValue({ id: 'org_1', name: 'Acme Inc.' });
+      txUserCreate.mockImplementation(async ({ data }) => ({
+        id: 'usr_1',
+        email: data.email,
+        passwordHash: data.passwordHash,
+        role: data.role,
+        orgId: data.orgId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      prisma.refreshToken.create.mockResolvedValue({});
+      accountService.sendVerificationEmail.mockRejectedValue(
+        new Error('SendGrid down'),
+      );
+
+      const result = await authService.register({
+        email: 'jane@example.com',
+        password: 'Test1234!',
+        orgName: 'Acme Inc.',
+      });
+
+      // Registration succeeds despite the email failure — the user isn't
+      // penalised for a transient provider outage.
+      expect(result.accessToken).toEqual(expect.any(String));
     });
 
     it('rejects registration with an existing email WITHOUT starting a transaction', async () => {
@@ -127,6 +167,7 @@ describe('AuthService', () => {
         passwordHash: 'hash',
         role: UserRole.owner,
         orgId: 'org_1',
+        emailVerifiedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -153,6 +194,7 @@ describe('AuthService', () => {
         passwordHash,
         role: UserRole.admin,
         orgId: 'org_1',
+        emailVerifiedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -184,6 +226,7 @@ describe('AuthService', () => {
         passwordHash,
         role: UserRole.owner,
         orgId: 'org_1',
+        emailVerifiedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

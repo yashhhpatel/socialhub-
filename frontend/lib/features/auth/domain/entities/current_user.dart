@@ -10,12 +10,18 @@ class CurrentUser {
     required this.email,
     required this.role,
     required this.orgId,
+    required this.emailVerified,
   });
 
   final String id;
   final String email;
   final AppRole role;
   final String orgId;
+
+  /// Whether the user has confirmed their email (Phase 17.1). Drives the
+  /// "verify your email" banner; defaults to true for older API responses
+  /// that predate the field, so the banner never shows spuriously.
+  final bool emailVerified;
 
   bool get isAdmin => role.isAtLeast(AppRole.admin);
   bool get isEditor => role.isAtLeast(AppRole.editor);
@@ -25,5 +31,6 @@ class CurrentUser {
         email: json['email'] as String,
         role: AppRoleX.fromApi(json['role'] as String),
         orgId: json['orgId'] as String,
+        emailVerified: json['emailVerified'] as bool? ?? true,
       );
 }

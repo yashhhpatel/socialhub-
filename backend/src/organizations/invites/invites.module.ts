@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 
-import { EmailService } from '../../common/email/email.service';
+import { EmailModule } from '../../common/email/email.module';
 import {
   InvitesAdminController,
   InvitesPublicController,
@@ -8,13 +8,14 @@ import {
 import { InvitesService } from './invites.service';
 
 /**
- * Team invites (Milestone 11.1). EmailService is provided here (it's
- * stateless and only invites use it so far); PrismaService and ConfigService
- * come from their global modules.
+ * Team invites (Milestone 11.1). EmailService now comes from the shared
+ * EmailModule (Phase 17.1, once auth also needed it); PrismaService and
+ * ConfigService come from their global modules.
  */
 @Module({
+  imports: [EmailModule],
   controllers: [InvitesAdminController, InvitesPublicController],
-  providers: [InvitesService, EmailService],
+  providers: [InvitesService],
   exports: [InvitesService],
 })
 export class InvitesModule {}

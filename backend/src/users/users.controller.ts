@@ -44,6 +44,7 @@ export class UsersController {
       email: user.email,
       role: user.role,
       orgId: user.orgId,
+      emailVerified: user.emailVerifiedAt !== null,
       createdAt: user.createdAt,
     };
   }
