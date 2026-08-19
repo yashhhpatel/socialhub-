@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../data/api_organizations_repository.dart';
 
 /// Organization overview + settings hub. Shows the org's name, plan, size and
@@ -19,7 +20,8 @@ class OrganizationsScreen extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
-      child: ListView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Organization', style: theme.textTheme.headlineMedium),
           const SizedBox(height: SpacingTokens.xs),
@@ -35,7 +37,11 @@ class OrganizationsScreen extends ConsumerWidget {
                 child: CircularProgressIndicator(),
               ),
             ),
-            error: (e, _) => Text('Could not load your organization: ${describeApiError(e)}'),
+            error: (e, _) => isUnauthorized(e)
+                ? const SignInRequired(
+                    message: 'Log in to see your organization overview.',
+                  )
+                : Text('Could not load your organization: ${describeApiError(e)}'),
             data: (org) => _Overview(org: org),
           ),
           const SizedBox(height: SpacingTokens.lg),

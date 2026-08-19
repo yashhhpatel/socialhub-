@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../ai_suite/data/repositories/api_ai_suite_repository.dart';
 import '../../domain/entities/scheduled_job.dart';
@@ -82,19 +83,22 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
           const SizedBox(height: SpacingTokens.md),
           const _BestTimesBar(),
           const SizedBox(height: SpacingTokens.md),
-          Expanded(
-            child: jobsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => _SchedulerError(
-                message: describeApiError(error),
-                onRetry: () => ref.invalidate(schedulerJobsProvider),
-              ),
-              data: (jobs) {
-                _syncPolling(jobs);
-                if (jobs.isEmpty) return const _EmptyCalendar();
-                return _JobAgenda(jobs: jobs);
-              },
+          jobsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(SpacingTokens.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(message: 'Log in to view your calendar.')
+                : _SchedulerError(
+                    message: describeApiError(error),
+                    onRetry: () => ref.invalidate(schedulerJobsProvider),
+                  ),
+            data: (jobs) {
+              _syncPolling(jobs);
+              if (jobs.isEmpty) return const _EmptyCalendar();
+              return _JobAgenda(jobs: jobs);
+            },
           ),
         ],
       ),
@@ -161,6 +165,8 @@ class _JobAgenda extends ConsumerWidget {
     final history = jobs.where((j) => !j.isInFlight).toList();
 
     return ListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       children: [
         if (upcoming.isNotEmpty) ...[
           const _SectionHeader('Upcoming'),

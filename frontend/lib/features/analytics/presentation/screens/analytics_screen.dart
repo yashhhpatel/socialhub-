@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/analytics_overview.dart';
 import '../state/analytics_controller.dart';
@@ -54,17 +55,20 @@ class AnalyticsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          Expanded(
-            child: overviewAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => _AnalyticsError(
-                message: describeApiError(error),
-                onRetry: () => ref.invalidate(analyticsOverviewProvider),
-              ),
-              data: (overview) => overview.isEmpty
-                  ? const _EmptyAnalytics()
-                  : _Dashboard(overview: overview),
+          overviewAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(SpacingTokens.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(message: 'Log in to view your analytics.')
+                : _AnalyticsError(
+                    message: describeApiError(error),
+                    onRetry: () => ref.invalidate(analyticsOverviewProvider),
+                  ),
+            data: (overview) => overview.isEmpty
+                ? const _EmptyAnalytics()
+                : _Dashboard(overview: overview),
           ),
         ],
       ),
@@ -81,6 +85,8 @@ class _Dashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = overview.totals;
     return ListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       children: [
         Wrap(
           spacing: SpacingTokens.md,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/data/repositories/api_content_repository.dart';
 import '../../../editor/canvas/models/canvas_document.dart';
@@ -78,31 +79,36 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: SpacingTokens.lg),
-          Expanded(
-            child: templatesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Text('Could not load templates: ${describeApiError(error)}'),
-              ),
-              data: (templates) {
-                if (templates.isEmpty) return const _EmptyTemplates();
-                return GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 260,
-                    mainAxisExtent: 220,
-                    crossAxisSpacing: SpacingTokens.md,
-                    mainAxisSpacing: SpacingTokens.md,
-                  ),
-                  itemCount: templates.length,
-                  itemBuilder: (context, i) => _TemplateCard(
-                    template: templates[i],
-                    starting: _startingId == templates[i].id,
-                    onUse: () => _startFrom(templates[i]),
-                    onPublish: () => _publish(templates[i]),
-                  ),
-                );
-              },
+          templatesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(SpacingTokens.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(message: 'Log in to browse and use templates.')
+                : Center(
+                    child: Text('Could not load templates: ${describeApiError(error)}'),
+                  ),
+            data: (templates) {
+              if (templates.isEmpty) return const _EmptyTemplates();
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 260,
+                  mainAxisExtent: 220,
+                  crossAxisSpacing: SpacingTokens.md,
+                  mainAxisSpacing: SpacingTokens.md,
+                ),
+                itemCount: templates.length,
+                itemBuilder: (context, i) => _TemplateCard(
+                  template: templates[i],
+                  starting: _startingId == templates[i].id,
+                  onUse: () => _startFrom(templates[i]),
+                  onPublish: () => _publish(templates[i]),
+                ),
+              );
+            },
           ),
         ],
       ),

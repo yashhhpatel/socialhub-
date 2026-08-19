@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/state/templates_controller.dart';
@@ -108,30 +109,37 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          Expanded(
-            child: resultsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Text('Could not load the marketplace: ${describeApiError(error)}'),
-              ),
-              data: (results) {
-                if (results.isEmpty) return const _EmptyMarketplace();
-                return GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 260,
-                    mainAxisExtent: 230,
-                    crossAxisSpacing: SpacingTokens.md,
-                    mainAxisSpacing: SpacingTokens.md,
-                  ),
-                  itemCount: results.length,
-                  itemBuilder: (context, i) => _MarketplaceCard(
-                    template: results[i],
-                    cloning: _cloningId == results[i].id,
-                    onClone: () => _clone(results[i]),
-                  ),
-                );
-              },
+          resultsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(SpacingTokens.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(
+                    message: 'Log in to browse the community marketplace.',
+                  )
+                : Center(
+                    child: Text('Could not load the marketplace: ${describeApiError(error)}'),
+                  ),
+            data: (results) {
+              if (results.isEmpty) return const _EmptyMarketplace();
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 260,
+                  mainAxisExtent: 230,
+                  crossAxisSpacing: SpacingTokens.md,
+                  mainAxisSpacing: SpacingTokens.md,
+                ),
+                itemCount: results.length,
+                itemBuilder: (context, i) => _MarketplaceCard(
+                  template: results[i],
+                  cloning: _cloningId == results[i].id,
+                  onClone: () => _clone(results[i]),
+                ),
+              );
+            },
           ),
         ],
       ),

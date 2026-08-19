@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/state/auth_controller.dart';
 import '../theme/app_background.dart';
 import '../theme/breakpoints.dart';
+import 'widgets/app_footer.dart';
 import 'widgets/nav_drawer.dart';
 import 'widgets/top_nav_bar.dart';
 
@@ -67,7 +68,25 @@ class AppShell extends ConsumerWidget {
         onDestinationSelected: handleDestinationSelected,
         isMobile: isMobile,
       ),
-      body: AppBackground(child: child),
+      // One scroll owns the whole page: the routed content (given at least a
+      // viewport of height so short pages still fill the screen) followed by
+      // the global footer. AppBackground stays fixed behind the scroll.
+      body: AppBackground(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: child,
+                ),
+                const AppFooter(),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

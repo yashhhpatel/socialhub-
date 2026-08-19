@@ -13,6 +13,7 @@ import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/editor/editor_screen.dart';
+import '../../features/info/info_page_screen.dart';
 import '../../features/media_library/presentation/screens/media_library_screen.dart';
 import '../../features/organizations/presentation/screens/organizations_screen.dart';
 import '../../features/settings/white_label_screen.dart';
@@ -177,6 +178,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               queryParams: state.uri.queryParameters,
             ),
           ),
+          // Static informational + legal pages linked from the global footer.
+          // Public (not in navDestinations, no auth needed) and inside the
+          // shell so they carry the same header and footer as every page.
+          for (final slug in const [
+            'about',
+            'contact',
+            'security',
+            'help',
+            'privacy',
+            'terms',
+          ])
+            GoRoute(
+              path: '/$slug',
+              name: slug,
+              builder: (context, state) => InfoPageScreen(slug: slug),
+            ),
         ],
       ),
     ],

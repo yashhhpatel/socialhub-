@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/app_role.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../auth/domain/entities/current_user.dart';
 import '../../../auth/presentation/state/current_user_provider.dart';
@@ -27,8 +28,11 @@ class TeamScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Could not load your account: ${describeApiError(error)}')),
+        error: (error, _) => isUnauthorized(error)
+            ? const SignInRequired(message: 'Log in to manage your team.')
+            : Center(
+                child: Text('Could not load your account: ${describeApiError(error)}'),
+              ),
         data: (user) => user.isAdmin ? _TeamAdminView(user: user) : const _AccessDenied(),
       ),
     );
@@ -70,7 +74,8 @@ class _TeamAdminView extends ConsumerWidget {
     final membersAsync = ref.watch(teamMembersProvider);
     final invitesAsync = ref.watch(teamInvitesProvider);
 
-    return ListView(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
