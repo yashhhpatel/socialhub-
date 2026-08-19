@@ -4,6 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../theme/tokens/color_tokens.dart';
 import '../../theme/tokens/spacing_tokens.dart';
 
+// The footer uses a fixed gray backdrop with white text in both themes, so
+// its colors are defined here rather than pulled from the (light) colorScheme.
+const _footerBg = Color(0xFF374151); // slate gray
+const _footerText = Colors.white; // brand + links
+const _footerMuted = Color(0xB3FFFFFF); // white 70% — tagline, titles, copyright
+const _footerDivider = Color(0x2EFFFFFF); // white ~18% — border + divider
+
 /// Global site footer, rendered once by AppShell so every page — present and
 /// future — shares the same structure and styling.
 ///
@@ -40,18 +47,8 @@ class AppFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final isDark = theme.brightness == Brightness.dark;
-
     return DecoratedBox(
-      decoration: BoxDecoration(
-        // A soft lavender wash (light mode) sets the footer apart from the
-        // white content above while staying on-brand; dark mode keeps its
-        // deep surface.
-        color: isDark ? theme.colorScheme.surface : ColorTokens.lavenderLight,
-        border: const Border(top: BorderSide(color: ColorTokens.lavenderBorder)),
-      ),
+      decoration: const BoxDecoration(color: _footerBg),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.xl,
@@ -78,7 +75,7 @@ class AppFooter extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: SpacingTokens.xl),
-                Divider(color: ColorTokens.lavenderBorder, height: 1),
+                Divider(color: _footerDivider, height: 1),
                 SizedBox(height: SpacingTokens.md),
                 _BottomBar(),
               ],
@@ -131,7 +128,7 @@ class _BrandBlock extends StatelessWidget {
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
-                  color: theme.colorScheme.onSurface,
+                  color: _footerText,
                 ),
               ),
             ],
@@ -140,7 +137,7 @@ class _BrandBlock extends StatelessWidget {
           Text(
             'Plan, create, and publish across every social channel — from one calm workspace.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: _footerMuted,
               height: 1.5,
             ),
           ),
@@ -167,7 +164,7 @@ class _FooterColumn extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: _footerMuted,
               letterSpacing: 0.8,
               fontWeight: FontWeight.w600,
             ),
@@ -190,9 +187,7 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
+    final muted = theme.textTheme.bodySmall?.copyWith(color: _footerMuted);
 
     return Wrap(
       alignment: WrapAlignment.center,
@@ -228,9 +223,7 @@ class _FooterLinkText extends StatelessWidget {
       borderRadius: BorderRadius.circular(4),
       child: Text(
         link.label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+        style: theme.textTheme.bodyMedium?.copyWith(color: _footerText),
       ),
     );
   }

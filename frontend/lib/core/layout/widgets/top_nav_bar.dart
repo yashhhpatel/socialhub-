@@ -149,29 +149,33 @@ class _Brand extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
             ),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: ColorTokens.brandPrimary.withOpacity(0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: ColorTokens.brandPrimary.withOpacity(0.38),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-          child: const Icon(Icons.hub_outlined, size: 18, color: Colors.white),
+          child: const Icon(Icons.hub_outlined, size: 22, color: Colors.white),
         ),
         const SizedBox(width: SpacingTokens.sm),
         Text(
           'SocialHub',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17),
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
         ),
       ],
     );
@@ -289,7 +293,7 @@ class _NavTrigger extends StatelessWidget {
     final color = active ? colorScheme.primary : colorScheme.onSurfaceVariant;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
       child: Material(
         color: active
             ? colorScheme.primary.withOpacity(0.12)
@@ -300,7 +304,7 @@ class _NavTrigger extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.sm,
+              horizontal: SpacingTokens.sm + 2,
               vertical: 9,
             ),
             child: Row(

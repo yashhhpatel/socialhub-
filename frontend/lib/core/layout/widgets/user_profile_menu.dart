@@ -66,11 +66,15 @@ class UserProfileMenu extends StatelessWidget {
         if (value == 'settings') onOpenSettings();
       },
       child: CircleAvatar(
-        radius: 16,
+        radius: 20,
         backgroundColor: Theme.of(context).colorScheme.primary,
         child: Text(
           email.isNotEmpty ? email[0].toUpperCase() : '?',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
         ),
       ),
     );
