@@ -97,7 +97,7 @@ class _BrandBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 240,
+      width: 260,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -105,27 +105,43 @@ class _BrandBlock extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
                   ),
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: ColorTokens.brandPrimary.withOpacity(0.38),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.hub_outlined, size: 17, color: Colors.white),
+                child: const Icon(Icons.hub_outlined, size: 25, color: Colors.white),
               ),
-              const SizedBox(width: SpacingTokens.sm),
-              Text('SocialHub', style: theme.textTheme.titleMedium),
+              const SizedBox(width: SpacingTokens.md),
+              Text(
+                'SocialHub',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: SpacingTokens.md),
           Text(
             'Plan, create, and publish across every social channel — from one calm workspace.',
-            style: theme.textTheme.bodySmall?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              height: 1.5,
             ),
           ),
         ],
