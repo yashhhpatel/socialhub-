@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_error_message.dart';
 import '../../core/theme/tokens/spacing_tokens.dart';
+import '../../core/widgets/sign_in_required.dart';
 import '../auth/presentation/state/current_user_provider.dart';
 import 'data/api_white_label_repository.dart';
 import 'domain/white_label.dart';
@@ -79,7 +80,11 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load your account: ${describeApiError(e)}')),
+        error: (e, _) => isUnauthorized(e)
+            ? const SignInRequired(
+                message: 'Log in as an admin to manage white-label branding.',
+              )
+            : Center(child: Text('Could not load your account: ${describeApiError(e)}')),
         data: (user) {
           if (!user.isAdmin) return const _AdminsOnly();
           final wlAsync = ref.watch(whiteLabelProvider);
@@ -88,7 +93,8 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
             error: (e, _) => Center(child: Text('Could not load branding: ${describeApiError(e)}')),
             data: (wl) {
               _hydrate(wl);
-              return ListView(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('White label', style: theme.textTheme.headlineMedium),
                   const SizedBox(height: SpacingTokens.xs),

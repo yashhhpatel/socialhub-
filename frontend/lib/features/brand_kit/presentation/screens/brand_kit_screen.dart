@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_brand_kit_repository.dart';
 import '../../domain/entities/brand_kit.dart';
@@ -80,12 +81,17 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: kitAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text('Could not load your brand kit: ${describeApiError(error)}'),
-        ),
+        error: (error, _) => isUnauthorized(error)
+            ? const SignInRequired(
+                message: 'Log in to view and edit your brand kit.',
+              )
+            : Center(
+                child: Text('Could not load your brand kit: ${describeApiError(error)}'),
+              ),
         data: (kit) {
           _hydrate(kit);
-          return ListView(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Brand Kit', style: theme.textTheme.headlineMedium),
               const SizedBox(height: SpacingTokens.xs),

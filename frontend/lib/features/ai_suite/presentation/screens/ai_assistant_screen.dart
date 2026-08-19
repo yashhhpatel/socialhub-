@@ -68,7 +68,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
-      child: ListView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('AI Assistant', style: theme.textTheme.headlineMedium),
           const SizedBox(height: SpacingTokens.xs),

@@ -83,9 +83,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          Expanded(
-            child: _uploaded.isEmpty ? const _Empty() : _Grid(items: _uploaded),
-          ),
+          _uploaded.isEmpty ? const _Empty() : _Grid(items: _uploaded),
         ],
       ),
     );
@@ -100,6 +98,8 @@ class _Grid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 240,
         mainAxisExtent: 240,

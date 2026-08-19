@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../domain/entities/content_asset_summary.dart';
 import '../state/content_library_controller.dart';
 
@@ -79,16 +80,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          Expanded(
-            child: library.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => _LibraryError(
-                message: describeApiError(error),
-                onRetry: () => ref.invalidate(contentLibraryProvider),
-              ),
-              data: (assets) =>
-                  assets.isEmpty ? const _EmptyLibrary() : _AssetGrid(assets: assets),
+          library.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(SpacingTokens.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(message: 'Log in to view and create designs.')
+                : _LibraryError(
+                    message: describeApiError(error),
+                    onRetry: () => ref.invalidate(contentLibraryProvider),
+                  ),
+            data: (assets) =>
+                assets.isEmpty ? const _EmptyLibrary() : _AssetGrid(assets: assets),
           ),
         ],
       ),
@@ -104,6 +108,8 @@ class _AssetGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 240,
         mainAxisSpacing: SpacingTokens.md,

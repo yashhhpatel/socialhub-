@@ -17,6 +17,12 @@ import 'package:dio/dio.dart';
 ///
 /// Lives in core/network because every feature's error handling needs it,
 /// and per docs/architecture §1 cross-cutting concerns belong in core/.
+/// True when [error] is an HTTP 401 — i.e. the request needs an account.
+/// Screens use this to show a friendly "sign in to view this" state instead
+/// of an error, so pages stay explorable while signed out.
+bool isUnauthorized(Object error) =>
+    error is DioException && error.response?.statusCode == 401;
+
 String describeApiError(Object error) {
   if (error is! DioException) return error.toString();
 

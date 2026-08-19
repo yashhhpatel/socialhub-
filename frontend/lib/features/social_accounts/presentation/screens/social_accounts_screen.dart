@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../../core/widgets/sign_in_required.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
 import '../state/social_accounts_controller.dart';
@@ -101,7 +102,7 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
   Widget build(BuildContext context) {
     final accountsState = ref.watch(socialAccountsControllerProvider);
 
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,10 +132,15 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
               padding: EdgeInsets.symmetric(vertical: SpacingTokens.xl),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (error, _) => _ErrorState(
-              message: describeApiError(error),
-              onRetry: () => ref.read(socialAccountsControllerProvider.notifier).refresh(),
-            ),
+            error: (error, _) => isUnauthorized(error)
+                ? const SignInRequired(
+                    message: 'Log in to connect and manage your social accounts.',
+                  )
+                : _ErrorState(
+                    message: describeApiError(error),
+                    onRetry: () =>
+                        ref.read(socialAccountsControllerProvider.notifier).refresh(),
+                  ),
             data: (accounts) => Column(
               children: [
                 for (final platform in SocialPlatform.values) ...[

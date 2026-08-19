@@ -26,7 +26,7 @@ class DashboardScreen extends ConsumerWidget {
             ? 2
             : 1;
 
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
