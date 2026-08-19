@@ -6,6 +6,13 @@ import '../nav_menu_data.dart';
 import 'notifications_icon.dart';
 import 'user_profile_menu.dart';
 
+// The header uses a fixed gray backdrop with white text/icons, so its colors
+// are defined here rather than pulled from the (light) colorScheme.
+const _headerBg = Color(0xFF374151); // slate gray (matches the footer)
+const _headerText = Colors.white;
+const _headerMuted = Color(0xD9FFFFFF); // white ~85% — inactive nav items
+const _headerBorder = Color(0x24FFFFFF); // white ~14% — bottom border
+
 /// Horizontal top navigation with grouped categories and Buffer-style
 /// dropdown mega-menus. Compact by design — only a handful of top-level
 /// entries, so nothing ever scrolls horizontally.
@@ -41,19 +48,33 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Material(
-      color: theme.colorScheme.surface,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor)),
-        ),
-        child: SizedBox(
-          height: 64,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-            child: isMobile ? _buildMobile(context) : _buildDesktop(context),
+      color: _headerBg,
+      // Default icons AND icon-buttons (notifications bell, mobile menu) to
+      // white so they read on the gray backdrop — the app's IconButtonTheme
+      // otherwise tints them dark.
+      child: IconTheme(
+        data: const IconThemeData(color: _headerText),
+        child: IconButtonTheme(
+          data: IconButtonThemeData(
+            style: ButtonStyle(
+              foregroundColor: const WidgetStatePropertyAll(_headerText),
+              overlayColor: WidgetStatePropertyAll(Colors.white.withOpacity(0.12)),
+            ),
+          ),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: _headerBorder)),
+            ),
+            child: SizedBox(
+              height: 64,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+                child:
+                    isMobile ? _buildMobile(context) : _buildDesktop(context),
+              ),
+            ),
           ),
         ),
       ),
@@ -175,6 +196,7 @@ class _Brand extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
+                color: _headerText,
               ),
         ),
       ],
@@ -289,22 +311,21 @@ class _NavTrigger extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = active ? colorScheme.primary : colorScheme.onSurfaceVariant;
+    // White on the gray header; the active item is full-white and bolder with
+    // a subtle white pill, inactive items are slightly dimmed white.
+    final color = active ? _headerText : _headerMuted;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       child: Material(
-        color: active
-            ? colorScheme.primary.withOpacity(0.12)
-            : Colors.transparent,
+        color: active ? Colors.white.withOpacity(0.16) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.sm + 2,
+              horizontal: SpacingTokens.md,
               vertical: 9,
             ),
             child: Row(
@@ -314,7 +335,7 @@ class _NavTrigger extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: color,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
