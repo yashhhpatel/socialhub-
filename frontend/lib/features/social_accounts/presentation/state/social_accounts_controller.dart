@@ -6,6 +6,7 @@ import 'dart:html' as html;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/auth_token_store.dart';
 import '../../data/repositories/api_social_accounts_repository.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -49,5 +50,10 @@ class SocialAccountsController extends StateNotifier<AsyncValue<List<SocialAccou
 
 final socialAccountsControllerProvider = StateNotifierProvider<
     SocialAccountsController, AsyncValue<List<SocialAccount>>>((ref) {
+  // Recreate on login/logout (watching only whether a token exists, so a
+  // silent token refresh doesn't rebuild) — otherwise a 401 cached while
+  // signed out keeps the "Sign in to continue" state showing even after the
+  // user logs in.
+  ref.watch(authTokenStoreProvider.select((tokens) => tokens != null));
   return SocialAccountsController(ref.watch(socialAccountsRepositoryProvider));
 });
