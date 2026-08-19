@@ -31,3 +31,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    # Inter is the product typeface (see core/theme/tokens/typography_tokens).
+    # Bundled as the variable font so a single file covers every weight — the
+    # theme's fontWeight values map onto its wght axis. Without this the
+    # 'Inter' family name silently fell back to the platform default.
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf

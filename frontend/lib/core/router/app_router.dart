@@ -51,6 +51,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: GoRouterRefreshNotifier(ref),
     redirect: (context, state) {
       final isAuthenticated = ref.read(authTokenStoreProvider) != null;
+
+      // Return-to-after-login: when an authenticated user lands on the auth
+      // screens carrying a `?from=` (set when a protected action bounced them
+      // here), send them back to where they were instead of the dashboard.
+      if (isAuthenticated &&
+          (state.matchedLocation == '/login' ||
+              state.matchedLocation == '/register')) {
+        final from = state.uri.queryParameters['from'];
+        if (from != null &&
+            from.isNotEmpty &&
+            !from.startsWith('/login') &&
+            !from.startsWith('/register')) {
+          return from;
+        }
+      }
+
       return authRedirect(
         matchedLocation: state.matchedLocation,
         isAuthenticated: isAuthenticated,

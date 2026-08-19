@@ -42,34 +42,48 @@ class AppFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final isDark = theme.brightness == Brightness.dark;
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
+        // A soft lavender wash (light mode) sets the footer apart from the
+        // white content above while staying on-brand; dark mode keeps its
+        // deep surface.
+        color: isDark ? theme.colorScheme.surface : ColorTokens.lavenderLight,
+        border: const Border(top: BorderSide(color: ColorTokens.lavenderBorder)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.xl,
           vertical: SpacingTokens.xl,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Wrap(
-              spacing: SpacingTokens.xl * 2,
-              runSpacing: SpacingTokens.xl,
-              children: [
-                _BrandBlock(),
-                _FooterColumn(title: 'Product', links: _product),
-                _FooterColumn(title: 'Workspace', links: _workspace),
-                _FooterColumn(title: 'Company', links: _company),
+        // Centre the whole footer within a max width so it reads as a single
+        // centred block on wide screens, consistent on every page.
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1120),
+            // ignore: prefer_const_constructors, prefer_const_literals_to_create_immutables
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: const [
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: SpacingTokens.xl * 2,
+                  runSpacing: SpacingTokens.xl,
+                  children: [
+                    _BrandBlock(),
+                    _FooterColumn(title: 'Product', links: _product),
+                    _FooterColumn(title: 'Workspace', links: _workspace),
+                    _FooterColumn(title: 'Company', links: _company),
+                  ],
+                ),
+                SizedBox(height: SpacingTokens.xl),
+                Divider(color: ColorTokens.lavenderBorder, height: 1),
+                SizedBox(height: SpacingTokens.md),
+                _BottomBar(),
               ],
             ),
-            const SizedBox(height: SpacingTokens.xl),
-            Divider(color: theme.dividerColor, height: 1),
-            const SizedBox(height: SpacingTokens.md),
-            const _BottomBar(),
-          ],
+          ),
         ),
       ),
     );
@@ -165,7 +179,7 @@ class _BottomBar extends StatelessWidget {
     );
 
     return Wrap(
-      alignment: WrapAlignment.spaceBetween,
+      alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: SpacingTokens.lg,
       runSpacing: SpacingTokens.sm,

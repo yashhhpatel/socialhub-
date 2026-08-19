@@ -26,10 +26,16 @@ class SocialHubApp extends ConsumerWidget {
 
     // When a signed-out (or expired) user tries to use a feature that needs
     // an account, the AuthInterceptor bumps this signal — send them to log
-    // in. Done here, at the composition root, so the interceptor itself stays
-    // free of any router dependency.
+    // in, remembering where they were so we can return them afterwards. Done
+    // here, at the composition root, so the interceptor itself stays free of
+    // any router dependency.
     ref.listen<int>(loginRequiredSignalProvider, (_, __) {
-      router.go('/login');
+      final loc = router.routeInformationProvider.value.uri.toString();
+      final onAuthScreen =
+          loc.startsWith('/login') || loc.startsWith('/register');
+      router.go(
+        onAuthScreen ? '/login' : '/login?from=${Uri.encodeComponent(loc)}',
+      );
     });
 
     return MaterialApp.router(
