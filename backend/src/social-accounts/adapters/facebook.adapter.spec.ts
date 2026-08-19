@@ -97,13 +97,17 @@ describe('FacebookAdapter', () => {
         { ok: true, json: { access_token: 'user_long', token_type: 'bearer', expires_in: 5184000 } },
         // 3. /me/accounts -> pages
         { ok: true, json: { data: [{ id: 'page_555', name: 'My Page', access_token: 'page_token_zzz' }] } },
+        // 4. /me -> the authorizing user's id (for deauth/data-deletion matching)
+        { ok: true, json: { id: 'user_999' } },
       ]);
 
       const result = await adapter.connect('auth-code');
 
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
       // externalAccountId is the PAGE id, not the user id.
       expect(result.externalAccountId).toBe('page_555');
+      // externalUserId is the USER id — what Meta's callbacks match on.
+      expect(result.externalUserId).toBe('user_999');
       // accessToken is the PAGE token — what publish() posts with.
       expect(result.accessToken).toBe('page_token_zzz');
       expect(result.refreshToken).toBeUndefined();
@@ -126,6 +130,8 @@ describe('FacebookAdapter', () => {
         { ok: true, json: { access_token: 'user_short' } },
         { ok: true, json: { access_token: 'user_long', expires_in: 5184000 } },
         { ok: true, json: { data: [] } },
+        // /me runs in parallel with /me/accounts; provide its response too.
+        { ok: true, json: { id: 'user_999' } },
       ]);
 
       await expect(adapter.connect('code')).rejects.toThrow(/no facebook page/i);

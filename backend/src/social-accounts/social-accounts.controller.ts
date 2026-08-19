@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -12,10 +14,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UserRole } from '@prisma/client';
+import { Platform, UserRole } from '@prisma/client';
 import { Request, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { parseMetaSignedRequest } from '../common/crypto/meta-signed-request.util';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ConnectResponseDto } from './dto/connect-response.dto';
@@ -278,6 +281,132 @@ export class SocialAccountsController {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed.';
       this.respondToCallback(res, { connectError: message });
+    }
+  }
+
+  // --- Meta compliance callbacks (Phase 16) ---
+  //
+  // Meta calls these — not a signed-in user — so they are PUBLIC (no
+  // JwtAuthGuard) and authenticated instead by the `signed_request` body,
+  // an HMAC-SHA256 signature keyed on the app secret. Every Meta app that
+  // requests permissions MUST register a deauthorize and a data-deletion
+  // callback; these satisfy that requirement for facebook/instagram/threads.
+
+  /**
+   * Deauthorize callback: Meta pings this when a user removes our app from
+   * their account. We purge that user's connected accounts for the platform.
+   * PUBLIC — trust comes from the verified signed_request, not a session.
+   */
+  @Post(':platform/deauthorize')
+  @HttpCode(HttpStatus.OK)
+  async deauthorize(
+    @Param('platform') platformParam: string,
+    @Body('signed_request') signedRequest: string,
+  ): Promise<{ success: boolean }> {
+    const { platform, userId } = this.verifyMetaSignedRequest(
+      platformParam,
+      signedRequest,
+    );
+    await this.socialAccountsService.purgePlatformUser(platform, userId);
+    return { success: true };
+  }
+
+  /**
+   * Data-deletion request callback: Meta calls this when a user requests
+   * deletion of the data our app holds about them. We purge their accounts,
+   * record the request, and return the { url, confirmation_code } Meta
+   * requires so the user can check deletion status. PUBLIC — see above.
+   */
+  @Post(':platform/data-deletion')
+  @HttpCode(HttpStatus.OK)
+  async dataDeletion(
+    @Param('platform') platformParam: string,
+    @Body('signed_request') signedRequest: string,
+    @Req() req: Request,
+  ): Promise<{ url: string; confirmation_code: string }> {
+    const { platform, userId } = this.verifyMetaSignedRequest(
+      platformParam,
+      signedRequest,
+    );
+    const confirmationCode = await this.socialAccountsService.recordDataDeletion(
+      platform,
+      userId,
+    );
+    // Absolute, publicly-reachable status URL Meta shows the user. Built from
+    // the request host so it works behind ngrok/whatever domain is in front.
+    const proto = req.get('x-forwarded-proto') ?? req.protocol;
+    const url =
+      `${proto}://${req.get('host')}/social-accounts/data-deletion/status` +
+      `?code=${confirmationCode}`;
+    return { url, confirmation_code: confirmationCode };
+  }
+
+  /**
+   * Human-readable status page the data-deletion `url` above points to.
+   * PUBLIC by design — the confirmation code is the unguessable capability.
+   */
+  @Get('data-deletion/status')
+  async dataDeletionStatus(
+    @Query('code') code: string,
+  ): Promise<{ code: string; status: string; completedAt: string | null }> {
+    const record = code
+      ? await this.socialAccountsService.getDataDeletionStatus(code)
+      : null;
+    if (!record) {
+      return { code: code ?? '', status: 'not_found', completedAt: null };
+    }
+    return {
+      code: record.confirmationCode,
+      status: record.status,
+      completedAt: record.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Verifies a Meta signed_request against the platform's app secret and
+   * returns the resolved platform enum + the authorizing user id. Throws
+   * BadRequestException for a non-Meta platform, an unconfigured secret, or
+   * a missing/forged signature — never proceed on an unverified request.
+   */
+  private verifyMetaSignedRequest(
+    platformParam: string,
+    signedRequest: string,
+  ): { platform: Platform; userId: string } {
+    const secret = this.metaAppSecret(platformParam);
+    if (!secret) {
+      throw new BadRequestException(
+        `'${platformParam}' is not a Meta platform with compliance callbacks.`,
+      );
+    }
+    if (!signedRequest) {
+      throw new BadRequestException('Missing signed_request.');
+    }
+    const payload = parseMetaSignedRequest(signedRequest, secret);
+    if (!payload) {
+      throw new BadRequestException('Invalid or forged signed_request.');
+    }
+    return { platform: platformParam as Platform, userId: payload.user_id };
+  }
+
+  /**
+   * The app secret to verify a Meta signed_request for this platform, or
+   * null if the platform isn't a Meta one. Mirrors each adapter's env var
+   * naming (Facebook accepts the *_APP_SECRET / *_CLIENT_SECRET fallback).
+   */
+  private metaAppSecret(platform: string): string | null {
+    switch (platform) {
+      case 'facebook':
+        return (
+          this.configService.get<string>('FACEBOOK_APP_SECRET') ??
+          this.configService.get<string>('FACEBOOK_CLIENT_SECRET') ??
+          null
+        );
+      case 'instagram':
+        return this.configService.get<string>('INSTAGRAM_CLIENT_SECRET') ?? null;
+      case 'threads':
+        return this.configService.get<string>('THREADS_CLIENT_SECRET') ?? null;
+      default:
+        return null;
     }
   }
 

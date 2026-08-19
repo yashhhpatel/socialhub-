@@ -238,6 +238,12 @@ model SocialAccount {
   organization      Organization        @relation(fields: [orgId], references: [id])
   platform          Platform
   externalAccountId String
+  // The platform *user* id of the person who authorized the connection —
+  // distinct from externalAccountId (which is a Page/business id on Facebook).
+  // Meta's deauthorize/data-deletion callbacks identify the user by this id,
+  // so it's what those callbacks match on. Nullable: only populated for the
+  // Meta platforms (facebook/instagram/threads) that send those callbacks.
+  externalUserId    String?
   // Encrypted via TokenEncryptionService (Milestone 2.1) before ever
   // touching the database — never stored raw. See social-accounts.service.ts.
   accessTokenEnc    String
@@ -251,7 +257,22 @@ model SocialAccount {
   // twice to one org.
   @@unique([orgId, platform, externalAccountId])
   @@index([orgId])
+  @@index([platform, externalUserId])
   @@map("social_account")
+}
+
+// A Meta "Data Deletion Request" (see docs/META_APP_REVIEW.md). Meta POSTs a
+// signed request; we delete the user's connected accounts synchronously and
+// record the outcome here so the status URL we hand back can confirm it.
+model DataDeletionRequest {
+  id               String   @id @default(uuid())
+  platform         Platform
+  externalUserId   String
+  confirmationCode String   @unique
+  status           String   @default("completed")
+  createdAt        DateTime @default(now())
+
+  @@map("data_deletion_request")
 }
 
 model ContentAsset {

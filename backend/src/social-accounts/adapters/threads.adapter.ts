@@ -110,6 +110,9 @@ export class ThreadsAdapter implements PlatformAdapter {
 
     return {
       externalAccountId: profile.id,
+      // For Threads the account id IS the user id Meta's deauthorize/
+      // data-deletion callbacks reference.
+      externalUserId: profile.id,
       accessToken: longLived.access_token,
       // No separate refresh token for Threads — see class doc comment.
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
