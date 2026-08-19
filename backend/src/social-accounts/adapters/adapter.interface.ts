@@ -63,6 +63,13 @@ export interface PlatformCapabilities {
 /** Result of completing an OAuth authorization-code exchange. */
 export interface OAuthConnectionResult {
   externalAccountId: string;
+  /**
+   * The platform *user* id of the authorizing person, when it differs from
+   * externalAccountId (e.g. Facebook, where externalAccountId is a Page id).
+   * Meta's deauthorize/data-deletion callbacks match on this. Omit for
+   * platforms that don't send those callbacks.
+   */
+  externalUserId?: string;
   accessToken: string;
   /** Not every platform issues a refresh token (see each adapter). */
   refreshToken?: string;

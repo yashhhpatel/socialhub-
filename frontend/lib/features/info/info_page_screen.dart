@@ -154,19 +154,43 @@ const Map<String, InfoPage> infoPages = {
   ),
   'privacy': InfoPage(
     title: 'Privacy Policy',
-    intro: 'This summary explains what SocialHub collects and how it is used.',
+    intro: 'This policy explains what SocialHub collects, how it is used, and '
+        'how you can remove your data — including data obtained from platforms '
+        'you connect, such as Facebook, Instagram, and Threads.',
     sections: [
       InfoSection(
         'Information we collect',
         'Account details (name, email, organization), the content you create, '
-            'and the tokens needed to publish to platforms you connect. We also '
-            'collect basic usage data to operate and improve the product.',
+            'and basic usage data to operate and improve the product.',
+      ),
+      InfoSection(
+        'Data from connected platforms',
+        'When you connect a social account, we receive an access token and the '
+            'account identity needed to publish on your behalf — for example your '
+            'platform user ID, page or profile ID, and username. For Meta '
+            'platforms (Facebook, Instagram, Threads) we request only the '
+            'permissions required to list the pages or profiles you manage and to '
+            'publish the posts you schedule. We do not collect your Meta password, '
+            'and we do not read private messages. Access tokens are encrypted '
+            'before they are stored and are never exposed through our API.',
       ),
       InfoSection(
         'How we use it',
         'To provide the service — publishing your content, generating AI '
             'suggestions, and showing your analytics — and to keep your account '
-            'secure. We do not sell your personal data.',
+            'secure. We do not sell your personal data, and we do not use data '
+            'from connected platforms for advertising.',
+      ),
+      InfoSection(
+        'Removing your data',
+        'You can disconnect any platform at any time from Settings, which deletes '
+            'the stored token and account for that platform. For Meta platforms '
+            'you can also remove SocialHub from the app\'s settings on Facebook, '
+            'Instagram, or Threads; Meta then notifies us and we automatically '
+            'delete the data associated with your platform account. To request '
+            'deletion of all your data, use the "Remove App" option on the '
+            'platform or email privacy@socialhub.example — we confirm each request '
+            'with a tracking code and complete deletion promptly.',
       ),
       InfoSection(
         'Your choices',
@@ -190,6 +214,15 @@ const Map<String, InfoPage> infoPages = {
         'You keep ownership of your content. You grant SocialHub the permissions '
             'needed to store it and publish it on your behalf to the accounts '
             'you connect.',
+      ),
+      InfoSection(
+        'Connected platforms',
+        'When you connect a third-party platform such as Facebook, Instagram, or '
+            'Threads, your use of that platform through SocialHub is also governed '
+            'by that platform\'s own terms and policies. You are responsible for '
+            'holding the rights to publish the content you send to it, and you can '
+            'revoke SocialHub\'s access at any time from the platform or from '
+            'Settings.',
       ),
       InfoSection(
         'Availability',

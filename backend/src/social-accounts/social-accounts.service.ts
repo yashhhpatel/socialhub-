@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Platform, SocialAccount } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { generatePkcePair } from '../common/crypto/pkce.util';
@@ -157,6 +158,53 @@ export class SocialAccountsService {
     await this.prisma.socialAccount.delete({ where: { id: accountId } });
   }
 
+  // --- Meta compliance: deauthorize & data deletion callbacks ---
+  //
+  // Both are triggered by Meta (not a signed-in user) via a verified signed
+  // request; the controller verifies the signature before calling these. The
+  // person is identified by their platform *user* id, which we match against
+  // both externalUserId and externalAccountId (the latter covers Instagram/
+  // Threads, where the account id is the user id).
+
+  /**
+   * Delete every connected account for this platform belonging to the given
+   * platform user. Idempotent — a repeat callback for an already-removed user
+   * simply deletes nothing. Returns how many rows were removed.
+   */
+  async purgePlatformUser(platform: Platform, externalUserId: string): Promise<number> {
+    const result = await this.prisma.socialAccount.deleteMany({
+      where: {
+        platform,
+        OR: [{ externalUserId }, { externalAccountId: externalUserId }],
+      },
+    });
+    return result.count;
+  }
+
+  /**
+   * Handle a Meta data-deletion request: purge the user's accounts and record
+   * the outcome so the status URL handed back to Meta can confirm it. Returns
+   * the confirmation code Meta requires in the callback response.
+   */
+  async recordDataDeletion(
+    platform: Platform,
+    externalUserId: string,
+  ): Promise<string> {
+    await this.purgePlatformUser(platform, externalUserId);
+    const confirmationCode = randomBytes(16).toString('hex');
+    await this.prisma.dataDeletionRequest.create({
+      data: { platform, externalUserId, confirmationCode, status: 'completed' },
+    });
+    return confirmationCode;
+  }
+
+  /** Look up a data-deletion request by its confirmation code (status URL). */
+  getDataDeletionStatus(confirmationCode: string) {
+    return this.prisma.dataDeletionRequest.findUnique({
+      where: { confirmationCode },
+    });
+  }
+
   // --- Shared internals ---
 
   /**
@@ -188,9 +236,16 @@ export class SocialAccountsService {
   private async upsertAccount(
     orgId: string,
     platform: Platform,
-    result: { externalAccountId: string; accessToken: string; refreshToken?: string; expiresAt?: Date },
+    result: {
+      externalAccountId: string;
+      externalUserId?: string;
+      accessToken: string;
+      refreshToken?: string;
+      expiresAt?: Date;
+    },
   ): Promise<SocialAccount> {
-    const tokenFields = {
+    const fields = {
+      externalUserId: result.externalUserId ?? null,
       accessTokenEnc: this.tokenEncryption.encrypt(result.accessToken),
       refreshTokenEnc: result.refreshToken
         ? this.tokenEncryption.encrypt(result.refreshToken)
@@ -207,8 +262,8 @@ export class SocialAccountsService {
           externalAccountId: result.externalAccountId,
         },
       },
-      create: { orgId, platform, externalAccountId: result.externalAccountId, ...tokenFields },
-      update: tokenFields,
+      create: { orgId, platform, externalAccountId: result.externalAccountId, ...fields },
+      update: fields,
     });
   }
 

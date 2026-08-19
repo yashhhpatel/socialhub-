@@ -134,10 +134,16 @@ export class FacebookAdapter implements PlatformAdapter {
   async connect(authorizationCode: string): Promise<OAuthConnectionResult> {
     const userToken = await this.exchangeCodeForUserToken(authorizationCode);
     const longLived = await this.exchangeForLongLivedToken(userToken);
-    const page = await this.fetchFirstPage(longLived.access_token);
+    const [page, userId] = await Promise.all([
+      this.fetchFirstPage(longLived.access_token),
+      this.fetchUserId(longLived.access_token),
+    ]);
 
     return {
       externalAccountId: page.id,
+      // The Facebook USER id (not the Page id) — this is what Meta's
+      // deauthorize/data-deletion callbacks identify the person by.
+      externalUserId: userId,
       // The PAGE token, not the user token — this is what publish() posts
       // with. See class doc comment.
       accessToken: page.access_token,
@@ -147,6 +153,23 @@ export class FacebookAdapter implements PlatformAdapter {
         ? new Date(Date.now() + longLived.expires_in * 1000)
         : undefined,
     };
+  }
+
+  /** The authorizing user's Facebook id, for deauth/data-deletion matching. */
+  private async fetchUserId(userAccessToken: string): Promise<string> {
+    const params = new URLSearchParams({
+      fields: 'id',
+      access_token: userAccessToken,
+    });
+    const response = await fetch(`${GRAPH_BASE}/me?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(
+        `Facebook user lookup failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Facebook returned no user id.');
+    return data.id;
   }
 
   async refresh(refreshToken: string): Promise<RefreshedTokens> {

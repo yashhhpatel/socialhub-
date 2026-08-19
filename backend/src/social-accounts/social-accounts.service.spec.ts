@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Platform } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
@@ -23,6 +24,11 @@ describe('SocialAccountsService', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       delete: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    dataDeletionRequest: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
     };
   };
   let instagramAdapter: { connect: jest.Mock; getAuthorizationUrl: jest.Mock };
@@ -46,6 +52,11 @@ describe('SocialAccountsService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      dataDeletionRequest: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
       },
     };
     instagramAdapter = {
@@ -426,6 +437,82 @@ describe('SocialAccountsService', () => {
       await expect(service.disconnect('missing', 'org_1')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('purgePlatformUser (deauthorize)', () => {
+    it('deletes accounts matching the platform user by externalUserId OR externalAccountId', async () => {
+      prisma.socialAccount.deleteMany.mockResolvedValue({ count: 2 });
+
+      const removed = await service.purgePlatformUser(
+        Platform.facebook,
+        'meta_user_42',
+      );
+
+      expect(removed).toBe(2);
+      expect(prisma.socialAccount.deleteMany).toHaveBeenCalledWith({
+        where: {
+          platform: Platform.facebook,
+          OR: [
+            { externalUserId: 'meta_user_42' },
+            { externalAccountId: 'meta_user_42' },
+          ],
+        },
+      });
+    });
+
+    it('is idempotent — a repeat callback for an already-removed user deletes nothing', async () => {
+      prisma.socialAccount.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.purgePlatformUser(Platform.instagram, 'gone'),
+      ).resolves.toBe(0);
+    });
+  });
+
+  describe('recordDataDeletion', () => {
+    it('purges the user then records a request with a random confirmation code', async () => {
+      prisma.socialAccount.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.dataDeletionRequest.create.mockResolvedValue({});
+
+      const code = await service.recordDataDeletion(
+        Platform.instagram,
+        'ig_user_7',
+      );
+
+      // 16 random bytes -> 32 hex chars.
+      expect(code).toMatch(/^[0-9a-f]{32}$/);
+      expect(prisma.socialAccount.deleteMany).toHaveBeenCalledTimes(1);
+      expect(prisma.dataDeletionRequest.create).toHaveBeenCalledWith({
+        data: {
+          platform: Platform.instagram,
+          externalUserId: 'ig_user_7',
+          confirmationCode: code,
+          status: 'completed',
+        },
+      });
+    });
+
+    it('generates a distinct confirmation code each time', async () => {
+      prisma.socialAccount.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.dataDeletionRequest.create.mockResolvedValue({});
+
+      const a = await service.recordDataDeletion(Platform.facebook, 'u');
+      const b = await service.recordDataDeletion(Platform.facebook, 'u');
+
+      expect(a).not.toBe(b);
+    });
+  });
+
+  describe('getDataDeletionStatus', () => {
+    it('looks a request up by its confirmation code', async () => {
+      const row = { confirmationCode: 'abc', status: 'completed' };
+      prisma.dataDeletionRequest.findUnique.mockResolvedValue(row);
+
+      await expect(service.getDataDeletionStatus('abc')).resolves.toBe(row);
+      expect(prisma.dataDeletionRequest.findUnique).toHaveBeenCalledWith({
+        where: { confirmationCode: 'abc' },
+      });
     });
   });
 });
