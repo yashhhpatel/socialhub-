@@ -1,6 +1,10 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -9,6 +13,8 @@ import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AccountDataService } from './account-data.service';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { UserProfileDto } from './dto/user-profile.dto';
 import { UsersService } from './users.service';
 
@@ -18,7 +24,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly accountData: AccountDataService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
@@ -48,5 +57,32 @@ export class UsersController {
       mfaEnabled: user.mfaEnabled,
       createdAt: user.createdAt,
     };
+  }
+
+  /**
+   * GDPR data export (Phase 17.4): a JSON snapshot of everything attributable
+   * to the signed-in user (and their org). Tokens/secrets excluded.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/export')
+  exportData(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<Record<string, unknown>> {
+    return this.accountData.exportData(req.user.userId);
+  }
+
+  /**
+   * Permanently delete the signed-in user's account (Phase 17.4). An owner
+   * deletes the whole organization; a member deletes only their own data.
+   * Requires the current password in the body. Irreversible.
+   */
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Delete('me')
+  deleteAccount(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: DeleteAccountDto,
+  ): Promise<{ scope: 'organization' | 'user' }> {
+    return this.accountData.deleteAccount(req.user.userId, dto.password);
   }
 }

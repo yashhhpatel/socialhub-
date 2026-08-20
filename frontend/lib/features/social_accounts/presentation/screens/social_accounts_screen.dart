@@ -7,6 +7,7 @@ import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../../core/widgets/sign_in_required.dart';
+import '../../../auth/presentation/widgets/danger_zone_card.dart';
 import '../../../auth/presentation/widgets/mfa_settings_card.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -183,6 +184,10 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: SpacingTokens.lg),
+          Text('Account', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: SpacingTokens.md),
+          const DangerZoneCard(),
         ],
       ),
     );
