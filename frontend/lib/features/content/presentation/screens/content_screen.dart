@@ -8,7 +8,6 @@ import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../domain/entities/content_asset_summary.dart';
 import '../state/content_library_controller.dart';
 
@@ -94,12 +93,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 key: ValueKey('loading'),
                 child: _SkeletonGrid(),
               ),
+              // Logged out: show the normal empty library (browsable) rather
+              // than a wall — "New design" routes to login when tapped.
               error: (error, _) => KeyedSubtree(
                 key: const ValueKey('error'),
                 child: isUnauthorized(error)
-                    ? const SignInRequired(
-                        message: 'Log in to view and create designs.',
-                      )
+                    ? const _EmptyLibrary()
                     : _LibraryError(
                         message: describeApiError(error),
                         onRetry: () => ref.invalidate(contentLibraryProvider),

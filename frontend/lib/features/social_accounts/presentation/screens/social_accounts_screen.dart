@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../auth/presentation/widgets/danger_zone_card.dart';
 import '../../../auth/presentation/widgets/mfa_settings_card.dart';
 import '../../domain/entities/social_account.dart';
@@ -60,7 +60,7 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
       ref.read(socialAccountsControllerProvider.notifier).refresh();
     } else if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(error), backgroundColor: AppColors.error),
       );
     }
   }
@@ -148,41 +148,18 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
                   ),
               ],
             ),
+            // Logged out (unauthorized) still shows the full platform list —
+            // every card reads "Not connected", and tapping Connect routes to
+            // login (the connect call 401s → login redirect). Only a real
+            // error shows a retry state.
             error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(
-                    message: 'Log in to connect and manage your social accounts.',
-                  )
+                ? _buildPlatformList(const [])
                 : _ErrorState(
                     message: describeApiError(error),
                     onRetry: () =>
                         ref.read(socialAccountsControllerProvider.notifier).refresh(),
                   ),
-            data: (accounts) => Column(
-              children: [
-                for (var i = 0; i < SocialPlatform.values.length; i++) ...[
-                  StaggeredItem(
-                    index: i,
-                    child: PlatformConnectionCard(
-                      platform: SocialPlatform.values[i],
-                      account:
-                          _accountFor(accounts, SocialPlatform.values[i]),
-                      isConnecting:
-                          _connectingPlatform == SocialPlatform.values[i],
-                      isDisconnecting: _disconnectingAccountId ==
-                          _accountFor(accounts, SocialPlatform.values[i])?.id,
-                      onConnect: () =>
-                          _handleConnect(SocialPlatform.values[i]),
-                      onDisconnect: () {
-                        final account =
-                            _accountFor(accounts, SocialPlatform.values[i]);
-                        if (account != null) _handleDisconnect(account);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.sm),
-                ],
-              ],
-            ),
+            data: _buildPlatformList,
           ),
           const SizedBox(height: SpacingTokens.lg),
           Text('Account', style: Theme.of(context).textTheme.titleLarge),
@@ -190,6 +167,34 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
           const DangerZoneCard(),
         ],
       ),
+    );
+  }
+
+  /// The list of platform cards, driven by whatever accounts are connected
+  /// (empty when logged out — every card then reads "Not connected"). Kept as
+  /// one builder so the signed-in and logged-out views share the exact same UI.
+  Widget _buildPlatformList(List<SocialAccount> accounts) {
+    return Column(
+      children: [
+        for (var i = 0; i < SocialPlatform.values.length; i++) ...[
+          StaggeredItem(
+            index: i,
+            child: PlatformConnectionCard(
+              platform: SocialPlatform.values[i],
+              account: _accountFor(accounts, SocialPlatform.values[i]),
+              isConnecting: _connectingPlatform == SocialPlatform.values[i],
+              isDisconnecting: _disconnectingAccountId ==
+                  _accountFor(accounts, SocialPlatform.values[i])?.id,
+              onConnect: () => _handleConnect(SocialPlatform.values[i]),
+              onDisconnect: () {
+                final account = _accountFor(accounts, SocialPlatform.values[i]);
+                if (account != null) _handleDisconnect(account);
+              },
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+        ],
+      ],
     );
   }
 

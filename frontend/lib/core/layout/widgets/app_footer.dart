@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../theme/tokens/color_tokens.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/tokens/spacing_tokens.dart';
 
-// The footer uses a fixed gray backdrop with white text in both themes, so
-// its colors are defined here rather than pulled from the (light) colorScheme.
-const _footerBg = Color(0xFF374151); // slate gray
-const _footerText = Colors.white; // brand + links
-const _footerMuted = Color(0xB3FFFFFF); // white 70% — tagline, titles, copyright
-const _footerDivider = Color(0x2EFFFFFF); // white ~18% — border + divider
+// Footer chrome, from the Midnight Studio palette: a surface backdrop with a
+// 1px border, primary text and muted secondary text.
+const _footerBg = AppColors.surface;
+const _footerText = AppColors.textPrimary; // brand + links
+const _footerMuted = AppColors.textMuted; // tagline, titles, copyright
+const _footerDivider = AppColors.border; // border + divider
 
 /// Global site footer, rendered once by AppShell so every page — present and
 /// future — shares the same structure and styling.
@@ -105,28 +105,21 @@ class _BrandBlock extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
-                  ),
+                  color: AppColors.accent,
                   borderRadius: BorderRadius.circular(13),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ColorTokens.brandPrimary.withOpacity(0.38),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
-                child: const Icon(Icons.hub_outlined, size: 25, color: Colors.white),
+                child: const Icon(
+                  Icons.hub_outlined,
+                  size: 25,
+                  color: AppColors.textPrimary,
+                ),
               ),
               const SizedBox(width: SpacingTokens.md),
               Text(
                 'SocialHub',
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w500,
                   letterSpacing: -0.3,
                   color: _footerText,
                 ),
@@ -166,7 +159,7 @@ class _FooterColumn extends StatelessWidget {
             style: theme.textTheme.labelSmall?.copyWith(
               color: _footerMuted,
               letterSpacing: 0.8,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: SpacingTokens.md),

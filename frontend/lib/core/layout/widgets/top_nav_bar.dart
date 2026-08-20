@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/tokens/color_tokens.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/tokens/spacing_tokens.dart';
 import '../nav_menu_data.dart';
 import 'notifications_icon.dart';
 import 'user_profile_menu.dart';
 
-// The header uses a fixed gray backdrop with white text/icons, so its colors
-// are defined here rather than pulled from the (light) colorScheme.
-const _headerBg = Color(0xFF374151); // slate gray (matches the footer)
-const _headerText = Colors.white;
-const _headerMuted = Color(0xD9FFFFFF); // white ~85% — inactive nav items
-const _headerBorder = Color(0x24FFFFFF); // white ~14% — bottom border
+// Header chrome, from the Midnight Studio palette: a surface backdrop with a
+// 1px border and primary/muted text.
+const _headerBg = AppColors.surface;
+const _headerText = AppColors.textPrimary;
+const _headerMuted = AppColors.textMuted; // inactive nav items
+const _headerBorder = AppColors.border; // bottom border
 
 /// Horizontal top navigation with grouped categories and Buffer-style
 /// dropdown mega-menus. Compact by design — only a handful of top-level
@@ -56,10 +56,10 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       child: IconTheme(
         data: const IconThemeData(color: _headerText),
         child: IconButtonTheme(
-          data: IconButtonThemeData(
+          data: const IconButtonThemeData(
             style: ButtonStyle(
-              foregroundColor: const WidgetStatePropertyAll(_headerText),
-              overlayColor: WidgetStatePropertyAll(Colors.white.withOpacity(0.12)),
+              foregroundColor: WidgetStatePropertyAll(_headerText),
+              overlayColor: WidgetStatePropertyAll(AppColors.surfaceRaised),
             ),
           ),
           child: DecoratedBox(
@@ -173,28 +173,21 @@ class _Brand extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
-            ),
+            color: AppColors.accent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: ColorTokens.brandPrimary.withOpacity(0.38),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-            ],
           ),
-          child: const Icon(Icons.hub_outlined, size: 22, color: Colors.white),
+          child: const Icon(
+            Icons.hub_outlined,
+            size: 22,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(width: SpacingTokens.sm),
         Text(
           'SocialHub',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontSize: 22,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
                 letterSpacing: -0.3,
                 color: _headerText,
               ),
@@ -311,14 +304,14 @@ class _NavTrigger extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // White on the gray header; the active item is full-white and bolder with
-    // a subtle white pill, inactive items are slightly dimmed white.
-    final color = active ? _headerText : _headerMuted;
+    // The active item uses the accent (colour + a subtle accent pill); inactive
+    // items are muted. Weight stays within the two-weight scale (400/500).
+    final color = active ? AppColors.accentHover : _headerMuted;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       child: Material(
-        color: active ? Colors.white.withOpacity(0.16) : Colors.transparent,
+        color: active ? AppColors.accent.withOpacity(0.14) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
@@ -335,7 +328,7 @@ class _NavTrigger extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: color,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                    fontWeight: active ? FontWeight.w500 : FontWeight.w400,
                     fontSize: 14,
                   ),
                 ),
@@ -438,7 +431,7 @@ class _MegaItem extends StatelessWidget {
                       Text(
                         link.label,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                           color: selected
                               ? colorScheme.primary
                               : colorScheme.onSurface,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/motion/tap_scale.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -79,10 +80,10 @@ class PlatformConnectionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: isConnected
-                          ? Colors.greenAccent.shade400
+                          ? AppColors.success
                           : colorScheme.onSurface.withOpacity(0.55),
                       fontWeight:
-                          isConnected ? FontWeight.w600 : FontWeight.w400,
+                          isConnected ? FontWeight.w500 : FontWeight.w400,
                     ),
                   ),
                 ],
@@ -103,7 +104,7 @@ class PlatformConnectionCard extends StatelessWidget {
     if (isConnected) {
       return OutlinedButton(
         onPressed: isDisconnecting ? null : onDisconnect,
-        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
+        style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
         child: isDisconnecting
             ? const SizedBox(
                 width: 16,
@@ -122,7 +123,7 @@ class PlatformConnectionCard extends StatelessWidget {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             )
           : const Text('Connect'),

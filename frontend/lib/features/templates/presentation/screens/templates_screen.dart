@@ -6,7 +6,6 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/data/repositories/api_content_repository.dart';
 import '../../../editor/canvas/models/canvas_document.dart';
@@ -84,8 +83,10 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
           const SizedBox(height: SpacingTokens.lg),
           templatesAsync.when(
             loading: () => const _TemplatesSkeletonGrid(),
+            // Logged out: show the normal empty state (browsable); using a
+            // template routes to login.
             error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(message: 'Log in to browse and use templates.')
+                ? const _EmptyTemplates()
                 : Center(
                     child: Text('Could not load templates: ${describeApiError(error)}'),
                   ),

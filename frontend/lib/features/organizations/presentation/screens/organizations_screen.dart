@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../data/api_organizations_repository.dart';
 
 /// Organization overview + settings hub. Shows the org's name, plan, size and
@@ -37,10 +36,11 @@ class OrganizationsScreen extends ConsumerWidget {
                 child: CircularProgressIndicator(),
               ),
             ),
+            // Logged out: skip the data-only overview card entirely (rather
+            // than a blocking wall) — the page's header and the Manage links
+            // below stay fully browsable.
             error: (e, _) => isUnauthorized(e)
-                ? const SignInRequired(
-                    message: 'Log in to see your organization overview.',
-                  )
+                ? const SizedBox.shrink()
                 : Text('Could not load your organization: ${describeApiError(e)}'),
             data: (org) => _Overview(org: org),
           ),

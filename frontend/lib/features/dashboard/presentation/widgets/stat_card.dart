@@ -68,7 +68,7 @@ class StatCard extends StatelessWidget {
               subtitle!,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
             ),
           ],

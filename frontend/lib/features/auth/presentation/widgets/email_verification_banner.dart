@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/auth_token_store.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_account_repository.dart';
 import '../state/current_user_provider.dart';
@@ -50,11 +51,15 @@ class _EmailVerificationBannerState
     if (user == null || user.emailVerified) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    const amber = Color(0xFF92400E);
-    const amberBg = Color(0xFFFEF3C7);
+    // A caution notice — warning colour on a raised surface with a border,
+    // matching Midnight Studio (no coloured fills).
+    const caution = AppColors.warning;
 
     return Material(
-      color: amberBg,
+      color: AppColors.surfaceRaised,
+      shape: const Border(
+        bottom: BorderSide(color: AppColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.lg,
@@ -62,18 +67,18 @@ class _EmailVerificationBannerState
         ),
         child: Row(
           children: [
-            const Icon(Icons.mark_email_unread_outlined, color: amber, size: 20),
+            const Icon(Icons.mark_email_unread_outlined, color: caution, size: 20),
             const SizedBox(width: SpacingTokens.sm),
             Expanded(
               child: Text(
                 'Please verify your email (${user.email}) to secure your account.',
-                style: theme.textTheme.bodyMedium?.copyWith(color: amber),
+                style: theme.textTheme.bodyMedium?.copyWith(color: caution),
               ),
             ),
             const SizedBox(width: SpacingTokens.sm),
             TextButton(
               onPressed: _sending ? null : _resend,
-              style: TextButton.styleFrom(foregroundColor: amber),
+              style: TextButton.styleFrom(foregroundColor: caution),
               child: _sending
                   ? const SizedBox(
                       width: 16,

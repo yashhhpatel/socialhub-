@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../auth/presentation/state/current_user_provider.dart';
@@ -121,8 +122,8 @@ class _StatusChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (Color color, IconData icon) = switch (status) {
       ApprovalStatus.draft => (scheme.onSurfaceVariant, Icons.edit_outlined),
-      ApprovalStatus.pendingApproval => (Colors.orange.shade700, Icons.hourglass_top),
-      ApprovalStatus.approved => (Colors.green.shade700, Icons.check_circle_outline),
+      ApprovalStatus.pendingApproval => (AppColors.warning, Icons.hourglass_top),
+      ApprovalStatus.approved => (AppColors.success, Icons.check_circle_outline),
       ApprovalStatus.rejected => (scheme.error, Icons.cancel_outlined),
     };
 
@@ -142,7 +143,7 @@ class _StatusChip extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .labelMedium
-                ?.copyWith(color: color, fontWeight: FontWeight.w600),
+                ?.copyWith(color: color, fontWeight: FontWeight.w500),
           ),
         ],
       ),

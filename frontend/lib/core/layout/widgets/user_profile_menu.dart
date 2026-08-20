@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_colors.dart';
+
 /// Deliberately presentational-only: no Riverpod or go_router dependency
 /// here at all. AppShell (the one place already acting as a composition
 /// root — see its doc comment) reads the real session and wires
@@ -32,7 +34,7 @@ class UserProfileMenu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(email, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(email, style: const TextStyle(fontWeight: FontWeight.w500)),
               Text(
                 role,
                 style: TextStyle(
@@ -71,8 +73,8 @@ class UserProfileMenu extends StatelessWidget {
         child: Text(
           email.isNotEmpty ? email[0].toUpperCase() : '?',
           style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
             fontSize: 16,
           ),
         ),

@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/auth_interceptor.dart';
 import '../core/router/app_router.dart';
-import '../core/theme/dark_theme.dart';
-import '../core/theme/light_theme.dart';
+import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_controller.dart';
 import '../features/settings/data/api_white_label_repository.dart';
 
@@ -41,8 +40,10 @@ class SocialHubApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'SocialHub',
       debugShowCheckedModeBanner: false,
-      theme: _branded(lightTheme, brandColor),
-      darkTheme: _branded(darkTheme, brandColor),
+      // Midnight Studio is the app's single theme — applied to both slots so
+      // the app renders dark regardless of the (retained) theme-mode setting.
+      theme: _branded(midnightStudioTheme, brandColor),
+      darkTheme: _branded(midnightStudioTheme, brandColor),
       themeMode: themeMode,
       routerConfig: router,
     );

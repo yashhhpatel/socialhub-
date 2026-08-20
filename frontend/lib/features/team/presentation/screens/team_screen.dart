@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/app_role.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../auth/domain/entities/current_user.dart';
 import '../../../auth/presentation/state/current_user_provider.dart';
@@ -30,13 +30,68 @@ class TeamScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
+        // Logged out: show the browsable team page (header + empty roster);
+        // "Invite teammate" routes to login. No blocking wall.
         error: (error, _) => isUnauthorized(error)
-            ? const SignInRequired(message: 'Log in to manage your team.')
+            ? const _TeamLoggedOut()
             : Center(
                 child: Text('Could not load your account: ${describeApiError(error)}'),
               ),
         data: (user) => user.isAdmin ? _TeamAdminView(user: user) : const _AccessDenied(),
       ),
+    );
+  }
+}
+
+/// Browsable team page for a logged-out visitor: the same header and an
+/// "Invite teammate" action, which routes to login instead of blocking the
+/// whole page behind a wall.
+class _TeamLoggedOut extends StatelessWidget {
+  const _TeamLoggedOut();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Team', style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: SpacingTokens.xs),
+                  Text(
+                    'Manage who can access this workspace.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final from = GoRouterState.of(context).uri.toString();
+                context.go('/login?from=${Uri.encodeComponent(from)}');
+              },
+              icon: const Icon(Icons.person_add_alt_1, size: 18),
+              label: const Text('Invite teammate'),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        const _SectionHeader('Members'),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
+          child: Text(
+            'Your team members will appear here once you log in.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
