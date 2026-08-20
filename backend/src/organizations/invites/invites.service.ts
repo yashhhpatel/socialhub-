@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'crypto';
 import { roleMeetsMinimum } from '../../common/constants/role-rank';
 import { EmailService } from '../../common/email/email.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PlanLimitsService } from '../../billing/plan-limits.service';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 
@@ -31,6 +32,7 @@ export class InvitesService {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /**
@@ -58,6 +60,9 @@ export class InvitesService {
     if (existingUser && existingUser.orgId === orgId) {
       throw new ConflictException('That person is already a member of this organization.');
     }
+
+    // Plan-gating (Phase 18): members + pending invites must fit the seat cap.
+    await this.planLimits.assertCanAddTeamMember(orgId);
 
     // Supersede any outstanding pending invite for the same email+org, so a
     // re-invite issues a fresh single-use token rather than leaving two live.

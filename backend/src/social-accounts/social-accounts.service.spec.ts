@@ -94,6 +94,8 @@ describe('SocialAccountsService', () => {
       facebookAdapter as unknown as FacebookAdapter,
       threadsAdapter as unknown as ThreadsAdapter,
       linkedinAdapter as unknown as LinkedInAdapter,
+      // Plan-gating: allow by default in these tests (Phase 18).
+      { assertCanConnectSocialAccount: jest.fn().mockResolvedValue(undefined) } as never,
     );
   });
 
