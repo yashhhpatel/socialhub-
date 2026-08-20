@@ -70,7 +70,7 @@ class _NotificationsPanel extends StatelessWidget {
                 Text(
                   "You're all caught up",
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.xs),

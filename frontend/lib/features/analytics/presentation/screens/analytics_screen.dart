@@ -246,7 +246,7 @@ class _ComparisonTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final head = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
+    final head = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

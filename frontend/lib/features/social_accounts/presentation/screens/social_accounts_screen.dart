@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
@@ -59,7 +60,7 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
       ref.read(socialAccountsControllerProvider.notifier).refresh();
     } else if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(error), backgroundColor: AppColors.error),
       );
     }
   }

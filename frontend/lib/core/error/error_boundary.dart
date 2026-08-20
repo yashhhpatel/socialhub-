@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/tokens/color_tokens.dart';
+import '../theme/app_colors.dart';
 
 /// Global error handling for the app (Milestone 6.1).
 ///
@@ -64,21 +64,21 @@ class _ErrorFallback extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
-        color: ColorTokens.lavenderLight,
+        color: AppColors.background,
         alignment: Alignment.center,
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 44, color: ColorTokens.error),
+            const Icon(Icons.error_outline, size: 44, color: AppColors.error),
             const SizedBox(height: 16),
             const Text(
               'Something went wrong',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: ColorTokens.neutral900,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -86,14 +86,14 @@ class _ErrorFallback extends StatelessWidget {
               'This part of the page failed to load. Try again, and if it '
               'keeps happening, reload the app.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: ColorTokens.neutral600),
+              style: TextStyle(fontSize: 14, color: AppColors.textMuted),
             ),
             if (kDebugMode) ...[
               const SizedBox(height: 16),
               Text(
                 details.exceptionAsString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: ColorTokens.neutral600),
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
           ],

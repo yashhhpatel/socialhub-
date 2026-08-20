@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/motion/motion_modal.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_mfa_repository.dart';
 import '../state/current_user_provider.dart';
@@ -115,7 +116,7 @@ class _EnabledRow extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
+        const Icon(Icons.check_circle, color: AppColors.success, size: 20),
         const SizedBox(width: SpacingTokens.sm),
         Expanded(
           child: Text('Enabled', style: theme.textTheme.bodyLarge),
@@ -416,7 +417,7 @@ class _DisableDialogState extends State<_DisableDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
           onPressed: _submitting ? null : _submit,
           child: _submitting
               ? const SizedBox(

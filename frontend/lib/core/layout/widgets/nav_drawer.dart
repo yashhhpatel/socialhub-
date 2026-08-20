@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/tokens/color_tokens.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/tokens/spacing_tokens.dart';
 import '../nav_menu_data.dart';
 
@@ -34,17 +34,13 @@ class NavDrawer extends StatelessWidget {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
-                      ),
+                      color: AppColors.accent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.hub_outlined,
                       size: 18,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(width: SpacingTokens.sm),
@@ -148,7 +144,7 @@ class _DrawerLink extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: color,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: FontWeight.w500,
                     fontSize: 14,
                   ),
                 ),

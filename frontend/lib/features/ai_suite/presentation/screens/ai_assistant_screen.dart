@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/domain/entities/content_asset_summary.dart';
@@ -202,9 +203,9 @@ class _Analyser extends StatelessWidget {
                 '${score!.score}',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   color: score!.score >= 70
-                      ? Colors.green.shade600
+                      ? AppColors.success
                       : score!.score >= 40
-                          ? Colors.orange.shade700
+                          ? AppColors.warning
                           : theme.colorScheme.error,
                 ),
               ),

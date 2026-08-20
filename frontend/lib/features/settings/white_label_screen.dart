@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_error_message.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/tokens/spacing_tokens.dart';
 import '../auth/presentation/state/current_user_provider.dart';
 import 'data/api_white_label_repository.dart';
@@ -187,9 +188,9 @@ class _Preview extends StatelessWidget {
                         logoUrl,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image_outlined, color: Colors.white),
+                            const Icon(Icons.broken_image_outlined, color: AppColors.textMuted),
                       )
-                    : const Icon(Icons.image_outlined, color: Colors.white),
+                    : const Icon(Icons.image_outlined, color: AppColors.textMuted),
               ),
               const SizedBox(width: SpacingTokens.md),
               FilledButton(

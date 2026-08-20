@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../ai_suite/data/repositories/api_ai_suite_repository.dart';
@@ -317,11 +318,11 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (Color fg, String label) = switch (status) {
-      ScheduledJobStatus.scheduled => (scheme.primary, 'Scheduled'),
-      ScheduledJobStatus.queued => (scheme.primary, 'Queued'),
-      ScheduledJobStatus.processing => (scheme.primary, 'Publishing'),
-      ScheduledJobStatus.published => (Colors.green.shade700, 'Published'),
-      ScheduledJobStatus.failed => (scheme.error, 'Failed'),
+      ScheduledJobStatus.scheduled => (AppColors.warning, 'Scheduled'),
+      ScheduledJobStatus.queued => (AppColors.warning, 'Queued'),
+      ScheduledJobStatus.processing => (AppColors.warning, 'Publishing'),
+      ScheduledJobStatus.published => (AppColors.success, 'Published'),
+      ScheduledJobStatus.failed => (AppColors.error, 'Failed'),
       ScheduledJobStatus.cancelled => (scheme.onSurfaceVariant, 'Cancelled'),
     };
 
@@ -336,7 +337,7 @@ class _StatusChip extends StatelessWidget {
         style: Theme.of(context)
             .textTheme
             .labelSmall
-            ?.copyWith(color: fg, fontWeight: FontWeight.w600),
+            ?.copyWith(color: fg, fontWeight: FontWeight.w500),
       ),
     );
   }

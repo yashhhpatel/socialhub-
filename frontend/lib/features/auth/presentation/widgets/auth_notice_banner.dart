@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/tokens/color_tokens.dart';
+import '../../../../core/theme/app_colors.dart';
 
 /// Success / informational counterpart to [AuthErrorBanner] (Phase 17.1),
 /// used to confirm actions like "reset link sent" or "email verified". Styled
@@ -17,22 +17,22 @@ class AuthNoticeBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: ColorTokens.brandPrimary.withOpacity(0.1),
-        border: Border.all(color: ColorTokens.brandPrimary),
+        color: AppColors.accent.withOpacity(0.1),
+        border: Border.all(color: AppColors.accent),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.check_circle_outline,
-            color: ColorTokens.brandPrimary,
+            color: AppColors.accent,
             size: 20,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: ColorTokens.brandPrimary),
+              style: const TextStyle(color: AppColors.accent),
             ),
           ),
         ],

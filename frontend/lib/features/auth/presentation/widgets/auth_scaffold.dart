@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_background.dart';
-import '../../../../core/theme/tokens/color_tokens.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 
 /// Shared chrome for the login / register screens: the decorative lavender
@@ -37,13 +37,6 @@ class AuthScaffold extends StatelessWidget {
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: theme.dividerColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ColorTokens.brandPrimary.withOpacity(0.10),
-                      blurRadius: 40,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -87,21 +80,14 @@ class _BrandMark extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [ColorTokens.brandPrimary, ColorTokens.blobPink],
-          ),
+          color: AppColors.accent,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: ColorTokens.brandPrimary.withOpacity(0.4),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
-        child: const Icon(Icons.hub_outlined, color: Colors.white, size: 28),
+        child: const Icon(
+          Icons.hub_outlined,
+          color: AppColors.textPrimary,
+          size: 28,
+        ),
       ),
     );
   }
