@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AccountService } from './account.service';
+import { AuthThrottleService } from './auth-throttle.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly accountService: AccountService,
+    private readonly throttle: AuthThrottleService,
   ) {}
 
   async register(params: {
@@ -88,13 +90,22 @@ export class AuthService {
   async login(params: {
     email: string;
     password: string;
+    /** Caller IP, for brute-force throttling (Phase 17.2). '' disables it. */
+    ip?: string;
   }): Promise<AuthResponseDto> {
+    const ip = params.ip ?? '';
+
+    // Refuse before touching credentials if this email or IP is already locked
+    // out — a 429, not the generic 401, so a client can back off correctly.
+    if (ip) await this.throttle.assertLoginAllowed(params.email, ip);
+
     const user = await this.usersService.findByEmail(params.email);
 
     // Deliberately generic message and constant code path whether the
     // user exists or the password is wrong — never reveal which, per
     // docs/api/SocialHub_REST_API_Design.md.
     if (!user) {
+      if (ip) await this.throttle.recordLoginFailure(params.email, ip);
       throw new UnauthorizedException('Invalid email or password.');
     }
 
@@ -103,8 +114,13 @@ export class AuthService {
       user.passwordHash,
     );
     if (!passwordMatches) {
+      if (ip) await this.throttle.recordLoginFailure(params.email, ip);
       throw new UnauthorizedException('Invalid email or password.');
     }
+
+    // Clean slate on success so a legitimate user's earlier fumbles don't
+    // count against a later session.
+    if (ip) await this.throttle.recordLoginSuccess(user.email);
 
     return this.issueTokenPair(user.id, user.email, user.role, user.orgId);
   }

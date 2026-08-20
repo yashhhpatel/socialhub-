@@ -29,6 +29,11 @@ import { RATE_LIMIT_REDIS } from './rate-limit.tokens';
     },
     { provide: APP_GUARD, useClass: OrgRateLimitGuard },
   ],
+  // Exported so other modules (e.g. AuthModule's brute-force throttle, Phase
+  // 17.2) can share this same dedicated Redis client rather than opening
+  // another connection. Importing this module reuses the singleton, so the
+  // APP_GUARD above still registers exactly once.
+  exports: [RATE_LIMIT_REDIS],
 })
 export class RateLimitModule implements OnModuleDestroy {
   constructor(@Inject(RATE_LIMIT_REDIS) private readonly redis: Redis) {}

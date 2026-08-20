@@ -5,10 +5,12 @@ import { PassportModule } from '@nestjs/passport';
 import type { SignOptions } from 'jsonwebtoken';
 
 import { EmailModule } from '../common/email/email.module';
+import { RateLimitModule } from '../common/rate-limit/rate-limit.module';
 import { UsersModule } from '../users/users.module';
 import { AccountService } from './account.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuthThrottleService } from './auth-throttle.service';
 import { SsoController } from './sso/sso.controller';
 import { SsoService } from './sso/sso.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -17,6 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     UsersModule,
     EmailModule,
+    RateLimitModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -38,6 +41,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController, SsoController],
-  providers: [AuthService, AccountService, JwtStrategy, SsoService],
+  providers: [
+    AuthService,
+    AccountService,
+    AuthThrottleService,
+    JwtStrategy,
+    SsoService,
+  ],
 })
 export class AuthModule {}

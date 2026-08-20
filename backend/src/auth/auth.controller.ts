@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Ip,
   Post,
   Req,
   UseGuards,
@@ -11,6 +12,7 @@ import { Request } from 'express';
 
 import { AccountService } from './account.service';
 import { AuthService } from './auth.service';
+import { AuthThrottleService } from './auth-throttle.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -30,6 +32,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly accountService: AccountService,
+    private readonly throttle: AuthThrottleService,
   ) {}
 
   @Post('register')
@@ -39,8 +42,8 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Ip() ip: string): Promise<AuthResponseDto> {
+    return this.authService.login({ ...dto, ip });
   }
 
   @HttpCode(HttpStatus.OK)
@@ -87,7 +90,11 @@ export class AuthController {
   @Post('password-reset/request')
   async requestPasswordReset(
     @Body() dto: RequestPasswordResetDto,
+    @Ip() ip: string,
   ): Promise<{ message: string }> {
+    // Per-IP flood guard so this public, email-sending endpoint can't be used
+    // to mail-bomb an address. Throws 429 past the allowance.
+    if (ip) await this.throttle.assertNotFlooding(ip, 'password-reset');
     await this.accountService.requestPasswordReset(dto.email);
     return {
       message:
