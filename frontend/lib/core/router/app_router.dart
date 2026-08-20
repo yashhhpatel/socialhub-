@@ -5,6 +5,7 @@ import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/mfa_challenge_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_screen.dart';
@@ -94,6 +95,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      // Second step of an MFA login (Phase 17.3). Standalone auth screen; the
+      // challenge token lives in AuthController state, so a direct visit with
+      // no pending challenge bounces itself back to /login.
+      GoRoute(
+        path: '/mfa-challenge',
+        name: 'mfa-challenge',
+        builder: (context, state) => const MfaChallengeScreen(),
       ),
       GoRoute(
         path: '/reset-password',

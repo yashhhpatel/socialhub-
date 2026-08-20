@@ -100,6 +100,17 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthResult> verifyMfa({
+    required String challengeToken,
+    required String code,
+  }) async {
+    // The mock never issues an MFA challenge, so verification isn't reachable
+    // in normal use; kept complete so this remains a valid AuthRepository.
+    await Future<void>.delayed(_simulatedLatency);
+    return AuthResult.failure('MFA is not supported by the mock repository.');
+  }
+
+  @override
   Future<void> logout(String refreshToken) async {
     // No-op: the mock doesn't track live refresh-token validity state the
     // way the real backend's refresh_token table does, so there's nothing

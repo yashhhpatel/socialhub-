@@ -11,7 +11,7 @@ import 'package:socialhub/features/collaboration/presentation/widgets/approval_b
 import 'package:socialhub/features/collaboration/presentation/widgets/comments_drawer.dart';
 
 CurrentUser _user(AppRole role) =>
-    CurrentUser(id: 'u1', email: 'me@ex.com', role: role, orgId: 'org_1', emailVerified: true);
+    CurrentUser(id: 'u1', email: 'me@ex.com', role: role, orgId: 'org_1', emailVerified: true, mfaEnabled: false);
 
 Comment _comment(String body) => Comment(
       id: body,

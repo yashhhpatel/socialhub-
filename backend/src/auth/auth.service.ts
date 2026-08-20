@@ -14,7 +14,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AccountService } from './account.service';
 import { AuthThrottleService } from './auth-throttle.service';
+import { MfaService } from './mfa.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { MfaChallengeResponseDto } from './dto/mfa-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const BCRYPT_SALT_ROUNDS = 12;
@@ -31,6 +33,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly accountService: AccountService,
     private readonly throttle: AuthThrottleService,
+    private readonly mfaService: MfaService,
   ) {}
 
   async register(params: {
@@ -92,7 +95,7 @@ export class AuthService {
     password: string;
     /** Caller IP, for brute-force throttling (Phase 17.2). '' disables it. */
     ip?: string;
-  }): Promise<AuthResponseDto> {
+  }): Promise<AuthResponseDto | MfaChallengeResponseDto> {
     const ip = params.ip ?? '';
 
     // Refuse before touching credentials if this email or IP is already locked
@@ -118,10 +121,38 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    // Password is correct. If MFA is on, DON'T issue a session yet and DON'T
+    // clear the throttle counter — hand back a short-lived challenge the client
+    // exchanges with a second factor at completeMfaLogin. Clearing the counter
+    // is deferred to a fully-completed login.
+    if (user.mfaEnabled) {
+      return {
+        mfaRequired: true,
+        mfaChallengeToken: await this.mfaService.issueChallengeToken(user.id),
+      };
+    }
+
     // Clean slate on success so a legitimate user's earlier fumbles don't
     // count against a later session.
     if (ip) await this.throttle.recordLoginSuccess(user.email);
 
+    return this.issueTokenPair(user.id, user.email, user.role, user.orgId);
+  }
+
+  /**
+   * Second step of an MFA login: verify the challenge token + code, then issue
+   * the real session (Phase 17.3). Kept here (not in MfaService) so token
+   * issuance stays in one place.
+   */
+  async completeMfaLogin(
+    challengeToken: string,
+    code: string,
+  ): Promise<AuthResponseDto> {
+    const userId = await this.mfaService.verifyChallenge(challengeToken, code);
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException();
+    // Full login now complete — clear any lingering failure counter.
+    await this.throttle.recordLoginSuccess(user.email);
     return this.issueTokenPair(user.id, user.email, user.role, user.orgId);
   }
 

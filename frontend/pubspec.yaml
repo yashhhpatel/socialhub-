@@ -24,6 +24,10 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # QR rendering for TOTP MFA enrollment (Phase 17.3): turns the otpauth://
+  # URI into a scannable code. Pure-Dart, no native/platform channels.
+  qr_flutter: ^4.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

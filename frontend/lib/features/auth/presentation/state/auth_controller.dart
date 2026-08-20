@@ -67,8 +67,41 @@ class AuthController extends StateNotifier<AuthState> {
     if (result.isSuccess) {
       _storeTokens(result.session!);
       state = AuthState.authenticated(result.session!);
+    } else if (result.isMfaRequired) {
+      // Hold the challenge token in state; the MFA screen reads it and calls
+      // verifyMfa. No tokens are stored until the second factor passes.
+      state = AuthState.mfaRequired(result.mfaChallengeToken!);
     } else {
       state = AuthState.error(result.errorMessage!);
+    }
+  }
+
+  /// Second step of an MFA login (Phase 17.3): submit a TOTP/recovery code
+  /// against the pending challenge. Returns null on success, or an error
+  /// message the screen shows. A missing/expired challenge sends the user back
+  /// to a clean signed-out state.
+  Future<String?> verifyMfa(String code) async {
+    final challengeToken = state.mfaChallengeToken;
+    if (challengeToken == null) {
+      state = const AuthState.unauthenticated();
+      return 'Your login session expired. Please sign in again.';
+    }
+
+    final result =
+        await _repository.verifyMfa(challengeToken: challengeToken, code: code);
+
+    if (result.isSuccess) {
+      _storeTokens(result.session!);
+      state = AuthState.authenticated(result.session!);
+      return null;
+    }
+    return result.errorMessage ?? 'That code is incorrect. Try again.';
+  }
+
+  /// Abandon a pending MFA challenge (user backs out) — return to signed-out.
+  void cancelMfa() {
+    if (state.status == AuthStatus.mfaRequired) {
+      state = const AuthState.unauthenticated();
     }
   }
 
