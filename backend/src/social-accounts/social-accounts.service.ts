@@ -7,6 +7,7 @@ import {
 import { Platform, SocialAccount } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
+import { PlanLimitsService } from '../billing/plan-limits.service';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { generatePkcePair } from '../common/crypto/pkce.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,6 +49,7 @@ export class SocialAccountsService {
     private readonly facebookAdapter: FacebookAdapter,
     private readonly threadsAdapter: ThreadsAdapter,
     private readonly linkedinAdapter: LinkedInAdapter,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   // --- Instagram ---
@@ -244,6 +246,23 @@ export class SocialAccountsService {
       expiresAt?: Date;
     },
   ): Promise<SocialAccount> {
+    // Plan-gating (Phase 18): a NEW connection must fit the plan's account
+    // cap. Reconnecting an already-connected account (same platform + external
+    // id) is an update, so it's always allowed even at the limit.
+    const existing = await this.prisma.socialAccount.findUnique({
+      where: {
+        orgId_platform_externalAccountId: {
+          orgId,
+          platform,
+          externalAccountId: result.externalAccountId,
+        },
+      },
+      select: { id: true },
+    });
+    if (!existing) {
+      await this.planLimits.assertCanConnectSocialAccount(orgId);
+    }
+
     const fields = {
       externalUserId: result.externalUserId ?? null,
       accessTokenEnc: this.tokenEncryption.encrypt(result.accessToken),

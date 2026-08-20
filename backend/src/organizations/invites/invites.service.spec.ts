@@ -47,7 +47,12 @@ describe('InvitesService', () => {
     email = { sendInvite: jest.fn().mockResolvedValue(undefined) };
     const config = { get: jest.fn().mockReturnValue(undefined) };
 
-    service = new InvitesService(prisma as never, email as never, config as never);
+    service = new InvitesService(
+      prisma as never,
+      email as never,
+      config as never,
+      { assertCanAddTeamMember: jest.fn().mockResolvedValue(undefined) } as never,
+    );
   });
 
   describe('create', () => {

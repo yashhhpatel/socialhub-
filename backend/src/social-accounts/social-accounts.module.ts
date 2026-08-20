@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { BillingModule } from '../billing/billing.module';
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
@@ -10,6 +11,7 @@ import { SocialAccountsController } from './social-accounts.controller';
 import { SocialAccountsService } from './social-accounts.service';
 
 @Module({
+  imports: [BillingModule],
   controllers: [SocialAccountsController],
   providers: [
     SocialAccountsService,

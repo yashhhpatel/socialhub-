@@ -125,9 +125,66 @@ model Organization {
   templates        Template[]
   invites          Invite[]
   ssoConfig        SsoConfig?
+  subscription     Subscription?
+  invoices         Invoice[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
+}
+
+/// Billing subscription for an organization (Phase 18). One per org. The
+/// Stripe ids are null until the org starts a paid subscription; a free org
+/// simply has no Stripe customer/subscription yet. `planTier` here mirrors
+/// Organization.planTier — the org column stays the fast read used for
+/// plan-gating, while this row holds the billing detail Stripe owns.
+model Subscription {
+  id                   String             @id @default(uuid())
+  orgId                String             @unique
+  organization         Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  planTier             PlanTier           @default(free)
+  status               SubscriptionStatus @default(none)
+  /// End of the current paid period; drives "renews on"/"access until".
+  currentPeriodEnd     DateTime?
+  /// True when the user has cancelled but access runs to currentPeriodEnd.
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("subscription")
+}
+
+/// A Stripe invoice mirrored locally (Phase 18) so the billing page can show
+/// history without a live Stripe round-trip. Amounts are in the currency's
+/// minor unit (cents), as Stripe reports them.
+model Invoice {
+  id              String        @id @default(uuid())
+  orgId           String
+  organization    Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  stripeInvoiceId String        @unique
+  amountDue       Int
+  amountPaid      Int           @default(0)
+  currency        String        @default("usd")
+  status          String
+  hostedInvoiceUrl String?
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("invoice")
+}
+
+/// Stripe subscription lifecycle, mapped to the states we act on. `none` is a
+/// free org that has never subscribed; `pastDue` drives the dunning banner.
+enum SubscriptionStatus {
+  none
+  trialing
+  active
+  pastDue
+  canceled
+  incomplete
 }
 
 /// SAML SSO configuration for an enterprise org (Milestone 15.1). One per

@@ -7,7 +7,10 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './common/observability/sentry';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody enables req.rawBody for the Stripe webhook, whose signature is
+  // computed over the exact raw payload (Phase 18). JSON parsing still applies
+  // to every other route.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const configService = app.get(ConfigService);
 
