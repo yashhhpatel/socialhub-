@@ -8,12 +8,19 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AccountService } from './account.service';
+import { AuthThrottleService } from './auth-throttle.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
   let usersService: jest.Mocked<Pick<UsersService, 'findByEmail'>>;
   let accountService: jest.Mocked<Pick<AccountService, 'sendVerificationEmail'>>;
+  let throttle: jest.Mocked<
+    Pick<
+      AuthThrottleService,
+      'assertLoginAllowed' | 'recordLoginFailure' | 'recordLoginSuccess'
+    >
+  >;
   let prisma: {
     $transaction: jest.Mock;
     refreshToken: {
@@ -32,6 +39,11 @@ describe('AuthService', () => {
     };
     accountService = {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    throttle = {
+      assertLoginAllowed: jest.fn().mockResolvedValue(undefined),
+      recordLoginFailure: jest.fn().mockResolvedValue(undefined),
+      recordLoginSuccess: jest.fn().mockResolvedValue(undefined),
     };
 
     txOrganizationCreate = jest.fn();
@@ -67,6 +79,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: usersService },
         { provide: PrismaService, useValue: prisma },
         { provide: AccountService, useValue: accountService },
+        { provide: AuthThrottleService, useValue: throttle },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(30) },
@@ -234,6 +247,107 @@ describe('AuthService', () => {
       await expect(
         authService.login({ email: 'jane@example.com', password: 'WrongPassword1!' }),
       ).rejects.toThrow('Invalid email or password.');
+    });
+
+    it('records a throttle failure (email + ip) on a wrong password when an ip is given', async () => {
+      const passwordHash = await bcrypt.hash('Test1234!', 12);
+      usersService.findByEmail.mockResolvedValue({
+        id: 'usr_1',
+        email: 'jane@example.com',
+        passwordHash,
+        role: UserRole.owner,
+        orgId: 'org_1',
+        emailVerifiedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await expect(
+        authService.login({
+          email: 'jane@example.com',
+          password: 'WrongPassword1!',
+          ip: '203.0.113.7',
+        }),
+      ).rejects.toThrow('Invalid email or password.');
+
+      expect(throttle.assertLoginAllowed).toHaveBeenCalledWith(
+        'jane@example.com',
+        '203.0.113.7',
+      );
+      expect(throttle.recordLoginFailure).toHaveBeenCalledWith(
+        'jane@example.com',
+        '203.0.113.7',
+      );
+      expect(throttle.recordLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('records a throttle failure for an unknown email too (credential stuffing)', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        authService.login({
+          email: 'ghost@example.com',
+          password: 'whatever1!',
+          ip: '203.0.113.7',
+        }),
+      ).rejects.toThrow('Invalid email or password.');
+
+      expect(throttle.recordLoginFailure).toHaveBeenCalledWith(
+        'ghost@example.com',
+        '203.0.113.7',
+      );
+    });
+
+    it('clears the email throttle counter on a successful login', async () => {
+      const passwordHash = await bcrypt.hash('Test1234!', 12);
+      usersService.findByEmail.mockResolvedValue({
+        id: 'usr_1',
+        email: 'jane@example.com',
+        passwordHash,
+        role: UserRole.owner,
+        orgId: 'org_1',
+        emailVerifiedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.login({
+        email: 'jane@example.com',
+        password: 'Test1234!',
+        ip: '203.0.113.7',
+      });
+
+      expect(throttle.recordLoginSuccess).toHaveBeenCalledWith('jane@example.com');
+      expect(throttle.recordLoginFailure).not.toHaveBeenCalled();
+    });
+
+    it('propagates the 429 when the throttle says the caller is locked out', async () => {
+      throttle.assertLoginAllowed.mockRejectedValue(
+        new Error('Too many attempts.'),
+      );
+
+      await expect(
+        authService.login({
+          email: 'jane@example.com',
+          password: 'Test1234!',
+          ip: '203.0.113.7',
+        }),
+      ).rejects.toThrow('Too many attempts.');
+
+      // Locked out before credentials are ever checked.
+      expect(usersService.findByEmail).not.toHaveBeenCalled();
+    });
+
+    it('skips throttling entirely when no ip is supplied', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        authService.login({ email: 'ghost@example.com', password: 'x1!' }),
+      ).rejects.toThrow('Invalid email or password.');
+
+      expect(throttle.assertLoginAllowed).not.toHaveBeenCalled();
+      expect(throttle.recordLoginFailure).not.toHaveBeenCalled();
     });
   });
 

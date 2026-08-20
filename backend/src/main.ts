@@ -9,14 +9,20 @@ import { initSentry } from './common/observability/sentry';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Flutter Web (dev server on its own port) calls this API from a
-  // different origin, so the browser enforces CORS. Permissive for now
-  // (reflects any origin) since there's no deployed environment yet to
-  // scope this to specific domains — tightening this per-environment is
-  // exactly the kind of thing the Phase 6 hardening pass exists for, not
-  // something to guess at prematurely here.
+  const configService = app.get(ConfigService);
+
+  // Flutter Web (dev server on its own port) calls this API from a different
+  // origin, so the browser enforces CORS. In production, set CORS_ORIGINS to a
+  // comma-separated allowlist (e.g. "https://app.socialhub.com") and only those
+  // origins are reflected — the credentialed, wildcard-reflect default below is
+  // for local dev, where there's no fixed frontend origin to pin to (Phase
+  // 17.2 hardening).
+  const corsOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
   app.enableCors({
-    origin: true,
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
   });
 
@@ -39,8 +45,6 @@ async function bootstrap() {
   // be registered after the ValidationPipe so validation's own
   // BadRequestException flows through it too.
   app.useGlobalFilters(new AllExceptionsFilter());
-
-  const configService = app.get(ConfigService);
 
   // Error monitoring (Milestone 6.3). Initialised before the server starts
   // listening so nothing is served un-monitored. No-op without a SENTRY_DSN.
