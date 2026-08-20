@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/motion_page_transitions.dart';
 import 'tokens/color_tokens.dart';
 import 'tokens/typography_tokens.dart';
 
@@ -48,6 +49,8 @@ ThemeData _buildLightTheme() {
     canvasColor: ColorTokens.white,
     colorScheme: colorScheme,
     textTheme: textTheme,
+    // App-wide fade + 12px upward slide page transitions (motion layer).
+    pageTransitionsTheme: kMotionPageTransitionsTheme,
     dividerColor: ColorTokens.lavenderBorder,
     dividerTheme: const DividerThemeData(
       color: ColorTokens.lavenderBorder,

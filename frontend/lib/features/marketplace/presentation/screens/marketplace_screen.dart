@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/staggered_item.dart';
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -110,10 +113,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           ),
           const SizedBox(height: SpacingTokens.lg),
           resultsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () => const _MarketplaceSkeletonGrid(),
             error: (error, _) => isUnauthorized(error)
                 ? const SignInRequired(
                     message: 'Log in to browse the community marketplace.',
@@ -133,15 +133,46 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                   mainAxisSpacing: SpacingTokens.md,
                 ),
                 itemCount: results.length,
-                itemBuilder: (context, i) => _MarketplaceCard(
-                  template: results[i],
-                  cloning: _cloningId == results[i].id,
-                  onClone: () => _clone(results[i]),
+                itemBuilder: (context, i) => StaggeredItem(
+                  index: i,
+                  child: TapScale(
+                    hoverElevation: true,
+                    borderRadius: BorderRadius.circular(12),
+                    child: _MarketplaceCard(
+                      template: results[i],
+                      cloning: _cloningId == results[i].id,
+                      onClone: () => _clone(results[i]),
+                    ),
+                  ),
                 ),
               );
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shimmer grid shown while marketplace results load.
+class _MarketplaceSkeletonGrid extends StatelessWidget {
+  const _MarketplaceSkeletonGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 260,
+        mainAxisExtent: 230,
+        crossAxisSpacing: SpacingTokens.md,
+        mainAxisSpacing: SpacingTokens.md,
+      ),
+      itemCount: 3,
+      itemBuilder: (context, index) => Skeleton(
+        height: double.infinity,
+        borderRadius: BorderRadius.circular(14),
       ),
     );
   }

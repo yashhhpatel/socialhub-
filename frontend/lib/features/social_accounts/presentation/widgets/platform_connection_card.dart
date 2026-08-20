@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -38,50 +39,58 @@ class PlatformConnectionCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isConnected = account != null;
 
-    return Container(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+    return TapScale(
+      hoverElevation: true,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outline.withOpacity(0.15)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(_icon, color: colorScheme.primary),
             ),
-            child: Icon(_icon, color: colorScheme.primary),
-          ),
-          const SizedBox(width: SpacingTokens.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(platform.label, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 2),
-                Text(
-                  isConnected
-                      ? 'Connected · ${account!.externalAccountId}'
-                      : platform.isConnectable
-                          ? 'Not connected'
-                          : 'Coming soon',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isConnected
-                        ? Colors.greenAccent.shade400
-                        : colorScheme.onSurface.withOpacity(0.55),
-                    fontWeight: isConnected ? FontWeight.w600 : FontWeight.w400,
+            const SizedBox(width: SpacingTokens.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    platform.label,
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    isConnected
+                        ? 'Connected · ${account!.externalAccountId}'
+                        : platform.isConnectable
+                            ? 'Not connected'
+                            : 'Coming soon',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isConnected
+                          ? Colors.greenAccent.shade400
+                          : colorScheme.onSurface.withOpacity(0.55),
+                      fontWeight:
+                          isConnected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          _buildAction(context, isConnected),
-        ],
+            _buildAction(context, isConnected),
+          ],
+        ),
       ),
     );
   }
@@ -111,7 +120,10 @@ class PlatformConnectionCard extends StatelessWidget {
           ? const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
           : const Text('Connect'),
     );

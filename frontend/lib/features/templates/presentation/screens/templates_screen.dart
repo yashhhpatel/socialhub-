@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/staggered_item.dart';
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -80,10 +83,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
           ),
           const SizedBox(height: SpacingTokens.lg),
           templatesAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () => const _TemplatesSkeletonGrid(),
             error: (error, _) => isUnauthorized(error)
                 ? const SignInRequired(message: 'Log in to browse and use templates.')
                 : Center(
@@ -101,16 +101,47 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                   mainAxisSpacing: SpacingTokens.md,
                 ),
                 itemCount: templates.length,
-                itemBuilder: (context, i) => _TemplateCard(
-                  template: templates[i],
-                  starting: _startingId == templates[i].id,
-                  onUse: () => _startFrom(templates[i]),
-                  onPublish: () => _publish(templates[i]),
+                itemBuilder: (context, i) => StaggeredItem(
+                  index: i,
+                  child: TapScale(
+                    hoverElevation: true,
+                    borderRadius: BorderRadius.circular(12),
+                    child: _TemplateCard(
+                      template: templates[i],
+                      starting: _startingId == templates[i].id,
+                      onUse: () => _startFrom(templates[i]),
+                      onPublish: () => _publish(templates[i]),
+                    ),
+                  ),
                 ),
               );
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shimmer grid shown while templates load.
+class _TemplatesSkeletonGrid extends StatelessWidget {
+  const _TemplatesSkeletonGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 260,
+        mainAxisExtent: 220,
+        crossAxisSpacing: SpacingTokens.md,
+        mainAxisSpacing: SpacingTokens.md,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Skeleton(
+        height: double.infinity,
+        borderRadius: BorderRadius.circular(14),
       ),
     );
   }

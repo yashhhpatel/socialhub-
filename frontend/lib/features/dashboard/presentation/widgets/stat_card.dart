@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 
 /// One reusable card, parameterized, rather than 5 near-duplicate widgets
@@ -27,14 +28,17 @@ class StatCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final accent = accentColor ?? colorScheme.primary;
 
-    return Container(
-      padding: const EdgeInsets.all(SpacingTokens.lg),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.15)),
-      ),
-      child: Column(
+    return TapScale(
+      hoverElevation: true,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(SpacingTokens.lg),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outline.withOpacity(0.15)),
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -69,6 +73,7 @@ class StatCard extends StatelessWidget {
             ),
           ],
         ],
+        ),
       ),
     );
   }

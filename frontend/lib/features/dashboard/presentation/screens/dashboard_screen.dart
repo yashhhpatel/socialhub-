@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/theme/breakpoints.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/dashboard_mock_data.dart';
@@ -48,33 +49,49 @@ class DashboardScreen extends ConsumerWidget {
             mainAxisSpacing: SpacingTokens.md,
             childAspectRatio: 1.5,
             children: [
-              StatCard(
-                icon: Icons.schedule,
-                label: 'Scheduled Posts',
-                value: '${summary.scheduledPosts}',
+              StaggeredItem(
+                index: 0,
+                child: StatCard(
+                  icon: Icons.schedule,
+                  label: 'Scheduled Posts',
+                  value: '${summary.scheduledPosts}',
+                ),
               ),
-              StatCard(
-                icon: Icons.check_circle_outline,
-                label: 'Published Posts',
-                value: '${summary.publishedPosts}',
+              StaggeredItem(
+                index: 1,
+                child: StatCard(
+                  icon: Icons.check_circle_outline,
+                  label: 'Published Posts',
+                  value: '${summary.publishedPosts}',
+                ),
               ),
-              StatCard(
-                icon: Icons.edit_outlined,
-                label: 'Drafts',
-                value: '${summary.drafts}',
+              StaggeredItem(
+                index: 2,
+                child: StatCard(
+                  icon: Icons.edit_outlined,
+                  label: 'Drafts',
+                  value: '${summary.drafts}',
+                ),
               ),
-              StatCard(
-                icon: Icons.link,
-                label: 'Connected Accounts',
-                value: '${summary.connectedAccounts}',
-                subtitle: 'Manage in Settings',
+              StaggeredItem(
+                index: 3,
+                child: StatCard(
+                  icon: Icons.link,
+                  label: 'Connected Accounts',
+                  value: '${summary.connectedAccounts}',
+                  subtitle: 'Manage in Settings',
+                ),
               ),
-              StatCard(
-                icon: Icons.auto_awesome_outlined,
-                label: 'AI Credits',
-                value: '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
-                subtitle:
-                    '${(summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
+              StaggeredItem(
+                index: 4,
+                child: StatCard(
+                  icon: Icons.auto_awesome_outlined,
+                  label: 'AI Credits',
+                  value:
+                      '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
+                  subtitle:
+                      '${(summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
+                ),
               ),
             ],
           ),

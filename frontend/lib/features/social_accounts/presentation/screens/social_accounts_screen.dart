@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -133,9 +135,17 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
           ),
           const SizedBox(height: SpacingTokens.md),
           accountsState.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
+            loading: () => Column(
+              children: [
+                for (var i = 0; i < 3; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                    child: Skeleton(
+                      height: 72,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+              ],
             ),
             error: (error, _) => isUnauthorized(error)
                 ? const SignInRequired(
@@ -148,18 +158,25 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
                   ),
             data: (accounts) => Column(
               children: [
-                for (final platform in SocialPlatform.values) ...[
-                  PlatformConnectionCard(
-                    platform: platform,
-                    account: _accountFor(accounts, platform),
-                    isConnecting: _connectingPlatform == platform,
-                    isDisconnecting: _disconnectingAccountId ==
-                        _accountFor(accounts, platform)?.id,
-                    onConnect: () => _handleConnect(platform),
-                    onDisconnect: () {
-                      final account = _accountFor(accounts, platform);
-                      if (account != null) _handleDisconnect(account);
-                    },
+                for (var i = 0; i < SocialPlatform.values.length; i++) ...[
+                  StaggeredItem(
+                    index: i,
+                    child: PlatformConnectionCard(
+                      platform: SocialPlatform.values[i],
+                      account:
+                          _accountFor(accounts, SocialPlatform.values[i]),
+                      isConnecting:
+                          _connectingPlatform == SocialPlatform.values[i],
+                      isDisconnecting: _disconnectingAccountId ==
+                          _accountFor(accounts, SocialPlatform.values[i])?.id,
+                      onConnect: () =>
+                          _handleConnect(SocialPlatform.values[i]),
+                      onDisconnect: () {
+                        final account =
+                            _accountFor(accounts, SocialPlatform.values[i]);
+                        if (account != null) _handleDisconnect(account);
+                      },
+                    ),
                   ),
                   const SizedBox(height: SpacingTokens.sm),
                 ],
