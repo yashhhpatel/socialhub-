@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/network/auth_token_store.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/state/templates_controller.dart';
@@ -35,6 +37,14 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   }
 
   void _applySearch() {
+    // Browsing the marketplace needs an account (results come from an
+    // authenticated endpoint). Keep the Search button clickable while logged
+    // out, but route to login on click instead of silently returning nothing.
+    if (ref.read(authTokenStoreProvider) == null) {
+      final from = GoRouterState.of(context).uri.toString();
+      context.go('/login?from=${Uri.encodeComponent(from)}');
+      return;
+    }
     setState(() {
       _query = MarketplaceQuery(
         search: _searchController.text.trim(),

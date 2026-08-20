@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:socialhub/core/network/auth_token_store.dart';
 import 'package:socialhub/features/marketplace/data/repositories/api_marketplace_repository.dart';
 import 'package:socialhub/features/marketplace/presentation/screens/marketplace_screen.dart';
 import 'package:socialhub/features/templates/domain/entities/template.dart';
@@ -31,7 +32,13 @@ class _FakeMarketplaceRepo extends ApiMarketplaceRepository {
 Future<void> _pump(WidgetTester tester, _FakeMarketplaceRepo repo) {
   return tester.pumpWidget(
     ProviderScope(
-      overrides: [marketplaceRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        marketplaceRepositoryProvider.overrideWithValue(repo),
+        // Signed in: Search runs the query (logged out it would route to login).
+        authTokenStoreProvider.overrideWith(
+          (ref) => const AuthTokens(accessToken: 'a', refreshToken: 'r'),
+        ),
+      ],
       child: const MaterialApp(home: Scaffold(body: MarketplaceScreen())),
     ),
   );
