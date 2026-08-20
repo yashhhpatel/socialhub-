@@ -5,17 +5,11 @@ import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-/// A file the user chose in the browser: raw bytes + its name and MIME type.
-class PickedFile {
-  const PickedFile({required this.bytes, required this.name, required this.mimeType});
-
-  final Uint8List bytes;
-  final String name;
-  final String mimeType;
-}
+import 'picked_file.dart';
 
 /// Opens the browser file chooser (images and videos) and returns the chosen
-/// file's bytes, or null if the user cancels. Web only.
+/// file's bytes, or null if the user cancels. Web implementation, selected via
+/// the conditional import in file_picker.dart.
 Future<PickedFile?> pickImageOrVideo() async {
   final input = html.FileUploadInputElement()
     ..accept = 'image/*,video/*'

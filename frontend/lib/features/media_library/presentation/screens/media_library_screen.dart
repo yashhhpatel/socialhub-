@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/network/auth_token_store.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_media_repository.dart';
-import '../../data/web_file_picker.dart';
+import '../../data/file_picker.dart';
 
 /// Media library — upload images/videos and get a hosted URL to reuse in a
 /// design, brand kit logo, or white-label branding.
@@ -25,9 +27,17 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
   bool _uploading = false;
 
   Future<void> _pickAndUpload() async {
+    // Uploading needs an account (it hits an authenticated endpoint). Keep the
+    // Upload button clickable while logged out, but route to login on click —
+    // don't open the file picker — matching Marketplace Search's gating.
+    if (ref.read(authTokenStoreProvider) == null) {
+      final from = GoRouterState.of(context).uri.toString();
+      context.go('/login?from=${Uri.encodeComponent(from)}');
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final picked = await pickImageOrVideo();
+      final picked = await ref.read(filePickerProvider)();
       if (picked == null) return; // cancelled
       setState(() => _uploading = true);
       final result = await ref.read(mediaRepositoryProvider).upload(
