@@ -71,8 +71,19 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-                child:
-                    isMobile ? _buildMobile(context) : _buildDesktop(context),
+                // Cap the header content to a centred max width (matching the
+                // footer) so the brand and the right-hand controls pull inward
+                // on wide screens instead of hugging the far edges — a more
+                // compact, balanced header. Mobile widths are below this cap,
+                // so it's a no-op there.
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1120),
+                    child: isMobile
+                        ? _buildMobile(context)
+                        : _buildDesktop(context),
+                  ),
+                ),
               ),
             ),
           ),
@@ -137,7 +148,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const NotificationsIcon(),
-        const SizedBox(width: SpacingTokens.sm),
+        const SizedBox(width: SpacingTokens.xs),
         if (isAuthenticated)
           UserProfileMenu(
             email: userEmail,
