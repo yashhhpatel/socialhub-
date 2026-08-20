@@ -5,7 +5,6 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/state/templates_controller.dart';
@@ -114,10 +113,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           const SizedBox(height: SpacingTokens.lg),
           resultsAsync.when(
             loading: () => const _MarketplaceSkeletonGrid(),
+            // Logged out: show the normal empty state (browsable); cloning a
+            // template routes to login.
             error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(
-                    message: 'Log in to browse the community marketplace.',
-                  )
+                ? const _EmptyMarketplace()
                 : Center(
                     child: Text('Could not load the marketplace: ${describeApiError(error)}'),
                   ),

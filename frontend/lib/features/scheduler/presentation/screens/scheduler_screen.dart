@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../ai_suite/data/repositories/api_ai_suite_repository.dart';
 import '../../domain/entities/scheduled_job.dart';
@@ -88,8 +87,9 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
               padding: EdgeInsets.all(SpacingTokens.xl),
               child: Center(child: CircularProgressIndicator()),
             ),
+            // Logged out: show the normal empty calendar (browsable).
             error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(message: 'Log in to view your calendar.')
+                ? const _EmptyCalendar()
                 : _SchedulerError(
                     message: describeApiError(error),
                     onRetry: () => ref.invalidate(schedulerJobsProvider),

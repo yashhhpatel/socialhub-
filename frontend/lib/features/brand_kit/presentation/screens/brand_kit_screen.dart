@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_brand_kit_repository.dart';
 import '../../domain/entities/brand_kit.dart';
@@ -81,10 +80,10 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: kitAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
+        // Logged out: show the page header + a browsable note (editing gates
+        // on save), not a blocking wall.
         error: (error, _) => isUnauthorized(error)
-            ? const SignInRequired(
-                message: 'Log in to view and edit your brand kit.',
-              )
+            ? const _BrandKitLoggedOut()
             : Center(
                 child: Text('Could not load your brand kit: ${describeApiError(error)}'),
               ),
@@ -165,6 +164,35 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Browsable Brand Kit page for a logged-out visitor: the header plus a short,
+/// left-aligned note — no blocking wall.
+class _BrandKitLoggedOut extends StatelessWidget {
+  const _BrandKitLoggedOut();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Brand Kit', style: theme.textTheme.headlineMedium),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          'Your colours, fonts and logo — apply them to any design from the editor.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        Text(
+          'Log in to view and edit your brand kit.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

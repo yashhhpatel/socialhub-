@@ -48,10 +48,9 @@ class MfaSettingsCard extends ConsumerWidget {
           const SizedBox(height: SpacingTokens.md),
           userAsync.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, __) => Text(
-              'Sign in to manage two-factor authentication.',
-              style: theme.textTheme.bodyMedium,
-            ),
+            // Logged out: still show the Enable affordance — tapping it starts
+            // setup, which 401s and routes to login. No blocking wall here.
+            error: (_, __) => _DisabledRow(onEnable: () => _enableFlow(context, ref)),
             data: (user) => user.mfaEnabled
                 ? _EnabledRow(onDisable: () => _disableFlow(context, ref))
                 : _DisabledRow(onEnable: () => _enableFlow(context, ref)),

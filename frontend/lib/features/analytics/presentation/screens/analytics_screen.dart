@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
-import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/analytics_overview.dart';
 import '../state/analytics_controller.dart';
@@ -60,8 +59,9 @@ class AnalyticsScreen extends ConsumerWidget {
               padding: EdgeInsets.all(SpacingTokens.xl),
               child: Center(child: CircularProgressIndicator()),
             ),
+            // Logged out: show the normal empty analytics state (browsable).
             error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(message: 'Log in to view your analytics.')
+                ? const _EmptyAnalytics()
                 : _AnalyticsError(
                     message: describeApiError(error),
                     onRetry: () => ref.invalidate(analyticsOverviewProvider),

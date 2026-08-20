@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_error_message.dart';
 import '../../core/theme/tokens/spacing_tokens.dart';
-import '../../core/widgets/sign_in_required.dart';
 import '../auth/presentation/state/current_user_provider.dart';
 import 'data/api_white_label_repository.dart';
 import 'domain/white_label.dart';
@@ -80,10 +79,10 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
+        // Logged out: show the page header + a browsable, non-blocking note
+        // (branding editing itself is admin-only and gated on save).
         error: (e, _) => isUnauthorized(e)
-            ? const SignInRequired(
-                message: 'Log in as an admin to manage white-label branding.',
-              )
+            ? const _WhiteLabelLoggedOut()
             : Center(child: Text('Could not load your account: ${describeApiError(e)}')),
         data: (user) {
           if (!user.isAdmin) return const _AdminsOnly();
@@ -202,6 +201,35 @@ class _Preview extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Browsable White label page for a logged-out visitor: the page header plus a
+/// short, left-aligned note — no blocking wall.
+class _WhiteLabelLoggedOut extends StatelessWidget {
+  const _WhiteLabelLoggedOut();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('White label', style: theme.textTheme.headlineMedium),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          'Apply your own logo and brand colour across the whole workspace.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        Text(
+          'Log in as an admin to customise your branding.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
