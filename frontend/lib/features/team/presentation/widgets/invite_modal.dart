@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/app_role.dart';
+import '../../../../core/motion/motion_modal.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_team_repository.dart';
@@ -9,7 +10,8 @@ import '../../data/repositories/api_team_repository.dart';
 /// Opens the invite dialog. Returns true if an invite was sent, so the caller
 /// can refresh the pending list.
 Future<bool?> showInviteModal(BuildContext context, String orgId) {
-  return showDialog<bool>(
+  // Scale-in + fade entrance (motion layer).
+  return showMotionModal<bool>(
     context: context,
     builder: (_) => _InviteModal(orgId: orgId),
   );

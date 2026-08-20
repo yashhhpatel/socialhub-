@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/motion/motion_switcher.dart';
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/staggered_item.dart';
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../../core/widgets/sign_in_required.dart';
@@ -34,7 +38,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create design: ${describeApiError(error)}')),
+        SnackBar(
+          content: Text('Could not create design: ${describeApiError(error)}'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _creating = false);
@@ -80,21 +86,58 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          library.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
+          // Cross-fade skeleton → real content as the library loads (motion).
+          MotionSwitcher(
+            alignment: Alignment.topCenter,
+            child: library.when(
+              loading: () => const KeyedSubtree(
+                key: ValueKey('loading'),
+                child: _SkeletonGrid(),
+              ),
+              error: (error, _) => KeyedSubtree(
+                key: const ValueKey('error'),
+                child: isUnauthorized(error)
+                    ? const SignInRequired(
+                        message: 'Log in to view and create designs.',
+                      )
+                    : _LibraryError(
+                        message: describeApiError(error),
+                        onRetry: () => ref.invalidate(contentLibraryProvider),
+                      ),
+              ),
+              data: (assets) => KeyedSubtree(
+                key: const ValueKey('data'),
+                child: assets.isEmpty
+                    ? const _EmptyLibrary()
+                    : _AssetGrid(assets: assets),
+              ),
             ),
-            error: (error, _) => isUnauthorized(error)
-                ? const SignInRequired(message: 'Log in to view and create designs.')
-                : _LibraryError(
-                    message: describeApiError(error),
-                    onRetry: () => ref.invalidate(contentLibraryProvider),
-                  ),
-            data: (assets) =>
-                assets.isEmpty ? const _EmptyLibrary() : _AssetGrid(assets: assets),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shimmer placeholders shown while the library loads, matching the grid.
+class _SkeletonGrid extends StatelessWidget {
+  const _SkeletonGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 240,
+        mainAxisSpacing: SpacingTokens.md,
+        crossAxisSpacing: SpacingTokens.md,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: 8,
+      itemBuilder: (context, index) => Skeleton(
+        height: double.infinity,
+        borderRadius: BorderRadius.circular(12),
       ),
     );
   }
@@ -117,7 +160,10 @@ class _AssetGrid extends StatelessWidget {
         childAspectRatio: 0.85,
       ),
       itemCount: assets.length,
-      itemBuilder: (context, index) => _AssetCard(asset: assets[index]),
+      itemBuilder: (context, index) => StaggeredItem(
+        index: index,
+        child: _AssetCard(asset: assets[index]),
+      ),
     );
   }
 }
@@ -131,54 +177,58 @@ class _AssetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return InkWell(
-      onTap: () => context.go('/editor/${asset.id}'),
+    return TapScale(
+      hoverElevation: true,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: asset.masterImageUrl == null
-                  // No export yet — the design exists but has never been
-                  // rendered, so there is genuinely nothing to show.
-                  ? Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 32,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  : Image.network(asset.masterImageUrl!, fit: BoxFit.cover),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(SpacingTokens.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Design ${asset.id.substring(0, 8)}',
-                    style: theme.textTheme.bodyMedium,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    asset.variantCount > 0
-                        ? '${asset.variantCount} platform variant'
-                            '${asset.variantCount == 1 ? '' : 's'}'
-                        : asset.approvalStatus,
-                    style: theme.textTheme.labelSmall,
-                  ),
-                ],
+      child: InkWell(
+        onTap: () => context.go('/editor/${asset.id}'),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: asset.masterImageUrl == null
+                    // No export yet — the design exists but has never been
+                    // rendered, so there is genuinely nothing to show.
+                    ? Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 32,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    : Image.network(asset.masterImageUrl!, fit: BoxFit.cover),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(SpacingTokens.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Design ${asset.id.substring(0, 8)}',
+                      style: theme.textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      asset.variantCount > 0
+                          ? '${asset.variantCount} platform variant'
+                              '${asset.variantCount == 1 ? '' : 's'}'
+                          : asset.approvalStatus,
+                      style: theme.textTheme.labelSmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

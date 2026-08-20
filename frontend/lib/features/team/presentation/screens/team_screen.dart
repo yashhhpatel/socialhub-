@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/app_role.dart';
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/widgets/sign_in_required.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -102,15 +104,15 @@ class _TeamAdminView extends ConsumerWidget {
         const SizedBox(height: SpacingTokens.lg),
         const _SectionHeader('Members'),
         membersAsync.when(
-          loading: () => const Padding(
-            padding: EdgeInsets.all(SpacingTokens.lg),
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          loading: () => const _RosterSkeleton(),
           error: (e, _) => Text('Could not load members: ${describeApiError(e)}'),
           data: (members) => Column(
             children: [
-              for (final m in members)
-                _MemberTile(member: m, currentUser: user),
+              for (var i = 0; i < members.length; i++)
+                StaggeredItem(
+                  index: i,
+                  child: _MemberTile(member: members[i], currentUser: user),
+                ),
             ],
           ),
         ),
@@ -126,8 +128,11 @@ class _TeamAdminView extends ConsumerWidget {
                 )
               : Column(
                   children: [
-                    for (final inv in invites)
-                      _InviteTile(invite: inv, orgId: user.orgId),
+                    for (var i = 0; i < invites.length; i++)
+                      StaggeredItem(
+                        index: i,
+                        child: _InviteTile(invite: invites[i], orgId: user.orgId),
+                      ),
                   ],
                 ),
         ),
@@ -256,6 +261,39 @@ class _InviteTile extends ConsumerWidget {
         SnackBar(content: Text('Could not revoke: ${describeApiError(error)}')),
       );
     }
+  }
+}
+
+/// Shimmer rows shown while the roster loads.
+class _RosterSkeleton extends StatelessWidget {
+  const _RosterSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < 3; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+            child: Row(
+              children: [
+                Skeleton.circle(40),
+                const SizedBox(width: SpacingTokens.md),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(width: 180, height: 14),
+                      SizedBox(height: SpacingTokens.xs),
+                      Skeleton(width: 90, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }
 

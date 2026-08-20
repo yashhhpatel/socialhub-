@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../../core/motion/motion_modal.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_mfa_repository.dart';
 import '../state/current_user_provider.dart';
@@ -72,7 +73,7 @@ class MfaSettingsCard extends ConsumerWidget {
     }
     if (!context.mounted) return;
 
-    final codes = await showDialog<List<String>>(
+    final codes = await showMotionModal<List<String>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _EnrollDialog(setup: setup, repo: repo),
@@ -81,7 +82,7 @@ class MfaSettingsCard extends ConsumerWidget {
     if (codes != null) {
       ref.invalidate(currentUserProvider);
       if (context.mounted) {
-        await showDialog<void>(
+        await showMotionModal<void>(
           context: context,
           builder: (_) => _RecoveryCodesDialog(codes: codes),
         );
@@ -90,7 +91,7 @@ class MfaSettingsCard extends ConsumerWidget {
   }
 
   Future<void> _disableFlow(BuildContext context, WidgetRef ref) async {
-    final disabled = await showDialog<bool>(
+    final disabled = await showMotionModal<bool>(
       context: context,
       builder: (_) => _DisableDialog(repo: ref.read(mfaRepositoryProvider)),
     );

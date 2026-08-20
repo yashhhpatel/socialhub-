@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/motion_modal.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../ai_suite/presentation/widgets/ai_tools_panel.dart';
@@ -18,7 +19,8 @@ import 'caption_panel.dart';
 /// and X gets 16:9, so a preview of the un-cropped design would hide the
 /// one thing the user most needs to check before posting publicly.
 Future<void> showPublishModal(BuildContext context, String assetId) {
-  return showDialog<void>(
+  // Scale-in + fade entrance (motion layer) instead of a hard appear.
+  return showMotionModal<void>(
     context: context,
     builder: (_) => Dialog(
       child: ConstrainedBox(
