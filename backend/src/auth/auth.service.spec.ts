@@ -9,17 +9,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AccountService } from './account.service';
 import { AuthThrottleService } from './auth-throttle.service';
+import { MfaService } from './mfa.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
-  let usersService: jest.Mocked<Pick<UsersService, 'findByEmail'>>;
+  let usersService: jest.Mocked<Pick<UsersService, 'findByEmail' | 'findById'>>;
   let accountService: jest.Mocked<Pick<AccountService, 'sendVerificationEmail'>>;
   let throttle: jest.Mocked<
     Pick<
       AuthThrottleService,
       'assertLoginAllowed' | 'recordLoginFailure' | 'recordLoginSuccess'
     >
+  >;
+  let mfaService: jest.Mocked<
+    Pick<MfaService, 'issueChallengeToken' | 'verifyChallenge'>
   >;
   let prisma: {
     $transaction: jest.Mock;
@@ -36,6 +40,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     usersService = {
       findByEmail: jest.fn(),
+      findById: jest.fn(),
     };
     accountService = {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -44,6 +49,10 @@ describe('AuthService', () => {
       assertLoginAllowed: jest.fn().mockResolvedValue(undefined),
       recordLoginFailure: jest.fn().mockResolvedValue(undefined),
       recordLoginSuccess: jest.fn().mockResolvedValue(undefined),
+    };
+    mfaService = {
+      issueChallengeToken: jest.fn().mockResolvedValue('challenge.jwt.token'),
+      verifyChallenge: jest.fn(),
     };
 
     txOrganizationCreate = jest.fn();
@@ -80,6 +89,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AccountService, useValue: accountService },
         { provide: AuthThrottleService, useValue: throttle },
+        { provide: MfaService, useValue: mfaService },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(30) },
@@ -181,6 +191,8 @@ describe('AuthService', () => {
         role: UserRole.owner,
         orgId: 'org_1',
         emailVerifiedAt: null,
+        mfaEnabled: false,
+        mfaSecretEnc: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -208,6 +220,8 @@ describe('AuthService', () => {
         role: UserRole.admin,
         orgId: 'org_1',
         emailVerifiedAt: null,
+        mfaEnabled: false,
+        mfaSecretEnc: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -218,6 +232,7 @@ describe('AuthService', () => {
         password: 'Test1234!',
       });
 
+      if ('mfaRequired' in result) throw new Error('unexpected MFA challenge');
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.user.role).toBe(UserRole.admin);
       expect(result.user.orgId).toBe('org_1');
@@ -240,6 +255,8 @@ describe('AuthService', () => {
         role: UserRole.owner,
         orgId: 'org_1',
         emailVerifiedAt: null,
+        mfaEnabled: false,
+        mfaSecretEnc: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -258,6 +275,8 @@ describe('AuthService', () => {
         role: UserRole.owner,
         orgId: 'org_1',
         emailVerifiedAt: null,
+        mfaEnabled: false,
+        mfaSecretEnc: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -307,6 +326,8 @@ describe('AuthService', () => {
         role: UserRole.owner,
         orgId: 'org_1',
         emailVerifiedAt: null,
+        mfaEnabled: false,
+        mfaSecretEnc: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -348,6 +369,64 @@ describe('AuthService', () => {
 
       expect(throttle.assertLoginAllowed).not.toHaveBeenCalled();
       expect(throttle.recordLoginFailure).not.toHaveBeenCalled();
+    });
+
+    it('returns an MFA challenge (no session) when the account has MFA enabled', async () => {
+      const passwordHash = await bcrypt.hash('Test1234!', 12);
+      usersService.findByEmail.mockResolvedValue({
+        id: 'usr_1',
+        email: 'jane@example.com',
+        passwordHash,
+        role: UserRole.owner,
+        orgId: 'org_1',
+        emailVerifiedAt: null,
+        mfaEnabled: true,
+        mfaSecretEnc: 'enc',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await authService.login({
+        email: 'jane@example.com',
+        password: 'Test1234!',
+        ip: '203.0.113.7',
+      });
+
+      expect(result).toEqual({
+        mfaRequired: true,
+        mfaChallengeToken: 'challenge.jwt.token',
+      });
+      expect(mfaService.issueChallengeToken).toHaveBeenCalledWith('usr_1');
+      // No session issued, and the throttle counter is NOT cleared yet —
+      // the login isn't complete until the second factor is verified.
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+      expect(throttle.recordLoginSuccess).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completeMfaLogin', () => {
+    it('verifies the challenge, issues a session, and clears the throttle', async () => {
+      mfaService.verifyChallenge.mockResolvedValue('usr_1');
+      usersService.findById.mockResolvedValue({
+        id: 'usr_1',
+        email: 'jane@example.com',
+        passwordHash: 'hash',
+        role: UserRole.admin,
+        orgId: 'org_1',
+        emailVerifiedAt: null,
+        mfaEnabled: true,
+        mfaSecretEnc: 'enc',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      const result = await authService.completeMfaLogin('challenge', '123456');
+
+      expect(mfaService.verifyChallenge).toHaveBeenCalledWith('challenge', '123456');
+      expect(result.accessToken).toEqual(expect.any(String));
+      expect(result.user.role).toBe(UserRole.admin);
+      expect(throttle.recordLoginSuccess).toHaveBeenCalledWith('jane@example.com');
     });
   });
 

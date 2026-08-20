@@ -43,6 +43,27 @@ class ApiAuthRepository implements AuthRepository {
         '/auth/login',
         data: {'email': email, 'password': password},
       );
+      final data = response.data!;
+      // MFA-enabled accounts get a challenge instead of a session (Phase 17.3).
+      if (data['mfaRequired'] == true) {
+        return AuthResult.mfaRequired(data['mfaChallengeToken'] as String);
+      }
+      return AuthResult.success(_sessionFromResponse(data));
+    } on DioException catch (e) {
+      return AuthResult.failure(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<AuthResult> verifyMfa({
+    required String challengeToken,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/mfa/verify',
+        data: {'challengeToken': challengeToken, 'code': code},
+      );
       return AuthResult.success(_sessionFromResponse(response.data!));
     } on DioException catch (e) {
       return AuthResult.failure(_extractErrorMessage(e));

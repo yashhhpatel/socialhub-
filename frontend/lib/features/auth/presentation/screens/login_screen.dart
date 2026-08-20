@@ -57,6 +57,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // When the password step reports MFA is required, move to the second-factor
+    // screen (the challenge token lives in AuthController state).
+    ref.listen(authControllerProvider, (previous, next) {
+      if (next.status == AuthStatus.mfaRequired) {
+        context.go('/mfa-challenge');
+      }
+    });
+
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.status == AuthStatus.loading;
 

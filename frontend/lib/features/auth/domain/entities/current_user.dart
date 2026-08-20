@@ -11,6 +11,7 @@ class CurrentUser {
     required this.role,
     required this.orgId,
     required this.emailVerified,
+    required this.mfaEnabled,
   });
 
   final String id;
@@ -23,6 +24,10 @@ class CurrentUser {
   /// that predate the field, so the banner never shows spuriously.
   final bool emailVerified;
 
+  /// Whether TOTP multi-factor auth is enabled (Phase 17.3). Drives the MFA
+  /// section in settings; defaults false for older responses.
+  final bool mfaEnabled;
+
   bool get isAdmin => role.isAtLeast(AppRole.admin);
   bool get isEditor => role.isAtLeast(AppRole.editor);
 
@@ -32,5 +37,6 @@ class CurrentUser {
         role: AppRoleX.fromApi(json['role'] as String),
         orgId: json['orgId'] as String,
         emailVerified: json['emailVerified'] as bool? ?? true,
+        mfaEnabled: json['mfaEnabled'] as bool? ?? false,
       );
 }

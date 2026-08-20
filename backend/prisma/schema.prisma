@@ -192,17 +192,42 @@ model User {
   organization  Organization   @relation(fields: [orgId], references: [id])
   refreshTokens RefreshToken[]
   tokens        UserToken[]
+  mfaRecoveryCodes MfaRecoveryCode[]
   createdAssets ContentAsset[] @relation("CreatedAssets")
   comments      Comment[]
   /// Null until the user confirms ownership of their email via the
   /// verification link (Phase 17.1). Timestamp, not a bare bool, so we keep
   /// *when* it happened for support/audit without a second column.
   emailVerifiedAt DateTime?
+  /// TOTP multi-factor auth (Phase 17.3). `mfaEnabled` is the source of truth
+  /// for whether a login must pass a second factor. `mfaSecretEnc` holds the
+  /// base32 TOTP secret encrypted at rest (TokenEncryptionService, same as
+  /// OAuth tokens) — it's set the moment setup begins (pending) and only
+  /// becomes authoritative once mfaEnabled flips true after the first verified
+  /// code. Recovery codes live in mfaRecoveryCodes.
+  mfaEnabled    Boolean        @default(false)
+  mfaSecretEnc  String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([orgId])
   @@map("user")
+}
+
+/// Single-use MFA recovery codes (Phase 17.3): what a user falls back to when
+/// they've lost their authenticator device. Only the SHA-256 hash is stored,
+/// like RefreshToken/UserToken; `usedAt` burns a code after one use. Cleared
+/// and reissued whenever MFA is (re-)enabled.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("mfa_recovery_code")
 }
 
 /// One-time, single-use tokens for email verification and password reset

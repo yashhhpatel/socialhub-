@@ -45,6 +45,7 @@ export class UsersController {
       role: user.role,
       orgId: user.orgId,
       emailVerified: user.emailVerifiedAt !== null,
+      mfaEnabled: user.mfaEnabled,
       createdAt: user.createdAt,
     };
   }

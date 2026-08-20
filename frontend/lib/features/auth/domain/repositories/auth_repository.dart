@@ -26,5 +26,13 @@ abstract class AuthRepository {
     required String password,
   });
 
+  /// Second step of an MFA login (Phase 17.3): exchange the challenge token
+  /// from a login's [AuthResult.mfaRequired] plus a TOTP/recovery code for a
+  /// real session.
+  Future<AuthResult> verifyMfa({
+    required String challengeToken,
+    required String code,
+  });
+
   Future<void> logout(String refreshToken);
 }

@@ -5,6 +5,7 @@ import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../../core/widgets/sign_in_required.dart';
+import '../../../auth/presentation/widgets/mfa_settings_card.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
 import '../state/social_accounts_controller.dart';
@@ -117,6 +118,10 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
           ),
           const SizedBox(height: SpacingTokens.lg),
           const _AppearanceSection(),
+          const SizedBox(height: SpacingTokens.lg),
+          Text('Security', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: SpacingTokens.md),
+          const MfaSettingsCard(),
           const SizedBox(height: SpacingTokens.lg),
           Text('Connected accounts', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: SpacingTokens.xs),

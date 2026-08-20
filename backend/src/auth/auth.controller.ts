@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Ip,
@@ -13,9 +14,17 @@ import { Request } from 'express';
 import { AccountService } from './account.service';
 import { AuthService } from './auth.service';
 import { AuthThrottleService } from './auth-throttle.service';
+import { MfaService } from './mfa.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { MfaCodeDto, MfaVerifyDto } from './dto/mfa-code.dto';
+import {
+  MfaChallengeResponseDto,
+  MfaEnabledResponseDto,
+  MfaSetupResponseDto,
+  MfaStatusDto,
+} from './dto/mfa-response.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
@@ -33,6 +42,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly accountService: AccountService,
     private readonly throttle: AuthThrottleService,
+    private readonly mfaService: MfaService,
   ) {}
 
   @Post('register')
@@ -42,7 +52,10 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto, @Ip() ip: string): Promise<AuthResponseDto> {
+  login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+  ): Promise<AuthResponseDto | MfaChallengeResponseDto> {
     return this.authService.login({ ...dto, ip });
   }
 
@@ -107,5 +120,54 @@ export class AuthController {
   @Post('password-reset')
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.accountService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  // --- Multi-factor auth (Phase 17.3) ---
+
+  /** Current MFA state for the signed-in user (drives the settings UI). */
+  @UseGuards(JwtAuthGuard)
+  @Get('mfa/status')
+  mfaStatus(@Req() req: AuthenticatedRequest): Promise<MfaStatusDto> {
+    return this.mfaService.status(req.user.userId);
+  }
+
+  /** Begin enrollment: returns the secret + otpauth URI to add to an app. */
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('mfa/setup')
+  mfaSetup(@Req() req: AuthenticatedRequest): Promise<MfaSetupResponseDto> {
+    return this.mfaService.beginSetup(req.user.userId, req.user.email);
+  }
+
+  /** Finish enrollment by verifying a code; returns one-time recovery codes. */
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('mfa/enable')
+  mfaEnable(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: MfaCodeDto,
+  ): Promise<MfaEnabledResponseDto> {
+    return this.mfaService.enable(req.user.userId, dto.code);
+  }
+
+  /** Turn MFA off — requires a valid current second factor. */
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('mfa/disable')
+  async mfaDisable(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: MfaCodeDto,
+  ): Promise<void> {
+    await this.mfaService.disable(req.user.userId, dto.code);
+  }
+
+  /**
+   * Second step of an MFA login: exchange the challenge token + code for a
+   * real session. PUBLIC — the challenge token is the credential.
+   */
+  @HttpCode(HttpStatus.OK)
+  @Post('mfa/verify')
+  mfaVerify(@Body() dto: MfaVerifyDto): Promise<AuthResponseDto> {
+    return this.authService.completeMfaLogin(dto.challengeToken, dto.code);
   }
 }

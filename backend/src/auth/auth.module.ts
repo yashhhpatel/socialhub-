@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { SignOptions } from 'jsonwebtoken';
 
+import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
 import { EmailModule } from '../common/email/email.module';
 import { RateLimitModule } from '../common/rate-limit/rate-limit.module';
 import { UsersModule } from '../users/users.module';
@@ -11,6 +12,7 @@ import { AccountService } from './account.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthThrottleService } from './auth-throttle.service';
+import { MfaService } from './mfa.service';
 import { SsoController } from './sso/sso.controller';
 import { SsoService } from './sso/sso.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -45,6 +47,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     AccountService,
     AuthThrottleService,
+    MfaService,
+    TokenEncryptionService,
     JwtStrategy,
     SsoService,
   ],
