@@ -12,6 +12,8 @@ import { AccountService } from './account.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthThrottleService } from './auth-throttle.service';
+import { GoogleAuthController } from './google-auth.controller';
+import { GoogleAuthService } from './google-auth.service';
 import { MfaService } from './mfa.service';
 import { SsoController } from './sso/sso.controller';
 import { SsoService } from './sso/sso.service';
@@ -42,12 +44,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController, SsoController],
+  controllers: [AuthController, GoogleAuthController, SsoController],
   providers: [
     AuthService,
     AccountService,
     AuthThrottleService,
     MfaService,
+    GoogleAuthService,
     TokenEncryptionService,
     JwtStrategy,
     SsoService,
