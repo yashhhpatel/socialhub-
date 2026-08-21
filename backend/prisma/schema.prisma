@@ -283,7 +283,16 @@ model Invite {
 model User {
   id            String         @id @default(uuid())
   email         String         @unique
-  passwordHash  String
+  /// Null for accounts that only ever sign in with Google (no password set).
+  /// Password login and password re-auth guard against null (see AuthService
+  /// / AccountDataService). A Google user can still add a password later via
+  /// the normal password-reset flow.
+  passwordHash  String?
+  /// Set when the account is linked to a Google identity (the Google `sub`).
+  /// Unique so one Google account maps to exactly one user; nullable because
+  /// email/password-only accounts have none. Linked on first Google sign-in
+  /// for an existing email, or set when a Google sign-in creates the account.
+  googleId      String?        @unique
   role          UserRole       @default(editor)
   orgId         String
   organization  Organization   @relation(fields: [orgId], references: [id])
@@ -350,6 +359,10 @@ model UserToken {
 enum UserTokenType {
   email_verification
   password_reset
+  /// Single-use, short-lived ticket handed to the frontend after a
+  /// server-verified Google sign-in, exchanged once for a real session so no
+  /// tokens ever travel in the redirect URL (Google OAuth flow).
+  google_login_handoff
 }
 
 /// A comment on a design (Milestone 13.1) — the collaboration thread teams

@@ -113,10 +113,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const passwordMatches = await bcrypt.compare(
-      params.password,
-      user.passwordHash,
-    );
+    // A Google-only account has no password hash. Treat a password login
+    // attempt against it exactly like a wrong password — same generic message,
+    // same failure-count bookkeeping — so it never reveals how the account was
+    // created.
+    const passwordMatches =
+      user.passwordHash != null &&
+      (await bcrypt.compare(params.password, user.passwordHash));
     if (!passwordMatches) {
       if (ip) await this.throttle.recordLoginFailure(params.email, ip);
       throw new UnauthorizedException('Invalid email or password.');
