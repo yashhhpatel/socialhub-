@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { BillingModule } from '../../billing/billing.module';
 import { EmailModule } from '../../common/email/email.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 import {
   InvitesAdminController,
   InvitesPublicController,
@@ -14,7 +15,7 @@ import { InvitesService } from './invites.service';
  * ConfigService come from their global modules.
  */
 @Module({
-  imports: [EmailModule, BillingModule],
+  imports: [EmailModule, BillingModule, NotificationsModule],
   controllers: [InvitesAdminController, InvitesPublicController],
   providers: [InvitesService],
   exports: [InvitesService],

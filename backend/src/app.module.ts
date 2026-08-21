@@ -9,6 +9,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
@@ -65,6 +66,7 @@ import { UsersModule } from './users/users.module';
     AnalyticsModule,
     AuditModule,
     BillingModule,
+    NotificationsModule,
     RateLimitModule,
   ],
   providers: [

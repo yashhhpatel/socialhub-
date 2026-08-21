@@ -187,6 +187,25 @@ enum SubscriptionStatus {
   incomplete
 }
 
+/// An in-app notification for a single user (Phase 19). `type` is a short slug
+/// the UI maps to an icon (e.g. publish_succeeded, publish_failed,
+/// invite_accepted); `linkPath` is an optional in-app route the item deep-links
+/// to. `readAt` null = unread. Cascade-deleted with the user.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  linkPath  String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@map("notification")
+}
+
 /// SAML SSO configuration for an enterprise org (Milestone 15.1). One per
 /// org (orgId unique). Holds the IdP's SSO URL and signing certificate plus
 /// the SP issuer/entity-id this app presents — everything needed to build a
@@ -250,6 +269,7 @@ model User {
   refreshTokens RefreshToken[]
   tokens        UserToken[]
   mfaRecoveryCodes MfaRecoveryCode[]
+  notifications Notification[]
   createdAssets ContentAsset[] @relation("CreatedAssets")
   comments      Comment[]
   /// Null until the user confirms ownership of their email via the

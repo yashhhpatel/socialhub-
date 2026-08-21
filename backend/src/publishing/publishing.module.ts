@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 
 import { TokenEncryptionService } from '../common/crypto/token-encryption.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { FacebookAdapter } from '../social-accounts/adapters/facebook.adapter';
 import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter';
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
@@ -39,6 +40,7 @@ import { ScheduledPublishDispatcher } from './schedule.cron';
       { name: PUBLISH_QUEUES[Platform.threads] },
       { name: PUBLISH_QUEUES[Platform.linkedin] },
     ),
+    NotificationsModule,
   ],
   controllers: [PublishingController],
   providers: [

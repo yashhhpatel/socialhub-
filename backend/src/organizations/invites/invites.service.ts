@@ -14,6 +14,7 @@ import { roleMeetsMinimum } from '../../common/constants/role-rank';
 import { EmailService } from '../../common/email/email.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlanLimitsService } from '../../billing/plan-limits.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 
@@ -33,6 +34,7 @@ export class InvitesService {
     private readonly email: EmailService,
     private readonly config: ConfigService,
     private readonly planLimits: PlanLimitsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -139,7 +141,7 @@ export class InvitesService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
 
-    return this.prisma.$transaction(async (tx) => {
+    const user = await this.prisma.$transaction(async (tx) => {
       // Re-check + claim the invite atomically: the guard on status makes a
       // concurrent double-accept impossible.
       const claimed = await tx.invite.updateMany({
@@ -159,6 +161,17 @@ export class InvitesService {
         },
       });
     });
+
+    // Let the inviter know their invitee joined (Phase 19). Best-effort.
+    await this.notifications.notifySafe({
+      userId: invite.invitedById,
+      type: 'invite_accepted',
+      title: 'Invite accepted',
+      body: `${invite.email} accepted your invitation and joined the team.`,
+      linkPath: '/team',
+    });
+
+    return user;
   }
 
   private hashToken(rawToken: string): string {
