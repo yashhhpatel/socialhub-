@@ -8,13 +8,13 @@ import '../../../../core/network/auth_token_store.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_media_repository.dart';
 import '../../data/file_picker.dart';
+import '../../domain/media_item.dart';
 
 /// Media library — upload images/videos and get a hosted URL to reuse in a
 /// design, brand kit logo, or white-label branding.
 ///
-/// This session lists what you've uploaded here. A persistent, cross-session
-/// catalogue is the next enhancement (it needs a backend media table); until
-/// then, copy the URL you need — every upload is permanently hosted.
+/// Uploads persist to the org's library (a server-side `MediaAsset`), so the
+/// catalogue is the same every time you return — not just this session.
 class MediaLibraryScreen extends ConsumerStatefulWidget {
   const MediaLibraryScreen({super.key});
 
@@ -23,7 +23,6 @@ class MediaLibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
-  final List<UploadedMedia> _uploaded = [];
   bool _uploading = false;
 
   Future<void> _pickAndUpload() async {
@@ -40,12 +39,13 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
       final picked = await ref.read(filePickerProvider)();
       if (picked == null) return; // cancelled
       setState(() => _uploading = true);
-      final result = await ref.read(mediaRepositoryProvider).upload(
+      await ref.read(mediaRepositoryProvider).upload(
             bytes: picked.bytes,
             name: picked.name,
             mimeType: picked.mimeType,
           );
-      if (mounted) setState(() => _uploaded.insert(0, result));
+      // Refresh the persisted list so the new upload appears.
+      ref.invalidate(mediaLibraryProvider);
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(content: Text('Upload failed: ${describeApiError(error)}')),
@@ -55,9 +55,23 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
     }
   }
 
+  Future<void> _delete(MediaItem item) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(mediaRepositoryProvider).delete(item.id);
+      ref.invalidate(mediaLibraryProvider);
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Delete failed: ${describeApiError(error)}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loggedIn = ref.watch(authTokenStoreProvider) != null;
+    final library = ref.watch(mediaLibraryProvider);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -93,7 +107,19 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
-          _uploaded.isEmpty ? const _Empty() : _Grid(items: _uploaded),
+          if (!loggedIn)
+            const _Empty()
+          else
+            library.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.only(top: SpacingTokens.xl),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, _) => _LoadError(message: describeApiError(error)),
+              data: (items) => items.isEmpty
+                  ? const _Empty()
+                  : _Grid(items: items, onDelete: _delete),
+            ),
         ],
       ),
     );
@@ -101,9 +127,10 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
 }
 
 class _Grid extends StatelessWidget {
-  const _Grid({required this.items});
+  const _Grid({required this.items, required this.onDelete});
 
-  final List<UploadedMedia> items;
+  final List<MediaItem> items;
+  final void Function(MediaItem) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -117,15 +144,16 @@ class _Grid extends StatelessWidget {
         mainAxisSpacing: SpacingTokens.md,
       ),
       itemCount: items.length,
-      itemBuilder: (context, i) => _MediaCard(media: items[i]),
+      itemBuilder: (context, i) => _MediaCard(media: items[i], onDelete: onDelete),
     );
   }
 }
 
 class _MediaCard extends StatelessWidget {
-  const _MediaCard({required this.media});
+  const _MediaCard({required this.media, required this.onDelete});
 
-  final UploadedMedia media;
+  final MediaItem media;
+  final void Function(MediaItem) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +172,14 @@ class _MediaCard extends StatelessWidget {
             child: Container(
               color: theme.colorScheme.surfaceContainerHighest,
               child: media.isVideo
-                  ? const Center(child: Icon(Icons.videocam_outlined, size: 32))
+                  ? (media.posterUrl != null
+                      ? Image.network(
+                          media.posterUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Center(child: Icon(Icons.videocam_outlined, size: 32)),
+                        )
+                      : const Center(child: Icon(Icons.videocam_outlined, size: 32)))
                   : Image.network(
                       media.url,
                       fit: BoxFit.cover,
@@ -175,9 +210,38 @@ class _MediaCard extends StatelessWidget {
                     );
                   },
                 ),
+                IconButton(
+                  tooltip: 'Delete',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  onPressed: () => onDelete(media),
+                ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.error_outline, size: 40, color: theme.colorScheme.error),
+          const SizedBox(height: SpacingTokens.md),
+          Text("Couldn't load your media", style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(message, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
         ],
       ),
     );
