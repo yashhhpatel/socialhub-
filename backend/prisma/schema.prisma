@@ -127,9 +127,30 @@ model Organization {
   ssoConfig        SsoConfig?
   subscription     Subscription?
   invoices         Invoice[]
+  mediaAssets      MediaAsset[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
+}
+
+/// A persisted media-library upload (Phase 19). Records the hosted Cloudinary
+/// URL + public id so the org's uploads survive across sessions (previously
+/// the Media page kept only an in-session list). `type` is 'image' | 'video';
+/// `posterUrl` is the video thumbnail. Scoped + cascade-deleted per org.
+model MediaAsset {
+  id           String       @id @default(uuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  url          String
+  publicId     String
+  type         String
+  name         String
+  posterUrl    String?
+  createdById  String
+  createdAt    DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("media_asset")
 }
 
 /// Billing subscription for an organization (Phase 18). One per org. The

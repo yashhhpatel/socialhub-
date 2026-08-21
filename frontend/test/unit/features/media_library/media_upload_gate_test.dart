@@ -8,19 +8,40 @@ import 'package:go_router/go_router.dart';
 import 'package:socialhub/core/network/auth_token_store.dart';
 import 'package:socialhub/features/media_library/data/api_media_repository.dart';
 import 'package:socialhub/features/media_library/data/file_picker.dart';
+import 'package:socialhub/features/media_library/domain/media_item.dart';
 import 'package:socialhub/features/media_library/presentation/screens/media_library_screen.dart';
 
-/// Fake repository so uploads never hit the network.
+/// Stateful fake repository so uploads never hit the network but still show up
+/// in the persisted list on the next fetch (the screen re-reads after upload).
 class _FakeMediaRepo extends ApiMediaRepository {
   _FakeMediaRepo() : super(Dio());
 
+  final List<MediaItem> _items = [];
+
   @override
-  Future<UploadedMedia> upload({
+  Future<List<MediaItem>> list() async => List.of(_items);
+
+  @override
+  Future<MediaItem> upload({
     required Uint8List bytes,
     required String name,
     required String mimeType,
-  }) async =>
-      UploadedMedia(url: 'https://cdn.test/$name', publicId: 'p1', name: name);
+  }) async {
+    final item = MediaItem(
+      id: 'id_${_items.length}',
+      url: 'https://cdn.test/$name',
+      publicId: 'p1',
+      type: mimeType.startsWith('video/') ? 'video' : 'image',
+      name: name,
+    );
+    _items.insert(0, item);
+    return item;
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    _items.removeWhere((e) => e.id == id);
+  }
 }
 
 /// Router hosting the Media screen (inside a Scaffold + scroll, like AppShell)
@@ -53,18 +74,15 @@ void main() {
     'logged out: Upload is clickable, routes to login, and never opens the picker',
     (tester) async {
       var pickerCalled = false;
-      await tester.pumpWidget(
-        _host(
-          overrides: [
-            // Token store defaults to null (logged out); make it explicit.
-            authTokenStoreProvider.overrideWith((ref) => null),
-            filePickerProvider.overrideWithValue(() async {
-              pickerCalled = true;
-              return null;
-            }),
-          ],
-        ),
-      );
+      final overrides = <Override>[
+        // Token store defaults to null (logged out); make it explicit.
+        authTokenStoreProvider.overrideWith((ref) => null),
+        filePickerProvider.overrideWithValue(() async {
+          pickerCalled = true;
+          return null;
+        }),
+      ];
+      await tester.pumpWidget(_host(overrides: overrides));
       await tester.pumpAndSettle();
 
       // The Upload button (a FilledButton.icon) is visible; its label is unique.
@@ -84,18 +102,15 @@ void main() {
     'logged in: Upload opens the picker and does not redirect',
     (tester) async {
       var pickerCalled = false;
-      await tester.pumpWidget(
-        _host(
-          overrides: [
-            authTokenStoreProvider.overrideWith((ref) => _loggedIn),
-            mediaRepositoryProvider.overrideWithValue(_FakeMediaRepo()),
-            filePickerProvider.overrideWithValue(() async {
-              pickerCalled = true;
-              return null; // user cancels — nothing to upload
-            }),
-          ],
-        ),
-      );
+      final overrides = <Override>[
+        authTokenStoreProvider.overrideWith((ref) => _loggedIn),
+        mediaRepositoryProvider.overrideWithValue(_FakeMediaRepo()),
+        filePickerProvider.overrideWithValue(() async {
+          pickerCalled = true;
+          return null; // user cancels — nothing to upload
+        }),
+      ];
+      await tester.pumpWidget(_host(overrides: overrides));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Upload'));
@@ -111,29 +126,54 @@ void main() {
   testWidgets(
     'logged in: a picked file is uploaded and shown in the grid',
     (tester) async {
-      await tester.pumpWidget(
-        _host(
-          overrides: [
-            authTokenStoreProvider.overrideWith((ref) => _loggedIn),
-            mediaRepositoryProvider.overrideWithValue(_FakeMediaRepo()),
-            filePickerProvider.overrideWithValue(
-              () async => PickedFile(
-                bytes: Uint8List.fromList([1, 2, 3]),
-                name: 'photo.png',
-                mimeType: 'image/png',
-              ),
-            ),
-          ],
+      final overrides = <Override>[
+        authTokenStoreProvider.overrideWith((ref) => _loggedIn),
+        mediaRepositoryProvider.overrideWithValue(_FakeMediaRepo()),
+        filePickerProvider.overrideWithValue(
+          () async => PickedFile(
+            bytes: Uint8List.fromList([1, 2, 3]),
+            name: 'photo.png',
+            mimeType: 'image/png',
+          ),
         ),
-      );
+      ];
+      await tester.pumpWidget(_host(overrides: overrides));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Upload'));
       await tester.pumpAndSettle();
 
-      // The uploaded item appears (name rendered on its card).
+      // The uploaded item appears (name rendered on its card) after the list
+      // refreshes from the persisted store.
       expect(find.text('photo.png'), findsOneWidget);
       expect(find.text('LOGIN PAGE'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'logged in: an existing library item can be deleted',
+    (tester) async {
+      final repo = _FakeMediaRepo();
+      await repo.upload(
+        bytes: Uint8List.fromList([1]),
+        name: 'old.png',
+        mimeType: 'image/png',
+      );
+      final overrides = <Override>[
+        authTokenStoreProvider.overrideWith((ref) => _loggedIn),
+        mediaRepositoryProvider.overrideWithValue(repo),
+        filePickerProvider.overrideWithValue(() async => null),
+      ];
+      await tester.pumpWidget(_host(overrides: overrides));
+      await tester.pumpAndSettle();
+
+      expect(find.text('old.png'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('old.png'), findsNothing);
+      expect(find.text('No uploads yet'), findsOneWidget);
     },
   );
 }

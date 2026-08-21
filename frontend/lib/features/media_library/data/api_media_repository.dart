@@ -4,29 +4,25 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/auth_token_store.dart';
+import '../domain/media_item.dart';
 
-/// A hosted upload result — the CDN URL to reuse in designs, brand kit, or
-/// white-label branding.
-class UploadedMedia {
-  const UploadedMedia({required this.url, required this.publicId, required this.name});
-
-  final String url;
-  final String publicId;
-  final String name;
-
-  bool get isVideo =>
-      url.contains('/video/') || RegExp(r'\.(mp4|mov|webm)(\?|$)').hasMatch(url);
-}
-
-/// Uploads media through the existing content upload endpoint (Cloudinary),
-/// which returns a public URL + id. There's no server-side media catalogue
-/// yet, so this returns the single upload; the screen keeps a session list.
+/// Talks to the backend /media endpoints (Phase 19). Uploads persist to the
+/// org's media library (a `MediaAsset` row), so they survive across sessions —
+/// no more session-only list.
 class ApiMediaRepository {
   ApiMediaRepository(this._dio);
 
   final Dio _dio;
 
-  Future<UploadedMedia> upload({
+  Future<List<MediaItem>> list() async {
+    final response = await _dio.get<List<dynamic>>('/media');
+    return (response.data ?? [])
+        .map((e) => MediaItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<MediaItem> upload({
     required Uint8List bytes,
     required String name,
     required String mimeType,
@@ -40,17 +36,25 @@ class ApiMediaRepository {
       ),
     });
     final response = await _dio.post<Map<String, dynamic>>(
-      '/content/assets/upload',
+      '/media/upload',
       data: form,
     );
-    return UploadedMedia(
-      url: response.data!['url'] as String,
-      publicId: response.data!['publicId'] as String,
-      name: name,
-    );
+    return MediaItem.fromJson(response.data!);
   }
+
+  Future<void> delete(String id) => _dio.delete<void>('/media/$id');
 }
 
 final mediaRepositoryProvider = Provider<ApiMediaRepository>((ref) {
   return ApiMediaRepository(ref.watch(apiClientProvider));
+});
+
+/// The org's persisted media library. Re-evaluates on login/logout and returns
+/// an empty list when logged out (the screen shows its logged-out empty state
+/// rather than surfacing a 401).
+final mediaLibraryProvider =
+    FutureProvider.autoDispose<List<MediaItem>>((ref) async {
+  final loggedIn = ref.watch(authTokenStoreProvider.select((t) => t != null));
+  if (!loggedIn) return const [];
+  return ref.watch(mediaRepositoryProvider).list();
 });

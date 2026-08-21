@@ -18,6 +18,7 @@ import { ConfigModule } from './config/config.module';
 import { CommentsModule } from './content/comments/comments.module';
 import { ContentModule } from './content/content.module';
 import { HealthModule } from './health/health.module';
+import { MediaModule } from './media/media.module';
 import { InvitesModule } from './organizations/invites/invites.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -58,6 +59,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     SocialAccountsModule,
     ContentModule,
+    MediaModule,
     CommentsModule,
     PublishingModule,
     AiModule,
