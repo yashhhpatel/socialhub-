@@ -8,6 +8,7 @@ describe('PublishingService', () => {
   let service: PublishingService;
   let prisma: {
     contentVariant: { findUnique: jest.Mock };
+    contentAsset: { findUnique: jest.Mock };
     socialAccount: { findUnique: jest.Mock };
     publishJob: {
       create: jest.Mock;
@@ -30,6 +31,7 @@ describe('PublishingService', () => {
 
   const readyVariant = {
     id: 'var_1',
+    assetId: 'asset_1',
     platform: Platform.x,
     status: 'ready',
     renderedMediaUrl: 'https://cdn.test/var_1.png',
@@ -64,6 +66,9 @@ describe('PublishingService', () => {
   beforeEach(() => {
     prisma = {
       contentVariant: { findUnique: jest.fn().mockResolvedValue(readyVariant) },
+      contentAsset: {
+        findUnique: jest.fn().mockResolvedValue({ createdById: 'u1' }),
+      },
       socialAccount: { findUnique: jest.fn().mockResolvedValue(connectedAccount) },
       publishJob: {
         create: jest.fn().mockResolvedValue(jobRow),
@@ -97,6 +102,8 @@ describe('PublishingService', () => {
       fbQueue as never,
       thQueue as never,
       liQueue as never,
+      // Notifications (Phase 19) — best-effort, no-op in these tests.
+      { notifySafe: jest.fn().mockResolvedValue(undefined) } as never,
     );
   });
 

@@ -52,6 +52,7 @@ describe('InvitesService', () => {
       email as never,
       config as never,
       { assertCanAddTeamMember: jest.fn().mockResolvedValue(undefined) } as never,
+      { notifySafe: jest.fn().mockResolvedValue(undefined) } as never,
     );
   });
 

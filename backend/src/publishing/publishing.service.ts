@@ -22,6 +22,7 @@ import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter'
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   PUBLISH_JOB_OPTIONS,
   PUBLISH_QUEUES,
@@ -66,6 +67,7 @@ export class PublishingService {
     threadsQueue: Queue<PublishJobData>,
     @InjectQueue(PUBLISH_QUEUES[Platform.linkedin])
     linkedinQueue: Queue<PublishJobData>,
+    private readonly notifications: NotificationsService,
   ) {
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
@@ -197,6 +199,13 @@ export class PublishingService {
           lastError: null,
         },
       });
+
+      // Notify the design's author that their post went out (Phase 19).
+      await this.notifyOwner(variant.assetId, account.platform, {
+        type: 'publish_succeeded',
+        title: 'Post published',
+        body: `Your post was published to ${account.platform}.`,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Publish failed.';
       const isFinalAttempt = ctx.attemptsMade + 1 >= ctx.maxAttempts;
@@ -213,10 +222,40 @@ export class PublishingService {
         },
       });
 
+      // Only notify once retries are exhausted, so a transient blip that later
+      // succeeds doesn't alarm the user (Phase 19).
+      if (isFinalAttempt) {
+        await this.notifyOwner(variant.assetId, account.platform, {
+          type: 'publish_failed',
+          title: 'Post failed',
+          body: `Your post to ${account.platform} failed: ${message}`,
+        });
+      }
+
       // Rethrow so BullMQ schedules the next attempt (or moves the job to its
       // failed set once attempts are exhausted).
       throw error;
     }
+  }
+
+  /// Best-effort notification to a design's author about a publish outcome.
+  private async notifyOwner(
+    assetId: string,
+    platform: Platform,
+    n: { type: 'publish_succeeded' | 'publish_failed'; title: string; body: string },
+  ): Promise<void> {
+    const asset = await this.prisma.contentAsset.findUnique({
+      where: { id: assetId },
+      select: { createdById: true },
+    });
+    if (!asset) return;
+    await this.notifications.notifySafe({
+      userId: asset.createdById,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      linkPath: '/calendar',
+    });
   }
 
   /**
