@@ -20,12 +20,11 @@ class ApiAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/register',
-        data: {'email': email, 'password': password, 'orgName': orgName},
+        data: {'email': email, 'password': password},
       );
       return AuthResult.success(_sessionFromResponse(response.data!));
     } on DioException catch (e) {
@@ -49,6 +48,19 @@ class ApiAuthRepository implements AuthRepository {
         return AuthResult.mfaRequired(data['mfaChallengeToken'] as String);
       }
       return AuthResult.success(_sessionFromResponse(data));
+    } on DioException catch (e) {
+      return AuthResult.failure(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/google/exchange',
+        data: {'ticket': ticket},
+      );
+      return AuthResult.success(_sessionFromResponse(response.data!));
     } on DioException catch (e) {
       return AuthResult.failure(_extractErrorMessage(e));
     }

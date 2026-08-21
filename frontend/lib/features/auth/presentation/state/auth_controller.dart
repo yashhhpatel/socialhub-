@@ -76,6 +76,24 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// Completes a "Continue with Google" sign-in: swap the single-use handoff
+  /// ticket (from the Google redirect) for a session. Returns null on success,
+  /// or an error message the callback screen shows before bouncing to /login.
+  Future<String?> loginWithGoogleTicket(String ticket) async {
+    state = const AuthState.loading();
+
+    final result = await _repository.exchangeGoogleTicket(ticket);
+
+    if (result.isSuccess) {
+      _storeTokens(result.session!);
+      state = AuthState.authenticated(result.session!);
+      return null;
+    }
+    final message = result.errorMessage ?? 'Google sign-in failed.';
+    state = AuthState.error(message);
+    return message;
+  }
+
   /// Second step of an MFA login (Phase 17.3): submit a TOTP/recovery code
   /// against the pending challenge. Returns null on success, or an error
   /// message the screen shows. A missing/expired challenge sends the user back
@@ -108,14 +126,12 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     state = const AuthState.loading();
 
     final result = await _repository.register(
       email: email,
       password: password,
-      orgName: orgName,
     );
 
     if (result.isSuccess) {

@@ -117,6 +117,14 @@ export class AccountDataService {
 
     // Re-auth: deletion is destructive and irreversible, so require the
     // current password even though the caller already holds a valid token.
+    // Google-only accounts have no password to re-confirm with. Send them
+    // through the password-reset flow to set one first, rather than silently
+    // skipping the re-auth on a destructive, irreversible action.
+    if (user.passwordHash == null) {
+      throw new BadRequestException(
+        'This account has no password set. Use "Forgot password" to set one, then confirm deletion.',
+      );
+    }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new BadRequestException('Password is incorrect.');
 

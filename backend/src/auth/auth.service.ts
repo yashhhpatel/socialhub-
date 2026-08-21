@@ -17,6 +17,7 @@ import { AuthThrottleService } from './auth-throttle.service';
 import { MfaService } from './mfa.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { MfaChallengeResponseDto } from './dto/mfa-response.dto';
+import { defaultOrgName } from './default-org-name';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const BCRYPT_SALT_ROUNDS = 12;
@@ -39,7 +40,6 @@ export class AuthService {
   async register(params: {
     email: string;
     password: string;
-    orgName: string;
   }): Promise<AuthResponseDto> {
     const existing = await this.usersService.findByEmail(params.email);
     if (existing) {
@@ -56,10 +56,11 @@ export class AuthService {
     // never be able to observe even transiently. This intentionally does
     // NOT go through OrganizationsService/UsersService.create (see their
     // doc comments) since those use the plain, non-transactional
-    // PrismaService.
+    // PrismaService. The org name is no longer prompted for — it's derived
+    // from the email and renameable later in settings (Option A).
     const { user, organization } = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
-        data: { name: params.orgName },
+        data: { name: defaultOrgName(normalizedEmail) },
       });
 
       const user = await tx.user.create({
@@ -112,10 +113,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const passwordMatches = await bcrypt.compare(
-      params.password,
-      user.passwordHash,
-    );
+    // A Google-only account has no password hash. Treat a password login
+    // attempt against it exactly like a wrong password — same generic message,
+    // same failure-count bookkeeping — so it never reveals how the account was
+    // created.
+    const passwordMatches =
+      user.passwordHash != null &&
+      (await bcrypt.compare(params.password, user.passwordHash));
     if (!passwordMatches) {
       if (ip) await this.throttle.recordLoginFailure(params.email, ip);
       throw new UnauthorizedException('Invalid email or password.');

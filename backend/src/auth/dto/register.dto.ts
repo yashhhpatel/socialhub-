@@ -1,4 +1,4 @@
-import { IsEmail, Length, Matches, MinLength } from 'class-validator';
+import { IsEmail, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Enter a valid email address.' })
@@ -13,8 +13,7 @@ export class RegisterDto {
   })
   password: string;
 
-  // Deferred from Milestone 1.1 (Organization didn't exist yet). Mirrors
-  // the REST API design doc's rule: 2–100 chars.
-  @Length(2, 100, { message: 'Organization name must be 2–100 characters.' })
-  orgName: string;
+  // Organization name is no longer collected at signup. Every new account
+  // gets a default workspace auto-created from the user's email (renameable
+  // later in settings) — see AuthService.register / defaultOrgName.
 }

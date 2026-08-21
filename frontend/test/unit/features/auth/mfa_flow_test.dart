@@ -40,8 +40,11 @@ class _FakeAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async =>
+      AuthResult.failure('not used');
+
+  @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async =>
       AuthResult.failure('not used');
 
   @override

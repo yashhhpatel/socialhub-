@@ -38,7 +38,6 @@ class MockAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     await Future<void>.delayed(_simulatedLatency);
 
@@ -96,6 +95,16 @@ class MockAuthRepository implements AuthRepository {
         accessToken: 'mock_access_${_randomId()}',
         refreshToken: 'mock_refresh_${_randomId()}',
       ),
+    );
+  }
+
+  @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async {
+    // The mock has no Google flow; kept complete so this remains a valid
+    // AuthRepository for networkless tests.
+    await Future<void>.delayed(_simulatedLatency);
+    return AuthResult.failure(
+      'Google sign-in is not supported by the mock repository.',
     );
   }
 

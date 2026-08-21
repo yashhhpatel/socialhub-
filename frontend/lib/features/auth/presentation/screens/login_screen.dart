@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/platform/external_redirect.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../state/auth_controller.dart';
 import '../state/auth_state.dart';
+import '../widgets/auth_divider.dart';
 import '../widgets/auth_error_banner.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_submit_button.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/google_sign_in_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -55,6 +59,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
+  // Hand off to the backend's server-side Google flow (see GoogleAuthService):
+  // navigates the whole tab to /auth/google/start; the browser never handles
+  // Google's tokens.
+  void _continueWithGoogle() {
+    redirectToExternal('$apiBaseUrl/auth/google/start');
+  }
+
   @override
   Widget build(BuildContext context) {
     // When the password step reports MFA is required, move to the second-factor
@@ -68,6 +79,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.status == AuthStatus.loading;
 
+    // A failed/cancelled Google sign-in bounces back here with ?error=google.
+    final googleFailed =
+        GoRouterState.of(context).uri.queryParameters['error'] == 'google';
+
     return AuthScaffold(
       title: 'Welcome back',
       subtitle: 'Log in to your SocialHub workspace.',
@@ -78,7 +93,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (authState.status == AuthStatus.error)
-              AuthErrorBanner(message: authState.errorMessage!),
+              AuthErrorBanner(message: authState.errorMessage!)
+            else if (googleFailed)
+              const AuthErrorBanner(
+                message: "Google sign-in didn't complete. Please try again.",
+              ),
+            GoogleSignInButton(
+              onPressed: isLoading ? null : _continueWithGoogle,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            const AuthDivider(label: 'or continue with email'),
+            const SizedBox(height: SpacingTokens.md),
             AuthTextField(
               controller: _emailController,
               label: 'Email',
