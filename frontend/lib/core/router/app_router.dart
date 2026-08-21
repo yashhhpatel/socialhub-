@@ -9,6 +9,7 @@ import '../../features/auth/presentation/screens/mfa_challenge_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_screen.dart';
+import '../../features/billing/presentation/screens/billing_screen.dart';
 import '../../features/brand_kit/presentation/screens/brand_kit_screen.dart';
 import '../../features/team/presentation/screens/accept_invite_screen.dart';
 import '../../features/marketplace/presentation/screens/marketplace_screen.dart';
@@ -219,6 +220,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/white-label',
             name: 'white-label',
             builder: (context, state) => const WhiteLabelScreen(),
+          ),
+          GoRoute(
+            path: '/billing',
+            name: 'billing',
+            builder: (context, state) => const BillingScreen(),
           ),
           GoRoute(
             path: '/settings',
