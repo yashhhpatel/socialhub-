@@ -108,14 +108,12 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     state = const AuthState.loading();
 
     final result = await _repository.register(
       email: email,
       password: password,
-      orgName: orgName,
     );
 
     if (result.isSuccess) {

@@ -20,12 +20,11 @@ class ApiAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/register',
-        data: {'email': email, 'password': password, 'orgName': orgName},
+        data: {'email': email, 'password': password},
       );
       return AuthResult.success(_sessionFromResponse(response.data!));
     } on DioException catch (e) {

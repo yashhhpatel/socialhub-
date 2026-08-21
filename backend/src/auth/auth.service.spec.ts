@@ -124,7 +124,6 @@ describe('AuthService', () => {
       const result = await authService.register({
         email: 'Jane@Example.com',
         password: 'Test1234!',
-        orgName: 'Acme Inc.',
       });
 
       // Password must never be stored in plaintext.
@@ -137,8 +136,9 @@ describe('AuthService', () => {
       // The org creator is always 'owner'.
       expect(userCreateArgs.data.role).toBe(UserRole.owner);
       expect(userCreateArgs.data.orgId).toBe('org_1');
+      // Org name is derived from the email local-part (no longer prompted).
       expect(txOrganizationCreate).toHaveBeenCalledWith({
-        data: { name: 'Acme Inc.' },
+        data: { name: "jane's workspace" },
       });
 
       expect(result.user.email).toBe('jane@example.com'); // normalized
@@ -175,7 +175,6 @@ describe('AuthService', () => {
       const result = await authService.register({
         email: 'jane@example.com',
         password: 'Test1234!',
-        orgName: 'Acme Inc.',
       });
 
       // Registration succeeds despite the email failure — the user isn't
@@ -201,7 +200,6 @@ describe('AuthService', () => {
         authService.register({
           email: 'jane@example.com',
           password: 'Test1234!',
-          orgName: 'Acme Inc.',
         }),
       ).rejects.toBeInstanceOf(ConflictException);
 

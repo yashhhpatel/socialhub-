@@ -42,7 +42,6 @@ class _NoopAuthRepo implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async =>
       AuthResult.failure('x');
   @override

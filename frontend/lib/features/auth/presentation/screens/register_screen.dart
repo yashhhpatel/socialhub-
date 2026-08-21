@@ -19,24 +19,14 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _orgNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _orgNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  String? _validateOrgName(String? value) {
-    final trimmed = value?.trim() ?? '';
-    if (trimmed.length < 2 || trimmed.length > 100) {
-      return 'Organization name must be 2–100 characters.';
-    }
-    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -70,7 +60,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     await ref.read(authControllerProvider.notifier).register(
           email: _emailController.text,
           password: _passwordController.text,
-          orgName: _orgNameController.text,
         );
   }
 
@@ -90,12 +79,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           children: [
             if (authState.status == AuthStatus.error)
               AuthErrorBanner(message: authState.errorMessage!),
-            AuthTextField(
-              controller: _orgNameController,
-              label: 'Organization name',
-              validator: _validateOrgName,
-            ),
-            const SizedBox(height: SpacingTokens.md),
             AuthTextField(
               controller: _emailController,
               label: 'Email',

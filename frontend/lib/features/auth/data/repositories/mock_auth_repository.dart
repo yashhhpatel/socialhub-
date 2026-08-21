@@ -38,7 +38,6 @@ class MockAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async {
     await Future<void>.delayed(_simulatedLatency);
 

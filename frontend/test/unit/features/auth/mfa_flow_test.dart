@@ -40,7 +40,6 @@ class _FakeAuthRepository implements AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   }) async =>
       AuthResult.failure('not used');
 

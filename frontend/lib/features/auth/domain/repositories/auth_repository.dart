@@ -18,7 +18,6 @@ abstract class AuthRepository {
   Future<AuthResult> register({
     required String email,
     required String password,
-    required String orgName,
   });
 
   Future<AuthResult> login({
