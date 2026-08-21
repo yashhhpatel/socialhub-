@@ -35,6 +35,7 @@ class AppFooter extends StatelessWidget {
     _FooterLink('Organizations', '/organizations'),
     _FooterLink('Brand Kit', '/brand-kit'),
     _FooterLink('White Label', '/white-label'),
+    _FooterLink('Billing', '/billing'),
     _FooterLink('Settings', '/settings'),
   ];
 

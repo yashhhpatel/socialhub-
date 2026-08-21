@@ -145,6 +145,12 @@ const List<NavCategory> navMenu = [
         icon: Icons.format_paint_outlined,
       ),
       NavLink(
+        path: '/billing',
+        label: 'Billing',
+        description: 'Plan, usage and invoices',
+        icon: Icons.credit_card_outlined,
+      ),
+      NavLink(
         path: '/settings',
         label: 'Settings',
         description: 'Connected accounts & appearance',
