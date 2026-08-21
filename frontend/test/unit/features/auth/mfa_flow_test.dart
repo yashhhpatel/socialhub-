@@ -44,6 +44,10 @@ class _FakeAuthRepository implements AuthRepository {
       AuthResult.failure('not used');
 
   @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async =>
+      AuthResult.failure('not used');
+
+  @override
   Future<void> logout(String refreshToken) async {}
 }
 

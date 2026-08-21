@@ -45,6 +45,9 @@ class _NoopAuthRepo implements AuthRepository {
   }) async =>
       AuthResult.failure('x');
   @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async =>
+      AuthResult.failure('x');
+  @override
   Future<AuthResult> verifyMfa({
     required String challengeToken,
     required String code,

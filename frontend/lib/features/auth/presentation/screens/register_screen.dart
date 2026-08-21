@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/platform/external_redirect.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../state/auth_controller.dart';
 import '../state/auth_state.dart';
+import '../widgets/auth_divider.dart';
 import '../widgets/auth_error_banner.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_submit_button.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/google_sign_in_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -63,6 +67,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
   }
 
+  // Hand off to the backend's server-side Google flow: this navigates the whole
+  // tab to /auth/google/start, which redirects to Google and back. The browser
+  // never handles Google's tokens (see GoogleAuthService).
+  void _continueWithGoogle() {
+    redirectToExternal('$apiBaseUrl/auth/google/start');
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -79,6 +90,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           children: [
             if (authState.status == AuthStatus.error)
               AuthErrorBanner(message: authState.errorMessage!),
+            GoogleSignInButton(
+              onPressed: isLoading ? null : _continueWithGoogle,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            const AuthDivider(label: 'or continue with email'),
+            const SizedBox(height: SpacingTokens.md),
             AuthTextField(
               controller: _emailController,
               label: 'Email',

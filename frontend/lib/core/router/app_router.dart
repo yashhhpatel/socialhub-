@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/google_callback_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/mfa_challenge_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
@@ -96,6 +97,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      // Landing point for the Google sign-in redirect. Standalone (outside the
+      // shell, like /login) and not in navDestinations, so it's reachable while
+      // logged out; it reads the single-use handoff ticket from the URL and
+      // exchanges it for a session, then routes the user on.
+      GoRoute(
+        path: '/auth/google',
+        name: 'auth-google',
+        builder: (context, state) =>
+            GoogleCallbackScreen(ticket: state.uri.queryParameters['ticket']),
       ),
       // Second step of an MFA login (Phase 17.3). Standalone auth screen; the
       // challenge token lives in AuthController state, so a direct visit with

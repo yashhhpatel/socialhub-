@@ -25,6 +25,11 @@ abstract class AuthRepository {
     required String password,
   });
 
+  /// Exchanges the single-use handoff ticket from a server-verified Google
+  /// sign-in (delivered to the SPA in the redirect URL) for a real session —
+  /// the same [AuthResult] every other login path returns.
+  Future<AuthResult> exchangeGoogleTicket(String ticket);
+
   /// Second step of an MFA login (Phase 17.3): exchange the challenge token
   /// from a login's [AuthResult.mfaRequired] plus a TOTP/recovery code for a
   /// real session.

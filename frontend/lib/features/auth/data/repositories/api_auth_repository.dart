@@ -54,6 +54,19 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthResult> exchangeGoogleTicket(String ticket) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/google/exchange',
+        data: {'ticket': ticket},
+      );
+      return AuthResult.success(_sessionFromResponse(response.data!));
+    } on DioException catch (e) {
+      return AuthResult.failure(_extractErrorMessage(e));
+    }
+  }
+
+  @override
   Future<AuthResult> verifyMfa({
     required String challengeToken,
     required String code,
