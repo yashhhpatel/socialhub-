@@ -2,6 +2,15 @@
 
 Architecture only — no implementation code. This expands on the `frontend/` tree from the folder structure doc into the actual patterns each part follows.
 
+> **Corrections (2026-08-22, code is authoritative):**
+> - **Auth is action-level, not page-level.** Pages are browsable while logged out;
+>   only mutating actions redirect to `/login` (see `core/router/route_guards.dart`).
+>   Ignore any "unauthenticated → /login" (page-level) statement below.
+> - **Session persistence** uses `core/storage/key_value_store` (localStorage) via
+>   `authTokenStore` + `SessionProfileStore`; theme is a single fixed dark theme
+>   (not a persisted user preference).
+> - **AI** calls the backend, which uses **OpenAI gpt-4o-mini** (with a dev fallback).
+
 ---
 
 ## 1. Feature-Based Folder Structure

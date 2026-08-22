@@ -9,6 +9,7 @@ import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter'
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
+import { SocialAccountsModule } from '../social-accounts/social-accounts.module';
 import { PublishingController } from './publishing.controller';
 import { PublishingService } from './publishing.service';
 import { FacebookPublishProcessor } from './processors/facebook-publish.processor';
@@ -41,6 +42,9 @@ import { ScheduledPublishDispatcher } from './schedule.cron';
       { name: PUBLISH_QUEUES[Platform.linkedin] },
     ),
     NotificationsModule,
+    // Provides SocialTokenService — publishing ensures a fresh token before
+    // every publish so scheduled posts don't silently fail on expiry.
+    SocialAccountsModule,
   ],
   controllers: [PublishingController],
   providers: [

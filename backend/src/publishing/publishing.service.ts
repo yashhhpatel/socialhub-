@@ -22,6 +22,10 @@ import { InstagramAdapter } from '../social-accounts/adapters/instagram.adapter'
 import { LinkedInAdapter } from '../social-accounts/adapters/linkedin.adapter';
 import { ThreadsAdapter } from '../social-accounts/adapters/threads.adapter';
 import { XAdapter } from '../social-accounts/adapters/x.adapter';
+import {
+  SocialTokenService,
+  TokenReconnectRequiredError,
+} from '../social-accounts/social-token.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   PUBLISH_JOB_OPTIONS,
@@ -68,6 +72,7 @@ export class PublishingService {
     @InjectQueue(PUBLISH_QUEUES[Platform.linkedin])
     linkedinQueue: Queue<PublishJobData>,
     private readonly notifications: NotificationsService,
+    private readonly socialTokens: SocialTokenService,
   ) {
     this.adapters = {
       [Platform.instagram]: instagramAdapter,
@@ -180,6 +185,33 @@ export class PublishingService {
       },
     });
 
+    // Ensure the token is fresh (refresh proactively if near expiry). If the
+    // account is expired/revoked and can't be refreshed, this is a PERMANENT
+    // condition — fail the job terminally now and notify the owner to
+    // reconnect, rather than throwing (which would burn retries and let the
+    // post silently fail every attempt).
+    let accessToken: string;
+    try {
+      accessToken = await this.socialTokens.ensureFreshAccessToken(account);
+    } catch (err) {
+      if (err instanceof TokenReconnectRequiredError) {
+        await this.prisma.publishJob.update({
+          where: { id: job.id },
+          data: {
+            status: PublishJobStatus.failed,
+            lastError: `${account.platform} needs to be reconnected (token ${err.status}). Reconnect the account in Settings and republish.`,
+          },
+        });
+        await this.notifyOwner(variant.assetId, account.platform, {
+          type: 'publish_failed',
+          title: 'Reconnect required',
+          body: `Your ${account.platform} account needs to be reconnected before posts can publish.`,
+        });
+        return; // terminal — do not throw, do not retry
+      }
+      throw err;
+    }
+
     try {
       const result = await adapter.publish({
         imageUrl: variant.renderedMediaUrl,
@@ -188,7 +220,7 @@ export class PublishingService {
         // without one and must not resurrect the variant's older text.
         caption: data.caption ?? variant.caption ?? '',
         externalAccountId: account.externalAccountId,
-        accessToken: this.tokenEncryption.decrypt(account.accessTokenEnc),
+        accessToken,
       });
 
       await this.prisma.publishJob.update({

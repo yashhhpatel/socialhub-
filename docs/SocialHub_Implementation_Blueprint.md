@@ -3,6 +3,13 @@
 
 Each **Phase** defines the scope. Each **Milestone** inside it is sized to ~1–3 hours of focused work and builds on the one before it.
 
+> **Implementation status (as of 2026-08-22):** **Phases 0–15 are implemented**, as are
+> the four follow-on phases (16 Meta compliance, 17 account security, 18 billing, 19
+> notifications + media library) that were originally proposed in `GAP_ANALYSIS.md`.
+> Only **Phase 20 (production hardening / GA)** remains open. This document is retained
+> as the planning/history record; for the live, per-feature status and the current gap
+> list, see **`GAP_ANALYSIS.md`** (the reconciled source of truth).
+
 ---
 
 # PHASE 0 — Project Foundation & Tooling

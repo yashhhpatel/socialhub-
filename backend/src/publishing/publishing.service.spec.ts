@@ -1,6 +1,7 @@
 import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 
+import { TokenReconnectRequiredError } from '../social-accounts/social-token.service';
 import { PUBLISH_JOB_OPTIONS, PUBLISH_QUEUES } from './publish-queue.constants';
 import { PublishingService } from './publishing.service';
 
@@ -28,6 +29,7 @@ describe('PublishingService', () => {
   let fbQueue: { add: jest.Mock };
   let thQueue: { add: jest.Mock };
   let liQueue: { add: jest.Mock };
+  let socialTokens: { ensureFreshAccessToken: jest.Mock };
 
   const readyVariant = {
     id: 'var_1',
@@ -88,6 +90,15 @@ describe('PublishingService', () => {
     fbQueue = { add: jest.fn().mockResolvedValue(undefined) };
     thQueue = { add: jest.fn().mockResolvedValue(undefined) };
     liQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    // Token freshness (Phase 20): by default return the decrypted access token,
+    // as the real service would after a (no-op) refresh, so publish tests are
+    // unaffected. Individual tests override it to exercise the reconnect path.
+    socialTokens = {
+      ensureFreshAccessToken: jest.fn(
+        async (a: { accessTokenEnc: string }) =>
+          a.accessTokenEnc.replace(/^ENC\(|\)$/g, ''),
+      ),
+    };
 
     service = new PublishingService(
       prisma as never,
@@ -104,6 +115,7 @@ describe('PublishingService', () => {
       liQueue as never,
       // Notifications (Phase 19) — best-effort, no-op in these tests.
       { notifySafe: jest.fn().mockResolvedValue(undefined) } as never,
+      socialTokens as never,
     );
   });
 
@@ -239,6 +251,24 @@ describe('PublishingService', () => {
       expect(prisma.publishJob.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'published', externalPostId: 'tweet_9' }),
+        }),
+      );
+    });
+
+    it('fails the job terminally (no retry, no post) when the token needs reconnection', async () => {
+      socialTokens.ensureFreshAccessToken.mockRejectedValue(
+        new TokenReconnectRequiredError(Platform.x, 'revoked' as never),
+      );
+
+      // Must NOT throw — a reconnect is permanent, so BullMQ should not retry.
+      await expect(
+        service.executePublish({ publishJobId: 'job_1' }, { attemptsMade: 0, maxAttempts: 3 }),
+      ).resolves.toBeUndefined();
+
+      expect(xAdapter.publish).not.toHaveBeenCalled();
+      expect(prisma.publishJob.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'failed' }),
         }),
       );
     });

@@ -17,6 +17,7 @@ import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { CommentsModule } from './content/comments/comments.module';
 import { ContentModule } from './content/content.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { MediaModule } from './media/media.module';
 import { InvitesModule } from './organizations/invites/invites.module';
@@ -27,6 +28,7 @@ import { QueueModule } from './queue/queue.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { TemplatesModule } from './templates/templates.module';
 import { UsersModule } from './users/users.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 /**
  * Root module. Additional feature modules (publishing, ai, analytics,
@@ -60,6 +62,7 @@ import { UsersModule } from './users/users.module';
     SocialAccountsModule,
     ContentModule,
     MediaModule,
+    DashboardModule,
     CommentsModule,
     PublishingModule,
     AiModule,
@@ -69,6 +72,7 @@ import { UsersModule } from './users/users.module';
     AuditModule,
     BillingModule,
     NotificationsModule,
+    WebhooksModule,
     RateLimitModule,
   ],
   providers: [
