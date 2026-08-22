@@ -28,6 +28,7 @@ import { QueueModule } from './queue/queue.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { TemplatesModule } from './templates/templates.module';
 import { UsersModule } from './users/users.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 /**
  * Root module. Additional feature modules (publishing, ai, analytics,
@@ -71,6 +72,7 @@ import { UsersModule } from './users/users.module';
     AuditModule,
     BillingModule,
     NotificationsModule,
+    WebhooksModule,
     RateLimitModule,
   ],
   providers: [
