@@ -2,6 +2,13 @@
 
 No implementation — endpoint contracts only. GraphQL (analytics dashboard queries) is out of scope here per the architecture doc; this covers every REST endpoint.
 
+> **Authoritative source (as of 2026-08-22):** the NestJS controllers in
+> `backend/src/**/*.controller.ts`. Sections 1–7 below capture the original MVP→V1
+> contracts and remain accurate for those routes. Many endpoint groups have since
+> been added (security, billing, notifications, media, Google auth, and more).
+> **See [§12 — Endpoints added since initial design](#12-endpoints-added-since-initial-design)**
+> for the current surface, and defer to the controllers for exact request/response shapes.
+
 ---
 
 ## 0. Global Conventions (apply to every endpoint below, not repeated each time)
@@ -77,8 +84,11 @@ GET /resource?page=1&limit=20&sort=-createdAt
 - **Auth:** Public
 - **Request:**
 ```json
-{ "email": "jane@acme.com", "password": "MinLength8!", "orgName": "Acme Inc." }
+{ "email": "jane@acme.com", "password": "MinLength8!" }
 ```
+> **Updated (2026-08-22):** signup no longer accepts `orgName`. A default workspace is
+> auto-created and named from the email local-part (e.g. `jane's workspace`), renameable
+> later in settings.
 - **Response (201):**
 ```json
 {
@@ -87,7 +97,7 @@ GET /resource?page=1&limit=20&sort=-createdAt
   "refreshToken": "eyJ..."
 }
 ```
-- **Validation:** `email` valid format + unique; `password` min 8 chars, 1 number, 1 symbol; `orgName` 2–100 chars
+- **Validation:** `email` valid format + unique; `password` min 8 chars, 1 number, 1 symbol
 - **Error responses:** 409 if email already registered
 - **Permissions:** none (creates the first user/org)
 - **Swagger:** `RegisterDto` request body, `AuthResponseDto` response, tagged `Auth`
@@ -580,3 +590,64 @@ GET /api/docs-json       → Raw OpenAPI JSON (feeds packages/api-contracts/open
 - **Auth documentation:** `@ApiBearerAuth('access-token')` applied at controller level for all authenticated modules, with a global security scheme named `access-token` registered once in `main.ts`'s Swagger setup — so Swagger UI's "Authorize" button works across every tagged group in one step.
 - **Versioning:** all routes prefixed `/v1` via a global route prefix, so `/v2` can be introduced later without breaking existing integrations — reflected as `servers: [{ url: '/v1' }]` in the generated spec.
 - **Contract sync check:** as noted in the folder structure doc, `contract-drift-check.yml` in CI fails the build if the live generated `docs-json` output doesn't match the checked-in `packages/api-contracts/openapi.yaml` — Swagger docs are never allowed to silently go stale relative to the actual DTOs.
+
+---
+
+## 12. Endpoints added since initial design
+
+*(Reconciliation as of 2026-08-22. Grouped by controller; see
+`backend/src/**/*.controller.ts` for request/response detail. All are JWT-guarded
+unless marked **public**.)*
+
+**Auth — account lifecycle & security** (`auth.controller.ts`)
+- `POST /auth/verify-email` (public), `POST /auth/verify-email/resend`
+- `POST /auth/password-reset/request` (public), `POST /auth/password-reset` (public)
+- `GET /auth/mfa/status`, `POST /auth/mfa/setup`, `POST /auth/mfa/enable`,
+  `POST /auth/mfa/disable`, `POST /auth/mfa/verify` (public — challenge token is the credential)
+
+**Auth — Google sign-in** (`auth/google-auth.controller.ts`, all public)
+- `GET /auth/google/start` → redirects to Google consent
+- `GET /auth/google/callback` → server-side code exchange + verification, then redirect with a single-use ticket
+- `POST /auth/google/exchange` → swaps the ticket for the standard session response
+
+**Auth — SSO (SAML)** (`auth/sso/sso.controller.ts`)
+- `GET /auth/sso/:orgId/login` (public), `POST /auth/sso/callback` (public), `PATCH /auth/sso/config`
+
+**Users** (`users/users.controller.ts`)
+- `GET /users/me`, `GET /users/me/export` (data export), `DELETE /users/me` (account deletion)
+
+**Organizations** (`organizations/*`)
+- `GET /organizations/me`
+- `GET /organizations/:orgId/invites`, `DELETE /organizations/:orgId/invites/:inviteId`
+- `GET /organizations/:orgId/members`, `PATCH /organizations/:orgId/members/:userId/role`
+- `GET /organizations/white-label`, `PATCH /organizations/:orgId/white-label`
+
+**Social accounts — compliance & extra platforms** (`social-accounts.controller.ts`)
+- `POST/GET` connect+callback for `facebook`, `threads`, `linkedin` (in addition to `instagram`, `x`)
+- `POST /social-accounts/:platform/deauthorize`, `POST /social-accounts/:platform/data-deletion`,
+  `GET /social-accounts/data-deletion/status` (Meta compliance)
+
+**Content — approval & comments** (`content/*`)
+- `PATCH /content/assets/:id/approval`, `GET/PATCH /content/approval-policy`
+- `POST/GET /content/assets/:assetId/comments`
+- `POST /content/assets/upload`
+
+**Billing** (`billing/billing.controller.ts`)
+- `GET /billing`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/webhook` (public — Stripe-signed)
+
+**Notifications** (`notifications/notifications.controller.ts`)
+- `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/:id/read`, `POST /notifications/read-all`
+
+**Media library** (`media/media.controller.ts`)
+- `GET /media`, `POST /media/upload`, `DELETE /media/:id`
+
+**Templates & marketplace** (`templates/*`)
+- `GET /templates`, `GET /templates/:id`, `POST /templates`
+- `GET /templates/marketplace`, `POST /templates/:id/publish`, `POST /templates/:id/clone`
+
+**Brand kits** (`brand-kits/brand-kits.controller.ts`): `GET /brand-kits`, `PATCH /brand-kits`
+
+**Analytics** (`analytics/analytics.controller.ts`): `GET /analytics/overview`, `GET /analytics/posts/:variantId`
+(plus a GraphQL resolver at `POST /graphql`, currently unused by the frontend)
+
+**Audit** (`audit/audit.controller.ts`): `GET /audit-logs`

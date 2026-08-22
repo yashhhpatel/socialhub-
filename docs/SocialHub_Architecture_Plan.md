@@ -158,6 +158,14 @@ GraphQL is layered in only for the analytics/dashboard aggregation views, where 
 
 ## 11. Phased Roadmap
 
+> **Status (2026-08-22):** MVP, V1, V2, and Enterprise tiers below are **all
+> implemented**, plus billing, account security/lifecycle, Meta compliance,
+> notifications, and a persistent media library. Remaining work is production
+> hardening/GA (E2E automation, observability maturity, IaC + prod deploy, webhooks,
+> proactive social-token refresh, dashboard-to-live-data). See `GAP_ANALYSIS.md` for
+> the reconciled per-feature status. Note: the AI layer runs on **OpenAI gpt-4o-mini**
+> (with a dev fallback), not the provider named elsewhere in earlier drafts.
+
 **MVP (prove the core loop)**
 - Auth, single-org accounts, connect 2 platforms (e.g., Instagram + X)
 - Basic editor (image only, core tools: crop/resize/text/layers)

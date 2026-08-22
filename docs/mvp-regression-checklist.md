@@ -1,5 +1,10 @@
 # SocialHub — MVP Regression Checklist
 
+> **Note (2026-08-22):** the app now uses **action-level** auth — pages are browsable
+> while logged out and only mutating actions redirect to `/login`. Any "logged-out user
+> is redirected to /login" step below should be read as "logged-out user can browse; the
+> *action* prompts login." The MVP path itself is unchanged.
+
 Milestone 6.3. Run this before promoting a build to staging or production.
 It exercises the full MVP path end to end — **register → connect an account
 → design → publish → view the result** — plus the cross-cutting concerns

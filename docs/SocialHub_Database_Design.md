@@ -2,6 +2,13 @@
 
 Schema is presented as it exists at the end of the roadmap (MVP → Enterprise), built incrementally by the migrations each blueprint phase introduces. PostgreSQL + Prisma, as specified in the architecture doc.
 
+> **Authoritative source (as of 2026-08-22):** `backend/prisma/schema.prisma` and
+> the 23 applied migrations under `backend/prisma/migrations/`. Sections 1–7 below
+> reflect the original design; the schema has since grown (billing, notifications,
+> media, account-security, Google auth). **See [§10 — Schema delta since initial
+> design](#10-schema-delta-since-initial-design)** for what was added, and defer to
+> the Prisma file for exact field definitions.
+
 ---
 
 ## 1. ER Diagram
@@ -609,3 +616,42 @@ model SsoConfig {
 - **Read replicas**: analytics dashboard queries (Phase 10) are read-heavy and tolerant of slight staleness — route `analytics.resolver.ts` queries to a read replica once write load on the primary becomes a contention point, rather than scaling the primary vertically indefinitely.
 - **Connection pooling**: NestJS + Prisma against RDS should sit behind PgBouncer (or RDS Proxy) once concurrent background workers (BullMQ processors) plus API instances start approaching Postgres's native connection limits — this becomes relevant once Phase 8's five parallel platform-queue processors are all running concurrently in production.
 - **JSONB fields (`canvas_json`) are intentionally schemaless** for editor flexibility, but that means they're **not indexed for querying by internal structure** — any future feature needing to query "designs containing a video layer," for example, would need either a GIN index on the JSONB column or a denormalized boolean/enum column added alongside it. Don't reach for deep JSONB querying as a default; add a real column when a real query need appears.
+
+---
+
+## 10. Schema delta since initial design
+
+*(Reconciliation as of 2026-08-22. The live schema is `backend/prisma/schema.prisma`;
+these are the tables/enums/fields added after §1–7 were written. Field-level detail
+lives in the Prisma file to avoid re-drift.)*
+
+**New models (Phases 16–19 + auth follow-ups):**
+
+| Model | Purpose |
+|---|---|
+| `Subscription` | Stripe subscription state per org (customer/subscription id, `planTier`, `SubscriptionStatus`, period end, cancel-at-period-end). Billing (Phase 18). |
+| `Invoice` | Per-org invoice records mirrored from Stripe (amount due/paid, currency, status, hosted URL). Billing (Phase 18). |
+| `Notification` | Per-user in-app notifications (`type`, `title`, `body`, `linkPath`, `readAt`). Phase 19. |
+| `MediaAsset` | Persistent org-scoped media library items (`url`, `publicId`, `type`, `name`, `posterUrl`). Phase 19. |
+| `MfaRecoveryCode` | One-time TOTP recovery codes. Phase 17.3. |
+| `UserToken` | Single-use, expiring tokens (`UserTokenType`, hashed, `consumedAt`) — email verification, password reset, and the Google login handoff. Phase 17.1 / Google auth. |
+| `DataDeletionRequest` | Meta data-deletion callback tracking. Phase 16. |
+| `IngestionRun` | Analytics ingestion run bookkeeping (`IngestionStatus`). Phase 10 ingestion cron. |
+
+**New enums:** `SubscriptionStatus`, `UserTokenType` (`email_verification`,
+`password_reset`, `google_login_handoff`), `IngestionStatus`.
+
+**`User` model changes:**
+- `passwordHash` is now **nullable** (accounts that only sign in with Google have none).
+- Added `googleId` (unique, nullable) — links a Google identity.
+- Added `emailVerifiedAt` (Phase 17.1), `mfaEnabled` + `mfaSecretEnc` (Phase 17.3),
+  and the `notifications` relation.
+
+**Corrections to §7 as written:**
+- `User.role` uses `@default(editor)` (the doc's `@default(member: editor)` was never
+  valid Prisma and does not match the code).
+- `AIUsageLog` is the actual model name (doc shows `AiUsageLog`).
+
+**Migration reality:** migrations are applied with `prisma migrate deploy` (or
+`migrate dev` locally) — there is no `deploy-production.yml`, `CODEOWNERS` review gate,
+or `prisma/seed.ts` in the repo yet; §8's references to those remain aspirational.
