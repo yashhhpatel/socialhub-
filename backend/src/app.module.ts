@@ -17,6 +17,7 @@ import { BrandKitsModule } from './brand-kits/brand-kits.module';
 import { ConfigModule } from './config/config.module';
 import { CommentsModule } from './content/comments/comments.module';
 import { ContentModule } from './content/content.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { MediaModule } from './media/media.module';
 import { InvitesModule } from './organizations/invites/invites.module';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     SocialAccountsModule,
     ContentModule,
     MediaModule,
+    DashboardModule,
     CommentsModule,
     PublishingModule,
     AiModule,

@@ -2,25 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/motion/staggered_item.dart';
+import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/breakpoints.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
-import '../../data/dashboard_mock_data.dart';
+import '../../data/api_dashboard_repository.dart';
+import '../../domain/entities/dashboard_summary.dart';
 import '../widgets/recent_activity_card.dart';
 import '../widgets/stat_card.dart';
 
 /// The real dashboard content — rendered inside AppShell's content area,
 /// not a standalone Scaffold (AppShell owns the sidebar/top bar now).
 ///
-/// Data comes from dashboardSummaryProvider, currently backed by mock
-/// data (see features/dashboard/data/dashboard_mock_data.dart) — this
-/// screen has no idea that's true, since it only depends on the
-/// DashboardSummary shape, not how it's produced.
+/// Data comes from the live `GET /dashboard/summary` endpoint via
+/// dashboardSummaryProvider (org-scoped, real PostgreSQL data). The screen
+/// handles loading, error (with retry), and empty states; the visual design of
+/// the loaded view is unchanged.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(dashboardSummaryProvider);
+    final summaryAsync = ref.watch(dashboardSummaryProvider);
+
+    return summaryAsync.when(
+      loading: () => const _DashboardLoading(),
+      error: (error, _) => _DashboardError(
+        message: describeApiError(error),
+        onRetry: () => ref.invalidate(dashboardSummaryProvider),
+      ),
+      data: (summary) => _DashboardContent(summary: summary),
+    );
+  }
+}
+
+class _DashboardContent extends StatelessWidget {
+  const _DashboardContent({required this.summary});
+
+  final DashboardSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
     final columns = Breakpoints.isDesktop(context)
         ? 3
         : Breakpoints.isTablet(context)
@@ -87,10 +108,12 @@ class DashboardScreen extends ConsumerWidget {
                 child: StatCard(
                   icon: Icons.auto_awesome_outlined,
                   label: 'AI Credits',
-                  value:
-                      '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
-                  subtitle:
-                      '${(summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
+                  value: summary.aiCreditsUnlimited
+                      ? '${summary.aiCreditsUsed}'
+                      : '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
+                  subtitle: summary.aiCreditsUnlimited
+                      ? 'Unlimited'
+                      : '${summary.aiCreditsTotal == 0 ? 0 : (summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
                 ),
               ),
             ],
@@ -98,6 +121,60 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: SpacingTokens.lg),
           RecentActivityCard(items: summary.recentActivity),
         ],
+      ),
+    );
+  }
+}
+
+/// Loading state — a lightweight centered spinner in the content area.
+class _DashboardLoading extends StatelessWidget {
+  const _DashboardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(SpacingTokens.lg),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+/// Error state with a retry action — no fake fallback data is ever shown.
+class _DashboardError extends StatelessWidget {
+  const _DashboardError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 40, color: theme.colorScheme.error),
+            const SizedBox(height: SpacingTokens.md),
+            Text(
+              "Couldn't load your dashboard",
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
