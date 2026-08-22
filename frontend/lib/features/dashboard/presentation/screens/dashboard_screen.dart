@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
@@ -26,10 +27,14 @@ class DashboardScreen extends ConsumerWidget {
 
     return summaryAsync.when(
       loading: () => const _DashboardLoading(),
-      error: (error, _) => _DashboardError(
-        message: describeApiError(error),
-        onRetry: () => ref.invalidate(dashboardSummaryProvider),
-      ),
+      error: (error, _) => isUnauthorized(error)
+          // Logged out: the page stays reachable (browse-freely), but the
+          // data needs an account — show a calm prompt, not a red error.
+          ? const _DashboardLoggedOut()
+          : _DashboardError(
+              message: describeApiError(error),
+              onRetry: () => ref.invalidate(dashboardSummaryProvider),
+            ),
       data: (summary) => _DashboardContent(summary: summary),
     );
   }
@@ -135,6 +140,46 @@ class _DashboardLoading extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.all(SpacingTokens.lg),
       child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+/// Logged-out state — the dashboard's data is per-account, so invite the user
+/// to log in rather than showing an error. Matches the app's browse-freely,
+/// gate-actions pattern.
+class _DashboardLoggedOut extends StatelessWidget {
+  const _DashboardLoggedOut();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.insights_outlined,
+              size: 40,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            Text('Your dashboard', style: theme.textTheme.titleMedium),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              'Log in to see your scheduled posts, activity, and usage.',
+              style: theme.textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            FilledButton(
+              onPressed: () => context.go('/login?from=/dashboard'),
+              child: const Text('Log in'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,5 +108,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No recent activity yet.'), findsOneWidget);
+  });
+
+  testWidgets('logged out (401): calm log-in prompt, not a red error',
+      (tester) async {
+    await tester.pumpWidget(_host(<Override>[
+      dashboardSummaryProvider.overrideWith(
+        (ref) async => throw DioException(
+          requestOptions: RequestOptions(path: '/dashboard/summary'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/dashboard/summary'),
+            statusCode: 401,
+          ),
+        ),
+      ),
+    ],),);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Log in to see'), findsOneWidget);
+    expect(find.text('Log in'), findsOneWidget);
+    // The alarming error card must NOT show for a plain logged-out state.
+    expect(find.textContaining("Couldn't load your dashboard"), findsNothing);
   });
 }
