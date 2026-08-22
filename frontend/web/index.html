@@ -14,18 +14,19 @@
   <meta name="apple-mobile-web-app-title" content="SocialHub">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#8B5CF6">
+  <meta name="theme-color" content="#0D0F14">
 
   <title>SocialHub</title>
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <style>
-    /* First-paint loading state: a calm lavender wash + spinner shown
+    /* First-paint loading state: matches the app's Midnight Studio dark theme
+       (see core/theme/app_colors.dart) so there's no light-to-dark flash
        before the Flutter engine finishes booting. Flutter paints its own
        opaque canvas on top, so this naturally disappears once loaded. */
     html, body { margin: 0; height: 100%; }
     body {
-      background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 55%, #FFFFFF 100%);
+      background: #0D0F14; /* AppColors.background */
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     #boot-loader {
@@ -36,15 +37,15 @@
     }
     #boot-loader .mark {
       width: 52px; height: 52px; border-radius: 16px;
-      background: linear-gradient(135deg, #8B5CF6, #C4B5FD);
-      box-shadow: 0 8px 22px rgba(139, 92, 246, 0.4);
+      background: linear-gradient(135deg, #6C5CE7, #A29BFE); /* accent → accentHover */
+      box-shadow: 0 8px 22px rgba(108, 92, 231, 0.4);
     }
     #boot-loader .spinner {
       width: 26px; height: 26px; border-radius: 50%;
-      border: 3px solid #E4DEF7; border-top-color: #8B5CF6;
+      border: 3px solid #2A303C; border-top-color: #6C5CE7; /* border / accent */
       animation: spin 0.8s linear infinite;
     }
-    #boot-loader .label { color: #6E6A85; font-size: 14px; }
+    #boot-loader .label { color: #8A92A3; font-size: 14px; } /* textMuted */
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>

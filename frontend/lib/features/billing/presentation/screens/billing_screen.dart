@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
@@ -74,11 +75,8 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           overviewAsync.when(
             loading: () => const _BillingSkeleton(),
             error: (error, _) => isUnauthorized(error)
-                ? Text(
-                    'Log in to view your billing.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                ? _LoggedOutBilling(
+                    onAction: () => context.go('/login?from=/billing'),
                   )
                 : _ErrorState(
                     message: describeApiError(error),
@@ -337,6 +335,58 @@ class _UsageBar extends StatelessWidget {
   }
 }
 
+// Purchasable tiers with a short, honest blurb (real price shows on Stripe).
+const _purchasablePlans = [
+  (tier: 'starter', name: 'Starter', blurb: '5 accounts · 5 members · 500 AI credits'),
+  (tier: 'pro', name: 'Pro', blurb: '15 accounts · 20 members · 5,000 AI credits'),
+  (tier: 'enterprise', name: 'Enterprise', blurb: 'Unlimited accounts, members & AI'),
+];
+
+/// Logged-out billing: the page stays visible (plans are public), but every
+/// action routes to login — the browse-freely, gate-actions pattern.
+class _LoggedOutBilling extends StatelessWidget {
+  const _LoggedOutBilling({required this.onAction});
+
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Log in to manage your plan and see usage.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        Wrap(
+          spacing: SpacingTokens.md,
+          runSpacing: SpacingTokens.md,
+          children: [
+            for (final p in _purchasablePlans)
+              SizedBox(
+                width: 260,
+                child: _PlanCard(
+                  tier: p.tier,
+                  name: p.name,
+                  blurb: p.blurb,
+                  isCurrent: false,
+                  // Enabled so a click is possible — it routes to login.
+                  canPurchase: true,
+                  busy: false,
+                  onUpgrade: onAction,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _PlanGrid extends StatelessWidget {
   const _PlanGrid({
     required this.overview,
@@ -350,20 +400,13 @@ class _PlanGrid extends StatelessWidget {
   final String? busyTier;
   final void Function(String tier) onUpgrade;
 
-  // Purchasable tiers with a short, honest blurb (real price shows on Stripe).
-  static const _plans = [
-    (tier: 'starter', name: 'Starter', blurb: '5 accounts · 5 members · 500 AI credits'),
-    (tier: 'pro', name: 'Pro', blurb: '15 accounts · 20 members · 5,000 AI credits'),
-    (tier: 'enterprise', name: 'Enterprise', blurb: 'Unlimited accounts, members & AI'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: SpacingTokens.md,
       runSpacing: SpacingTokens.md,
       children: [
-        for (final p in _plans)
+        for (final p in _purchasablePlans)
           SizedBox(
             width: 260,
             child: _PlanCard(

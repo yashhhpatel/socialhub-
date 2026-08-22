@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -121,6 +122,39 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('last payment failed'), findsOneWidget);
+    });
+
+    testWidgets('logged out (401): plans stay visible, actions gated',
+        (tester) async {
+      final overrides = <Override>[
+        billingOverviewProvider.overrideWith(
+          (ref) async => throw DioException(
+            requestOptions: RequestOptions(path: '/billing'),
+            response: Response(
+              requestOptions: RequestOptions(path: '/billing'),
+              statusCode: 401,
+            ),
+          ),
+        ),
+        // Value is irrelevant here — the 401 branch renders the logged-out
+        // billing view regardless of role.
+        currentUserProvider.overrideWith((ref) async => _user(AppRole.viewer)),
+      ];
+      await tester.pumpWidget(_host(overrides: overrides));
+      await tester.pumpAndSettle();
+
+      // Page + plans remain visible when logged out.
+      expect(find.text('Billing'), findsOneWidget);
+      expect(find.textContaining('Log in to manage your plan'), findsOneWidget);
+      expect(find.text('Starter'), findsOneWidget);
+      expect(find.text('Pro'), findsOneWidget);
+      expect(find.text('Enterprise'), findsOneWidget);
+      // Upgrade buttons are present and enabled (a tap routes to login).
+      final upgrades = tester.widgetList<FilledButton>(
+        find.widgetWithText(FilledButton, 'Upgrade'),
+      );
+      expect(upgrades, isNotEmpty);
+      expect(upgrades.every((b) => b.onPressed != null), isTrue);
     });
   });
 }
