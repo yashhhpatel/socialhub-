@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/screens/admin_home_screen.dart';
+import '../../features/admin/presentation/widgets/admin_shell.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
@@ -152,6 +154,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ref.read(authTokenStoreProvider) == null ? '/login' : null,
         builder: (context, state) =>
             EditorScreen(assetId: state.pathParameters['assetId']!),
+      ),
+      // Platform admin panel (Phase 21). Standalone, OUTSIDE the tenant
+      // AppShell — it has its own AdminShell (header + sidebar). Reachable only
+      // by platform admins; AdminShell enforces the client gate and the backend
+      // enforces it independently via PlatformAdminGuard. Not in navDestinations,
+      // so authRedirect leaves it addressable (the shell handles logged-out).
+      GoRoute(
+        path: '/admin',
+        name: 'admin',
+        builder: (context, state) => const AdminShell(
+          selectedPath: '/admin',
+          child: AdminHomeScreen(),
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(

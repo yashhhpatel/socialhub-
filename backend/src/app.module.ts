@@ -4,6 +4,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { AdminModule } from './admin/admin.module';
 import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
@@ -73,6 +74,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     BillingModule,
     NotificationsModule,
     WebhooksModule,
+    AdminModule,
     RateLimitModule,
   ],
   providers: [
