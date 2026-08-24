@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/screens/admin_org_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_organizations_screen.dart';
 import '../../features/admin/presentation/screens/admin_overview_screen.dart';
 import '../../features/admin/presentation/widgets/admin_shell.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
@@ -166,6 +168,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminShell(
           selectedPath: '/admin',
           child: AdminOverviewScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/organizations',
+        name: 'admin-organizations',
+        builder: (context, state) => const AdminShell(
+          selectedPath: '/admin/organizations',
+          child: AdminOrganizationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/organizations/:id',
+        name: 'admin-organization-detail',
+        builder: (context, state) => AdminShell(
+          selectedPath: '/admin/organizations',
+          child: AdminOrgDetailScreen(orgId: state.pathParameters['id']!),
         ),
       ),
       ShellRoute(

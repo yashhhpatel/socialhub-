@@ -1,8 +1,20 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
+import {
+  AdminOrgDetailDto,
+  AdminOrgListDto,
+} from './dto/admin-organizations.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 
@@ -19,7 +31,10 @@ interface AuthedRequest extends Request {
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly overviewService: AdminOverviewService) {}
+  constructor(
+    private readonly overviewService: AdminOverviewService,
+    private readonly organizationsService: AdminOrganizationsService,
+  ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
   @Get('me')
@@ -31,5 +46,25 @@ export class AdminController {
   @Get('overview')
   overview(): Promise<AdminOverviewDto> {
     return this.overviewService.overview();
+  }
+
+  /** Paginated, searchable organization list (21.3). */
+  @Get('organizations')
+  listOrganizations(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminOrgListDto> {
+    return this.organizationsService.list({
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** Full detail for one organization (21.3). */
+  @Get('organizations/:id')
+  organizationDetail(@Param('id') id: string): Promise<AdminOrgDetailDto> {
+    return this.organizationsService.detail(id);
   }
 }

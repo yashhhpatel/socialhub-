@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
+import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
 
 /// Talks to the platform-admin API (`/admin/*`, Phase 21). Every call is gated
@@ -25,6 +26,30 @@ class ApiAdminRepository {
     final response = await _dio.get<Map<String, dynamic>>('/admin/overview');
     return AdminOverview.fromJson(response.data!);
   }
+
+  /// Paginated, searchable organization list (21.3).
+  Future<AdminOrgList> organizations({
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/admin/organizations',
+      queryParameters: {
+        if (search != null && search.isNotEmpty) 'search': search,
+        'page': page,
+        'limit': limit,
+      },
+    );
+    return AdminOrgList.fromJson(response.data!);
+  }
+
+  /// One organization's full detail (21.3).
+  Future<AdminOrgDetail> organization(String id) async {
+    final response =
+        await _dio.get<Map<String, dynamic>>('/admin/organizations/$id');
+    return AdminOrgDetail.fromJson(response.data!);
+  }
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -42,4 +67,21 @@ final adminOverviewProvider =
     FutureProvider.autoDispose<AdminOverview>((ref) async {
   ref.watch(authTokenStoreProvider.select((t) => t != null));
   return ref.watch(adminRepositoryProvider).overview();
+});
+
+/// Query for the organizations list (search + page).
+typedef AdminOrgQuery = ({String search, int page});
+
+/// Organizations list (21.3), keyed by search + page.
+final adminOrganizationsProvider = FutureProvider.autoDispose
+    .family<AdminOrgList, AdminOrgQuery>((ref, query) async {
+  return ref
+      .watch(adminRepositoryProvider)
+      .organizations(search: query.search, page: query.page);
+});
+
+/// One organization's detail (21.3), keyed by id.
+final adminOrganizationProvider = FutureProvider.autoDispose
+    .family<AdminOrgDetail, String>((ref, id) async {
+  return ref.watch(adminRepositoryProvider).organization(id);
 });
