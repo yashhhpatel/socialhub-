@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -125,6 +126,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    // Refuse a suspended workspace (Phase 21.9) — checked only after the
+    // credentials are verified, so it never reveals suspension to an
+    // unauthenticated probe.
+    await this.assertOrgActive(user.orgId);
+
     // Password is correct. If MFA is on, DON'T issue a session yet and DON'T
     // clear the throttle counter — hand back a short-lived challenge the client
     // exchanges with a second factor at completeMfaLogin. Clearing the counter
@@ -155,6 +161,7 @@ export class AuthService {
     const userId = await this.mfaService.verifyChallenge(challengeToken, code);
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException();
+    await this.assertOrgActive(user.orgId);
     // Full login now complete — clear any lingering failure counter.
     await this.throttle.recordLoginSuccess(user.email);
     return this.issueTokenPair(user.id, user.email, user.role, user.orgId);
@@ -268,6 +275,19 @@ export class AuthService {
       accessToken,
       refreshToken: rawRefreshToken,
     };
+  }
+
+  /** Blocks a login when the user's workspace has been suspended (Phase 21.9). */
+  private async assertOrgActive(orgId: string): Promise<void> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { status: true },
+    });
+    if (org?.status === 'suspended') {
+      throw new ForbiddenException(
+        'This workspace has been suspended. Contact support.',
+      );
+    }
   }
 
   // Refresh tokens are stored hashed (SHA-256 is sufficient here — unlike

@@ -33,6 +33,7 @@ describe('AuthService', () => {
       update: jest.Mock;
       updateMany: jest.Mock;
     };
+    organization: { findUnique: jest.Mock };
   };
   let txOrganizationCreate: jest.Mock;
   let txUserCreate: jest.Mock;
@@ -74,6 +75,8 @@ describe('AuthService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      // Suspension check (Phase 21.9) — active by default.
+      organization: { findUnique: jest.fn().mockResolvedValue({ status: 'active' }) },
     };
 
     const module: TestingModule = await Test.createTestingModule({

@@ -47,7 +47,31 @@ class AdminOrgDetailScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            data: (o) => _Detail(org: o),
+            data: (o) => _Detail(
+              org: o,
+              onToggleSuspend: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final repo = ref.read(adminRepositoryProvider);
+                final suspend = o.status != 'suspended';
+                try {
+                  if (suspend) {
+                    await repo.suspendOrg(o.id);
+                  } else {
+                    await repo.reactivateOrg(o.id);
+                  }
+                  ref.invalidate(adminOrganizationProvider(orgId));
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(suspend ? 'Workspace suspended.' : 'Workspace reactivated.'),
+                    ),
+                  );
+                } catch (error) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Failed: ${describeApiError(error)}')),
+                  );
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -56,25 +80,49 @@ class AdminOrgDetailScreen extends ConsumerWidget {
 }
 
 class _Detail extends StatelessWidget {
-  const _Detail({required this.org});
+  const _Detail({required this.org, required this.onToggleSuspend});
 
   final AdminOrgDetail org;
+  final VoidCallback onToggleSuspend;
 
   String _limit(int v) => v < 0 ? '∞' : '$v';
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final suspended = org.status == 'suspended';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(org.name, style: theme.textTheme.headlineLarge),
+        Row(
+          children: [
+            Expanded(
+              child: Text(org.name, style: theme.textTheme.headlineLarge),
+            ),
+            OutlinedButton.icon(
+              onPressed: onToggleSuspend,
+              icon: Icon(
+                suspended ? Icons.play_circle_outline : Icons.block,
+                size: 18,
+              ),
+              style: suspended
+                  ? null
+                  : OutlinedButton.styleFrom(foregroundColor: theme.colorScheme.error),
+              label: Text(suspended ? 'Reactivate' : 'Suspend'),
+            ),
+          ],
+        ),
         const SizedBox(height: SpacingTokens.xs),
         Wrap(
           spacing: SpacingTokens.sm,
           children: [
             Chip(label: Text('Plan: ${org.planTier}')),
             Chip(label: Text('Subscription: ${org.subscriptionStatus ?? '—'}')),
+            if (suspended)
+              Chip(
+                label: const Text('Suspended'),
+                backgroundColor: theme.colorScheme.error.withOpacity(0.15),
+              ),
             if (org.requiresApproval) const Chip(label: Text('Approval required')),
           ],
         ),

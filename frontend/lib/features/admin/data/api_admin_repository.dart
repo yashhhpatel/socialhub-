@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
 import '../domain/admin_audit.dart';
+import '../domain/admin_data_deletion.dart';
 import '../domain/admin_billing.dart';
 import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
@@ -141,6 +142,21 @@ class ApiAdminRepository {
   Future<void> cancelPublishJob(String id) =>
       _dio.post<void>('/admin/publish-jobs/$id/cancel');
 
+  /// Data-deletion request queue (21.9).
+  Future<AdminDataDeletionList> dataDeletionRequests({int page = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/admin/data-deletion-requests',
+      queryParameters: {'page': page},
+    );
+    return AdminDataDeletionList.fromJson(response.data!);
+  }
+
+  Future<void> suspendOrg(String id) =>
+      _dio.post<void>('/admin/organizations/$id/suspend');
+
+  Future<void> reactivateOrg(String id) =>
+      _dio.post<void>('/admin/organizations/$id/reactivate');
+
   /// Cross-org audit log (21.8).
   Future<AdminAuditList> auditLogs({
     String? actorEmail,
@@ -229,6 +245,13 @@ final adminBillingProvider =
 final adminPublishJobsProvider = FutureProvider.autoDispose
     .family<AdminPublishJobList, String>((ref, status) async {
   return ref.watch(adminRepositoryProvider).publishJobs(status: status);
+});
+
+/// Data-deletion queue (21.9).
+final adminDataDeletionProvider =
+    FutureProvider.autoDispose<AdminDataDeletionList>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).dataDeletionRequests();
 });
 
 /// Audit-log query (21.8).

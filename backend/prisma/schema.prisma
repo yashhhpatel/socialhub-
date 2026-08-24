@@ -35,6 +35,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum OrgStatus {
+  active
+  suspended
+}
+
 enum PlanTier {
   free
   starter
@@ -112,6 +117,11 @@ model Organization {
   name             String
   planTier         PlanTier        @default(free)
   requiresApproval Boolean         @default(false)
+  /// Platform-admin suspension (Phase 21.9). A suspended workspace's members
+  /// can't obtain a new session (login is refused); set/cleared only from the
+  /// admin panel. `suspendedAt` records when it happened for audit/support.
+  status           OrgStatus       @default(active)
+  suspendedAt      DateTime?
   // White-labeling (Milestone 15.4): an enterprise org's own branding for
   // the app shell its users see — a logo and a primary colour. Null = the
   // default SocialHub branding.

@@ -10,6 +10,7 @@ import { AdminOverviewService } from './admin-overview.service';
 import { AdminPublishingService } from './admin-publishing.service';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminBillingService } from './admin-billing.service';
+import { AdminComplianceService } from './admin-compliance.service';
 import { AdminSocialAccountsService } from './admin-social-accounts.service';
 import { AdminUsersService } from './admin-users.service';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
@@ -31,6 +32,7 @@ import { PlatformAdminGuard } from './guards/platform-admin.guard';
     AdminBillingService,
     AdminPublishingService,
     AdminAuditService,
+    AdminComplianceService,
   ],
 })
 export class AdminModule {}

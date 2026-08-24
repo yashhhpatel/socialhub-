@@ -87,6 +87,7 @@ class AdminOrgDetail {
     required this.id,
     required this.name,
     required this.planTier,
+    required this.status,
     required this.requiresApproval,
     required this.subscriptionStatus,
     required this.createdAt,
@@ -99,6 +100,7 @@ class AdminOrgDetail {
   final String id;
   final String name;
   final String planTier;
+  final String status;
   final bool requiresApproval;
   final String? subscriptionStatus;
   final DateTime? createdAt;
@@ -117,6 +119,7 @@ class AdminOrgDetail {
       id: json['id'] as String,
       name: json['name'] as String? ?? '',
       planTier: json['planTier'] as String? ?? 'free',
+      status: json['status'] as String? ?? 'active',
       requiresApproval: json['requiresApproval'] as bool? ?? false,
       subscriptionStatus: json['subscriptionStatus'] as String?,
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),

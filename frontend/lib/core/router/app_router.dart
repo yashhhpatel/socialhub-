@@ -7,6 +7,7 @@ import '../../features/admin/presentation/screens/admin_overview_screen.dart';
 import '../../features/admin/presentation/screens/admin_publishing_screen.dart';
 import '../../features/admin/presentation/screens/admin_audit_screen.dart';
 import '../../features/admin/presentation/screens/admin_billing_screen.dart';
+import '../../features/admin/presentation/screens/admin_compliance_screen.dart';
 import '../../features/admin/presentation/screens/admin_social_accounts_screen.dart';
 import '../../features/admin/presentation/screens/admin_user_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
@@ -238,6 +239,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminShell(
           selectedPath: '/admin/audit',
           child: AdminAuditScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/compliance',
+        name: 'admin-compliance',
+        builder: (context, state) => const AdminShell(
+          selectedPath: '/admin/compliance',
+          child: AdminComplianceScreen(),
         ),
       ),
       ShellRoute(
