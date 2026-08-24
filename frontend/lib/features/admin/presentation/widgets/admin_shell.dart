@@ -24,6 +24,7 @@ const adminNavItems = <AdminNavItem>[
   AdminNavItem('Social accounts', Icons.link, '/admin/social-accounts'),
   AdminNavItem('Billing', Icons.payments_outlined, '/admin/billing'),
   AdminNavItem('Publishing', Icons.send_outlined, '/admin/publishing'),
+  AdminNavItem('Audit log', Icons.receipt_long_outlined, '/admin/audit'),
 ];
 
 /// Chrome for the platform-admin panel (Phase 21): its own header + sidebar,

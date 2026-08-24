@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
+import '../domain/admin_audit.dart';
 import '../domain/admin_billing.dart';
 import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
@@ -139,6 +140,25 @@ class ApiAdminRepository {
 
   Future<void> cancelPublishJob(String id) =>
       _dio.post<void>('/admin/publish-jobs/$id/cancel');
+
+  /// Cross-org audit log (21.8).
+  Future<AdminAuditList> auditLogs({
+    String? actorEmail,
+    String? method,
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/admin/audit-logs',
+      queryParameters: {
+        if (actorEmail != null && actorEmail.isNotEmpty) 'actorEmail': actorEmail,
+        if (method != null && method.isNotEmpty) 'method': method,
+        'page': page,
+        'limit': limit,
+      },
+    );
+    return AdminAuditList.fromJson(response.data!);
+  }
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -209,4 +229,17 @@ final adminBillingProvider =
 final adminPublishJobsProvider = FutureProvider.autoDispose
     .family<AdminPublishJobList, String>((ref, status) async {
   return ref.watch(adminRepositoryProvider).publishJobs(status: status);
+});
+
+/// Audit-log query (21.8).
+typedef AdminAuditQuery = ({String actorEmail, String method, int page});
+
+/// Cross-org audit log (21.8), keyed by filters + page.
+final adminAuditProvider = FutureProvider.autoDispose
+    .family<AdminAuditList, AdminAuditQuery>((ref, query) async {
+  return ref.watch(adminRepositoryProvider).auditLogs(
+        actorEmail: query.actorEmail,
+        method: query.method,
+        page: query.page,
+      );
 });

@@ -12,6 +12,7 @@ import {
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminAuditService } from './admin-audit.service';
 import { AdminBillingService } from './admin-billing.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
@@ -22,6 +23,7 @@ import {
   AdminOrgDetailDto,
   AdminOrgListDto,
 } from './dto/admin-organizations.dto';
+import { AdminAuditListDto } from './dto/admin-audit.dto';
 import { AdminBillingDto } from './dto/admin-billing.dto';
 import { AdminPublishJobListDto } from './dto/admin-publishing.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
@@ -55,6 +57,7 @@ export class AdminController {
     private readonly socialAccountsService: AdminSocialAccountsService,
     private readonly billingService: AdminBillingService,
     private readonly publishingService: AdminPublishingService,
+    private readonly auditService: AdminAuditService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -193,5 +196,25 @@ export class AdminController {
   @Post('publish-jobs/:id/cancel')
   cancelPublishJob(@Param('id') id: string): Promise<void> {
     return this.publishingService.cancel(id);
+  }
+
+  // --- Audit log (21.8) ---
+
+  /** Cross-org audit trail (optional org/actor/method filters). */
+  @Get('audit-logs')
+  auditLogs(
+    @Query('orgId') orgId?: string,
+    @Query('actorEmail') actorEmail?: string,
+    @Query('method') method?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminAuditListDto> {
+    return this.auditService.list({
+      orgId,
+      actorEmail,
+      method,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 }
