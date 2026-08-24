@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
+import '../domain/admin_overview.dart';
 
 /// Talks to the platform-admin API (`/admin/*`, Phase 21). Every call is gated
 /// server-side by PlatformAdminGuard; the client also hides the panel from
@@ -18,6 +19,12 @@ class ApiAdminRepository {
     final response = await _dio.get<Map<String, dynamic>>('/admin/me');
     return response.data!['email'] as String;
   }
+
+  /// Cross-tenant platform KPIs for the Overview dashboard (21.2).
+  Future<AdminOverview> overview() async {
+    final response = await _dio.get<Map<String, dynamic>>('/admin/overview');
+    return AdminOverview.fromJson(response.data!);
+  }
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -28,4 +35,11 @@ final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
 final adminMeProvider = FutureProvider.autoDispose<String>((ref) async {
   ref.watch(authTokenStoreProvider.select((t) => t != null));
   return ref.watch(adminRepositoryProvider).me();
+});
+
+/// Cross-tenant platform KPIs for the Overview dashboard (21.2).
+final adminOverviewProvider =
+    FutureProvider.autoDispose<AdminOverview>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).overview();
 });

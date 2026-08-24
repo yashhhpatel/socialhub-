@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/admin/presentation/screens/admin_home_screen.dart';
+import '../../features/admin/presentation/screens/admin_overview_screen.dart';
 import '../../features/admin/presentation/widgets/admin_shell.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
@@ -165,7 +165,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'admin',
         builder: (context, state) => const AdminShell(
           selectedPath: '/admin',
-          child: AdminHomeScreen(),
+          child: AdminOverviewScreen(),
         ),
       ),
       ShellRoute(
