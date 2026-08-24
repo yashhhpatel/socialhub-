@@ -19,6 +19,7 @@ class AdminNavItem {
 /// Sections of the admin panel. Items are added as their milestones land.
 const adminNavItems = <AdminNavItem>[
   AdminNavItem('Overview', Icons.dashboard_outlined, '/admin'),
+  AdminNavItem('Organizations', Icons.apartment_outlined, '/admin/organizations'),
 ];
 
 /// Chrome for the platform-admin panel (Phase 21): its own header + sidebar,
