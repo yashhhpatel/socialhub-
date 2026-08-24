@@ -382,6 +382,59 @@ export class PublishingService {
     return dispatched;
   }
 
+  /**
+   * Re-enqueue a job for another publish attempt (admin action, Phase 21.7).
+   * Cross-tenant by design — the caller is a platform admin, not an org member.
+   * A published job is never re-run (that would double-post).
+   */
+  async requeueJob(jobId: string): Promise<void> {
+    const job = await this.prisma.publishJob.findUnique({
+      where: { id: jobId },
+      include: { socialAccount: { select: { platform: true } } },
+    });
+    if (!job) throw new NotFoundException('Publish job not found.');
+    if (job.status === PublishJobStatus.published) {
+      throw new UnprocessableEntityException(
+        'This job already published; re-running would double-post.',
+      );
+    }
+
+    const queue = this.queues[job.socialAccount.platform];
+    if (!queue) {
+      throw new UnprocessableEntityException(
+        `No queue for platform ${job.socialAccount.platform}.`,
+      );
+    }
+
+    await this.prisma.publishJob.update({
+      where: { id: jobId },
+      data: { status: PublishJobStatus.queued, lastError: null },
+    });
+    await queue.add(
+      'publish',
+      { publishJobId: job.id, caption: job.caption ?? undefined },
+      PUBLISH_JOB_OPTIONS,
+    );
+  }
+
+  /**
+   * Cancel a job (admin action, Phase 21.7). Cross-tenant. A published job
+   * can't be cancelled (it already went out).
+   */
+  async cancelJob(jobId: string): Promise<void> {
+    const job = await this.prisma.publishJob.findUnique({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Publish job not found.');
+    if (job.status === PublishJobStatus.published) {
+      throw new UnprocessableEntityException(
+        'A published job cannot be cancelled.',
+      );
+    }
+    await this.prisma.publishJob.update({
+      where: { id: jobId },
+      data: { status: PublishJobStatus.cancelled },
+    });
+  }
+
   async findJobScoped(jobId: string, orgId: string): Promise<PublishJob> {
     const job = await this.prisma.publishJob.findUnique({
       where: { id: jobId },

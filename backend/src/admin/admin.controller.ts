@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminBillingService } from './admin-billing.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
+import { AdminPublishingService } from './admin-publishing.service';
 import { AdminSocialAccountsService } from './admin-social-accounts.service';
 import { AdminUsersService } from './admin-users.service';
 import {
@@ -22,6 +23,7 @@ import {
   AdminOrgListDto,
 } from './dto/admin-organizations.dto';
 import { AdminBillingDto } from './dto/admin-billing.dto';
+import { AdminPublishJobListDto } from './dto/admin-publishing.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
 import {
   AdminRefreshResultDto,
@@ -52,6 +54,7 @@ export class AdminController {
     private readonly usersService: AdminUsersService,
     private readonly socialAccountsService: AdminSocialAccountsService,
     private readonly billingService: AdminBillingService,
+    private readonly publishingService: AdminPublishingService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -160,5 +163,35 @@ export class AdminController {
   @Get('billing')
   billing(): Promise<AdminBillingDto> {
     return this.billingService.overview();
+  }
+
+  // --- Content & publishing (21.7) ---
+
+  /** Cross-tenant publish jobs (filter by status; failed = the triage queue). */
+  @Get('publish-jobs')
+  listPublishJobs(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminPublishJobListDto> {
+    return this.publishingService.list({
+      status,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** Re-enqueue a job for another attempt (never a published job). */
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('publish-jobs/:id/retry')
+  retryPublishJob(@Param('id') id: string): Promise<void> {
+    return this.publishingService.retry(id);
+  }
+
+  /** Cancel a job (not a published one). */
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('publish-jobs/:id/cancel')
+  cancelPublishJob(@Param('id') id: string): Promise<void> {
+    return this.publishingService.cancel(id);
   }
 }

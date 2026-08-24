@@ -6,6 +6,7 @@ import '../../../core/network/auth_token_store.dart';
 import '../domain/admin_billing.dart';
 import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
+import '../domain/admin_publish_job.dart';
 import '../domain/admin_social_account.dart';
 import '../domain/admin_user.dart';
 
@@ -115,6 +116,29 @@ class ApiAdminRepository {
     final response = await _dio.get<Map<String, dynamic>>('/admin/billing');
     return AdminBilling.fromJson(response.data!);
   }
+
+  /// Cross-tenant publish jobs (21.7), optionally filtered by status.
+  Future<AdminPublishJobList> publishJobs({
+    String? status,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/admin/publish-jobs',
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+        'page': page,
+        'limit': limit,
+      },
+    );
+    return AdminPublishJobList.fromJson(response.data!);
+  }
+
+  Future<void> retryPublishJob(String id) =>
+      _dio.post<void>('/admin/publish-jobs/$id/retry');
+
+  Future<void> cancelPublishJob(String id) =>
+      _dio.post<void>('/admin/publish-jobs/$id/cancel');
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -179,4 +203,10 @@ final adminBillingProvider =
     FutureProvider.autoDispose<AdminBilling>((ref) async {
   ref.watch(authTokenStoreProvider.select((t) => t != null));
   return ref.watch(adminRepositoryProvider).billing();
+});
+
+/// Cross-tenant publish jobs (21.7), keyed by status filter ('' = all).
+final adminPublishJobsProvider = FutureProvider.autoDispose
+    .family<AdminPublishJobList, String>((ref, status) async {
+  return ref.watch(adminRepositoryProvider).publishJobs(status: status);
 });
