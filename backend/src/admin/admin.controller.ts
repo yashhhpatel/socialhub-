@@ -12,6 +12,7 @@ import {
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminBillingService } from './admin-billing.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
 import { AdminSocialAccountsService } from './admin-social-accounts.service';
@@ -20,6 +21,7 @@ import {
   AdminOrgDetailDto,
   AdminOrgListDto,
 } from './dto/admin-organizations.dto';
+import { AdminBillingDto } from './dto/admin-billing.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
 import {
   AdminRefreshResultDto,
@@ -49,6 +51,7 @@ export class AdminController {
     private readonly organizationsService: AdminOrganizationsService,
     private readonly usersService: AdminUsersService,
     private readonly socialAccountsService: AdminSocialAccountsService,
+    private readonly billingService: AdminBillingService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -149,5 +152,13 @@ export class AdminController {
   @Post('social-accounts/:id/disconnect')
   disconnectSocialAccount(@Param('id') id: string): Promise<void> {
     return this.socialAccountsService.disconnect(id);
+  }
+
+  // --- Billing & revenue (21.6) ---
+
+  /** Cross-tenant billing overview (subscriptions, dunning, revenue, invoices). */
+  @Get('billing')
+  billing(): Promise<AdminBillingDto> {
+    return this.billingService.overview();
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/admin/presentation/screens/admin_org_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_organizations_screen.dart';
 import '../../features/admin/presentation/screens/admin_overview_screen.dart';
+import '../../features/admin/presentation/screens/admin_billing_screen.dart';
 import '../../features/admin/presentation/screens/admin_social_accounts_screen.dart';
 import '../../features/admin/presentation/screens/admin_user_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
@@ -211,6 +212,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminShell(
           selectedPath: '/admin/social-accounts',
           child: AdminSocialAccountsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/billing',
+        name: 'admin-billing',
+        builder: (context, state) => const AdminShell(
+          selectedPath: '/admin/billing',
+          child: AdminBillingScreen(),
         ),
       ),
       ShellRoute(
