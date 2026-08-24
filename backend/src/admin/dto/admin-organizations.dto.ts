@@ -32,6 +32,7 @@ export class AdminOrgDetailDto {
   id: string;
   name: string;
   planTier: string;
+  status: string;
   requiresApproval: boolean;
   subscriptionStatus: string | null;
   currentPeriodEnd: Date | null;

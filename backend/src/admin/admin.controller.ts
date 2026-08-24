@@ -14,6 +14,7 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminBillingService } from './admin-billing.service';
+import { AdminComplianceService } from './admin-compliance.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
 import { AdminPublishingService } from './admin-publishing.service';
@@ -25,6 +26,10 @@ import {
 } from './dto/admin-organizations.dto';
 import { AdminAuditListDto } from './dto/admin-audit.dto';
 import { AdminBillingDto } from './dto/admin-billing.dto';
+import {
+  AdminDataDeletionListDto,
+  AdminOrgStatusDto,
+} from './dto/admin-compliance.dto';
 import { AdminPublishJobListDto } from './dto/admin-publishing.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
 import {
@@ -58,6 +63,7 @@ export class AdminController {
     private readonly billingService: AdminBillingService,
     private readonly publishingService: AdminPublishingService,
     private readonly auditService: AdminAuditService,
+    private readonly complianceService: AdminComplianceService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -216,5 +222,33 @@ export class AdminController {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
+  }
+
+  // --- Compliance & suspension (21.9) ---
+
+  /** Meta data-deletion request queue. */
+  @Get('data-deletion-requests')
+  dataDeletionRequests(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminDataDeletionListDto> {
+    return this.complianceService.dataDeletionRequests({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** Suspend a workspace — its members can no longer obtain a session. */
+  @HttpCode(HttpStatus.OK)
+  @Post('organizations/:id/suspend')
+  suspendOrg(@Param('id') id: string): Promise<AdminOrgStatusDto> {
+    return this.complianceService.suspendOrg(id);
+  }
+
+  /** Reactivate a suspended workspace. */
+  @HttpCode(HttpStatus.OK)
+  @Post('organizations/:id/reactivate')
+  reactivateOrg(@Param('id') id: string): Promise<AdminOrgStatusDto> {
+    return this.complianceService.reactivateOrg(id);
   }
 }
