@@ -55,5 +55,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtStrategy,
     SsoService,
   ],
+  // AccountService is exported so the admin panel (Phase 21.4) can reuse the
+  // resend-verification / password-reset flows without duplicating them.
+  exports: [AccountService],
 })
 export class AuthModule {}
