@@ -1,7 +1,10 @@
 import {
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  Post,
   Query,
   Req,
   UseGuards,
@@ -11,11 +14,16 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
+import { AdminUsersService } from './admin-users.service';
 import {
   AdminOrgDetailDto,
   AdminOrgListDto,
 } from './dto/admin-organizations.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
+import {
+  AdminUserDetailDto,
+  AdminUserListDto,
+} from './dto/admin-users.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 
 interface AuthedRequest extends Request {
@@ -34,6 +42,7 @@ export class AdminController {
   constructor(
     private readonly overviewService: AdminOverviewService,
     private readonly organizationsService: AdminOrganizationsService,
+    private readonly usersService: AdminUsersService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -66,5 +75,41 @@ export class AdminController {
   @Get('organizations/:id')
   organizationDetail(@Param('id') id: string): Promise<AdminOrgDetailDto> {
     return this.organizationsService.detail(id);
+  }
+
+  // --- Users (21.4) ---
+
+  /** Paginated, searchable user list (by email). */
+  @Get('users')
+  listUsers(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminUserListDto> {
+    return this.usersService.list({
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** Full detail for one user. */
+  @Get('users/:id')
+  userDetail(@Param('id') id: string): Promise<AdminUserDetailDto> {
+    return this.usersService.detail(id);
+  }
+
+  /** Re-send the email-verification link to a user (safe). */
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('users/:id/resend-verification')
+  resendVerification(@Param('id') id: string): Promise<void> {
+    return this.usersService.resendVerification(id);
+  }
+
+  /** Send a password-reset link to a user (the admin never sets the password). */
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('users/:id/force-password-reset')
+  forcePasswordReset(@Param('id') id: string): Promise<void> {
+    return this.usersService.forcePasswordReset(id);
   }
 }

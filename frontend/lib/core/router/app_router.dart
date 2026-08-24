@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../features/admin/presentation/screens/admin_org_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_organizations_screen.dart';
 import '../../features/admin/presentation/screens/admin_overview_screen.dart';
+import '../../features/admin/presentation/screens/admin_user_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../features/admin/presentation/widgets/admin_shell.dart';
 import '../../features/ai_suite/presentation/screens/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
@@ -184,6 +186,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => AdminShell(
           selectedPath: '/admin/organizations',
           child: AdminOrgDetailScreen(orgId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        name: 'admin-users',
+        builder: (context, state) => const AdminShell(
+          selectedPath: '/admin/users',
+          child: AdminUsersScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/users/:id',
+        name: 'admin-user-detail',
+        builder: (context, state) => AdminShell(
+          selectedPath: '/admin/users',
+          child: AdminUserDetailScreen(userId: state.pathParameters['id']!),
         ),
       ),
       ShellRoute(
