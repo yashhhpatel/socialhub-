@@ -294,6 +294,12 @@ model User {
   /// for an existing email, or set when a Google sign-in creates the account.
   googleId      String?        @unique
   role          UserRole       @default(editor)
+  /// Platform (super) admin flag — grants access to the cross-tenant /admin
+  /// panel (Phase 21). Deliberately SEPARATE from the org `role` axis: being an
+  /// org owner never implies platform admin. Verified from the DB on every
+  /// /admin request (PlatformAdminGuard), so revoking it takes effect at once.
+  /// Granted only via the secure seed (env-driven) or another platform admin.
+  isPlatformAdmin Boolean      @default(false)
   orgId         String
   organization  Organization   @relation(fields: [orgId], references: [id])
   refreshTokens RefreshToken[]

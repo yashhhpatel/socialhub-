@@ -55,6 +55,7 @@ export class UsersController {
       orgId: user.orgId,
       emailVerified: user.emailVerifiedAt !== null,
       mfaEnabled: user.mfaEnabled,
+      isPlatformAdmin: user.isPlatformAdmin,
       createdAt: user.createdAt,
     };
   }

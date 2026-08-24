@@ -12,6 +12,7 @@ class CurrentUser {
     required this.orgId,
     required this.emailVerified,
     required this.mfaEnabled,
+    this.isPlatformAdmin = false,
   });
 
   final String id;
@@ -28,6 +29,11 @@ class CurrentUser {
   /// section in settings; defaults false for older responses.
   final bool mfaEnabled;
 
+  /// Whether the user is a platform (super) admin — gates the /admin panel
+  /// entry on the client (Phase 21). The server enforces access independently;
+  /// defaults false for older responses so /admin never shows spuriously.
+  final bool isPlatformAdmin;
+
   bool get isAdmin => role.isAtLeast(AppRole.admin);
   bool get isEditor => role.isAtLeast(AppRole.editor);
 
@@ -38,5 +44,6 @@ class CurrentUser {
         orgId: json['orgId'] as String,
         emailVerified: json['emailVerified'] as bool? ?? true,
         mfaEnabled: json['mfaEnabled'] as bool? ?? false,
+        isPlatformAdmin: json['isPlatformAdmin'] as bool? ?? false,
       );
 }
