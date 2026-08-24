@@ -14,12 +14,17 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
+import { AdminSocialAccountsService } from './admin-social-accounts.service';
 import { AdminUsersService } from './admin-users.service';
 import {
   AdminOrgDetailDto,
   AdminOrgListDto,
 } from './dto/admin-organizations.dto';
 import { AdminOverviewDto } from './dto/admin-overview.dto';
+import {
+  AdminRefreshResultDto,
+  AdminSocialAccountListDto,
+} from './dto/admin-social-accounts.dto';
 import {
   AdminUserDetailDto,
   AdminUserListDto,
@@ -43,6 +48,7 @@ export class AdminController {
     private readonly overviewService: AdminOverviewService,
     private readonly organizationsService: AdminOrganizationsService,
     private readonly usersService: AdminUsersService,
+    private readonly socialAccountsService: AdminSocialAccountsService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -111,5 +117,37 @@ export class AdminController {
   @Post('users/:id/force-password-reset')
   forcePasswordReset(@Param('id') id: string): Promise<void> {
     return this.usersService.forcePasswordReset(id);
+  }
+
+  // --- Social accounts (21.5) ---
+
+  /** Cross-tenant social-account health (filter by status/platform). */
+  @Get('social-accounts')
+  listSocialAccounts(
+    @Query('status') status?: string,
+    @Query('platform') platform?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminSocialAccountListDto> {
+    return this.socialAccountsService.list({
+      status,
+      platform,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** Force a token refresh; reports whether the account now needs reconnection. */
+  @HttpCode(HttpStatus.OK)
+  @Post('social-accounts/:id/refresh')
+  refreshSocialAccount(@Param('id') id: string): Promise<AdminRefreshResultDto> {
+    return this.socialAccountsService.refresh(id);
+  }
+
+  /** Disconnect (delete) a social account. */
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('social-accounts/:id/disconnect')
+  disconnectSocialAccount(@Param('id') id: string): Promise<void> {
+    return this.socialAccountsService.disconnect(id);
   }
 }

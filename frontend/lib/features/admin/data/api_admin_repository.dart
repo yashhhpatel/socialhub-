@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
 import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
+import '../domain/admin_social_account.dart';
 import '../domain/admin_user.dart';
 
 /// Talks to the platform-admin API (`/admin/*`, Phase 21). Every call is gated
@@ -80,6 +81,33 @@ class ApiAdminRepository {
 
   Future<void> forcePasswordReset(String id) =>
       _dio.post<void>('/admin/users/$id/force-password-reset');
+
+  /// Social-account health list (21.5), optionally filtered by status.
+  Future<AdminSocialAccountList> socialAccounts({
+    String? status,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/admin/social-accounts',
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+        'page': page,
+        'limit': limit,
+      },
+    );
+    return AdminSocialAccountList.fromJson(response.data!);
+  }
+
+  /// Force a token refresh; returns the resulting status.
+  Future<String> refreshSocialAccount(String id) async {
+    final response = await _dio
+        .post<Map<String, dynamic>>('/admin/social-accounts/$id/refresh');
+    return response.data!['status'] as String? ?? 'unknown';
+  }
+
+  Future<void> disconnectSocialAccount(String id) =>
+      _dio.post<void>('/admin/social-accounts/$id/disconnect');
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -131,4 +159,10 @@ final adminUsersProvider = FutureProvider.autoDispose
 final adminUserProvider = FutureProvider.autoDispose
     .family<AdminUserDetail, String>((ref, id) async {
   return ref.watch(adminRepositoryProvider).user(id);
+});
+
+/// Social-account health list (21.5), keyed by status filter ('' = all).
+final adminSocialAccountsProvider = FutureProvider.autoDispose
+    .family<AdminSocialAccountList, String>((ref, status) async {
+  return ref.watch(adminRepositoryProvider).socialAccounts(status: status);
 });
