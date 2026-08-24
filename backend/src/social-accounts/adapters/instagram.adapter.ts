@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import {
@@ -25,8 +25,13 @@ const GRAPH_BASE = 'https://graph.instagram.com';
 // asking them to reconnect.
 const SCOPES = ['instagram_business_basic', 'instagram_business_content_publish'];
 
+// Meta's Business-Login token endpoint has shipped BOTH shapes over time: a
+// `data: [...]` wrapper AND a flat `{ access_token, user_id }`. Accept either
+// so a server-side format flip doesn't break connect (see parse below).
 interface InstagramShortLivedTokenResponse {
-  data: Array<{ access_token: string; user_id: string; permissions: string }>;
+  data?: Array<{ access_token: string; user_id: string; permissions?: string }>;
+  access_token?: string;
+  user_id?: string;
 }
 
 interface InstagramLongLivedTokenResponse {
@@ -61,6 +66,7 @@ interface InstagramProfileResponse {
 @Injectable()
 export class InstagramAdapter implements PlatformAdapter {
   readonly platform: PlatformName = 'instagram';
+  private readonly logger = new Logger(InstagramAdapter.name);
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -157,9 +163,15 @@ export class InstagramAdapter implements PlatformAdapter {
     }
 
     const data = (await response.json()) as InstagramShortLivedTokenResponse;
-    const token = data.data?.[0]?.access_token;
+    // Accept both the `data: [...]` wrapper and the flat `{ access_token }`.
+    const token = data.data?.[0]?.access_token ?? data.access_token;
 
     if (!token) {
+      // Log the actual body (no token in it, so nothing sensitive) so an
+      // unexpected shape is diagnosable instead of a bare failure.
+      this.logger.warn(
+        `Instagram code exchange: no access_token in response: ${JSON.stringify(data)}`,
+      );
       throw new Error('Instagram code exchange returned no access token.');
     }
 
