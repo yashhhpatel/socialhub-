@@ -94,6 +94,24 @@ describe('InstagramAdapter', () => {
       expect(result.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
     });
 
+    it('also accepts the flat token-response shape ({ access_token } without a data wrapper)', async () => {
+      const adapter = makeAdapter();
+      const fetchMock = mockFetchSequence([
+        // 1. code -> short-lived token, FLAT shape (Meta ships this variant too)
+        { ok: true, json: { access_token: 'short_lived_flat', user_id: '123' } },
+        // 2. short-lived -> long-lived token
+        { ok: true, json: { access_token: 'long_lived_xyz', token_type: 'bearer', expires_in: 5184000 } },
+        // 3. profile fetch
+        { ok: true, json: { id: 'ig_user_789', username: 'testaccount' } },
+      ]);
+
+      const result = await adapter.connect('auth-code-from-callback');
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.externalAccountId).toBe('ig_user_789');
+      expect(result.accessToken).toBe('long_lived_xyz');
+    });
+
     it('throws with a clear message if the code exchange call fails', async () => {
       const adapter = makeAdapter();
       mockFetchSequence([{ ok: false, text: 'invalid_grant' }]);
