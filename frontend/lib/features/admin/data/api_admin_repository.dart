@@ -10,6 +10,7 @@ import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
 import '../domain/admin_publish_job.dart';
 import '../domain/admin_social_account.dart';
+import '../domain/admin_system.dart';
 import '../domain/admin_user.dart';
 
 /// Talks to the platform-admin API (`/admin/*`, Phase 21). Every call is gated
@@ -157,6 +158,26 @@ class ApiAdminRepository {
   Future<void> reactivateOrg(String id) =>
       _dio.post<void>('/admin/organizations/$id/reactivate');
 
+  /// Deep system health (21.10).
+  Future<AdminHealth> systemHealth() async {
+    final r = await _dio.get<Map<String, dynamic>>('/admin/system/health');
+    return AdminHealth.fromJson(r.data!);
+  }
+
+  Future<List<AdminQueueStat>> systemQueues() async {
+    final r = await _dio.get<List<dynamic>>('/admin/system/queues');
+    return (r.data ?? [])
+        .map((e) => AdminQueueStat.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<AdminRecentError>> systemErrors() async {
+    final r = await _dio.get<List<dynamic>>('/admin/system/errors');
+    return (r.data ?? [])
+        .map((e) => AdminRecentError.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Cross-org audit log (21.8).
   Future<AdminAuditList> auditLogs({
     String? actorEmail,
@@ -245,6 +266,24 @@ final adminBillingProvider =
 final adminPublishJobsProvider = FutureProvider.autoDispose
     .family<AdminPublishJobList, String>((ref, status) async {
   return ref.watch(adminRepositoryProvider).publishJobs(status: status);
+});
+
+/// Deep system health (21.10).
+final adminHealthProvider = FutureProvider.autoDispose<AdminHealth>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).systemHealth();
+});
+
+final adminQueuesProvider =
+    FutureProvider.autoDispose<List<AdminQueueStat>>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).systemQueues();
+});
+
+final adminErrorsProvider =
+    FutureProvider.autoDispose<List<AdminRecentError>>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).systemErrors();
 });
 
 /// Data-deletion queue (21.9).

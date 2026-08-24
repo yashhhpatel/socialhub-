@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminBillingService } from './admin-billing.service';
 import { AdminComplianceService } from './admin-compliance.service';
+import { AdminSystemService } from './admin-system.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
 import { AdminOverviewService } from './admin-overview.service';
 import { AdminPublishingService } from './admin-publishing.service';
@@ -26,6 +27,11 @@ import {
 } from './dto/admin-organizations.dto';
 import { AdminAuditListDto } from './dto/admin-audit.dto';
 import { AdminBillingDto } from './dto/admin-billing.dto';
+import {
+  AdminHealthDto,
+  AdminQueueStatDto,
+  AdminRecentErrorDto,
+} from './dto/admin-system.dto';
 import {
   AdminDataDeletionListDto,
   AdminOrgStatusDto,
@@ -64,6 +70,7 @@ export class AdminController {
     private readonly publishingService: AdminPublishingService,
     private readonly auditService: AdminAuditService,
     private readonly complianceService: AdminComplianceService,
+    private readonly systemService: AdminSystemService,
   ) {}
 
   /** Confirms the caller is a platform admin (drives the admin shell gate). */
@@ -250,5 +257,25 @@ export class AdminController {
   @Post('organizations/:id/reactivate')
   reactivateOrg(@Param('id') id: string): Promise<AdminOrgStatusDto> {
     return this.complianceService.reactivateOrg(id);
+  }
+
+  // --- System & monitoring (21.10) ---
+
+  /** Deep health: probes Postgres + Redis, not just uptime. */
+  @Get('system/health')
+  systemHealth(): Promise<AdminHealthDto> {
+    return this.systemService.health();
+  }
+
+  /** BullMQ queue job counts (publish queues + token-refresh sweep). */
+  @Get('system/queues')
+  systemQueues(): Promise<AdminQueueStatDto[]> {
+    return this.systemService.queues_();
+  }
+
+  /** Recent 4xx/5xx across all tenants (from the audit trail). */
+  @Get('system/errors')
+  systemErrors(): Promise<AdminRecentErrorDto[]> {
+    return this.systemService.recentErrors();
   }
 }
