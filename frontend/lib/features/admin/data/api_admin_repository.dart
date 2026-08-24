@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_token_store.dart';
+import '../domain/admin_billing.dart';
 import '../domain/admin_organization.dart';
 import '../domain/admin_overview.dart';
 import '../domain/admin_social_account.dart';
@@ -108,6 +109,12 @@ class ApiAdminRepository {
 
   Future<void> disconnectSocialAccount(String id) =>
       _dio.post<void>('/admin/social-accounts/$id/disconnect');
+
+  /// Cross-tenant billing overview (21.6).
+  Future<AdminBilling> billing() async {
+    final response = await _dio.get<Map<String, dynamic>>('/admin/billing');
+    return AdminBilling.fromJson(response.data!);
+  }
 }
 
 final adminRepositoryProvider = Provider<ApiAdminRepository>((ref) {
@@ -165,4 +172,11 @@ final adminUserProvider = FutureProvider.autoDispose
 final adminSocialAccountsProvider = FutureProvider.autoDispose
     .family<AdminSocialAccountList, String>((ref, status) async {
   return ref.watch(adminRepositoryProvider).socialAccounts(status: status);
+});
+
+/// Cross-tenant billing overview (21.6).
+final adminBillingProvider =
+    FutureProvider.autoDispose<AdminBilling>((ref) async {
+  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  return ref.watch(adminRepositoryProvider).billing();
 });
