@@ -47,18 +47,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (_deletingIds.contains(asset.id)) return;
 
     final name = _designName(asset);
+    // useRootNavigator + rootNavigator on the pops are explicit (not defaults)
+    // so the dialog and its barrier are pushed to, and popped from, the SAME
+    // (root) navigator. Under go_router's nested ShellRoute navigators, leaving
+    // this implicit is how a barrier can end up on one navigator and the pop
+    // target on another — stranding the barrier and freezing the whole app.
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete design?'),
         content: Text('"$name" will be permanently deleted. This cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(true),
             child: const Text('Delete'),
           ),
         ],
