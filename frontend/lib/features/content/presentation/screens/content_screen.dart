@@ -8,6 +8,7 @@ import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../data/repositories/api_content_repository.dart';
 import '../../domain/entities/content_asset_summary.dart';
 import '../state/content_library_controller.dart';
 
@@ -27,6 +28,68 @@ class ContentScreen extends ConsumerStatefulWidget {
 
 class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _creating = false;
+
+  /// Deletes in flight — used to disable the card's delete button and block a
+  /// second request for the same design (fixes double-click).
+  final Set<String> _deletingIds = {};
+
+  /// Successfully deleted — filtered out of the grid so the design disappears
+  /// instantly, with no list refetch/flicker and no page refresh.
+  final Set<String> _deletedIds = {};
+
+  /// Confirms, then deletes a design. The confirmation dialog is fully resolved
+  /// (closed) BEFORE any async work runs, so its modal barrier can never be
+  /// left covering the app if the delete throws — that barrier-stuck-up case is
+  /// the classic "whole app frozen until refresh" bug. All state is reset in
+  /// every path; on failure the design stays visible and interactive.
+  Future<void> _confirmAndDelete(ContentAssetSummary asset) async {
+    // Guard against a duplicate request for the same design (double-click).
+    if (_deletingIds.contains(asset.id)) return;
+
+    final name = _designName(asset);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete design?'),
+        content: Text('"$name" will be permanently deleted. This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    // The dialog (and its barrier) is gone by here regardless of the choice.
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _deletingIds.add(asset.id));
+    try {
+      await ref.read(contentRepositoryProvider).deleteAsset(asset.id);
+      if (!mounted) return;
+      setState(() {
+        _deletingIds.remove(asset.id);
+        _deletedIds.add(asset.id); // remove from the grid without a refetch
+      });
+      messenger.showSnackBar(SnackBar(content: Text('"$name" deleted.')));
+    } catch (error) {
+      if (!mounted) return;
+      // Keep the design visible + interactive; just clear the busy state.
+      setState(() => _deletingIds.remove(asset.id));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Delete failed: ${describeApiError(error)}')),
+      );
+    }
+  }
+
+  String _designName(ContentAssetSummary asset) =>
+      'Design ${asset.id.substring(0, 8)}';
 
   Future<void> _createAndOpen() async {
     setState(() => _creating = true);
@@ -104,12 +167,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         onRetry: () => ref.invalidate(contentLibraryProvider),
                       ),
               ),
-              data: (assets) => KeyedSubtree(
-                key: const ValueKey('data'),
-                child: assets.isEmpty
-                    ? const _EmptyLibrary()
-                    : _AssetGrid(assets: assets),
-              ),
+              data: (assets) {
+                // Hide optimistically-deleted designs (removed instantly, no
+                // refetch). Falls back to the empty state once the last one goes.
+                final visible = assets
+                    .where((a) => !_deletedIds.contains(a.id))
+                    .toList();
+                return KeyedSubtree(
+                  key: const ValueKey('data'),
+                  child: visible.isEmpty
+                      ? const _EmptyLibrary()
+                      : _AssetGrid(
+                          assets: visible,
+                          deletingIds: _deletingIds,
+                          onDelete: _confirmAndDelete,
+                        ),
+                );
+              },
             ),
           ),
         ],
@@ -143,9 +217,15 @@ class _SkeletonGrid extends StatelessWidget {
 }
 
 class _AssetGrid extends StatelessWidget {
-  const _AssetGrid({required this.assets});
+  const _AssetGrid({
+    required this.assets,
+    required this.deletingIds,
+    required this.onDelete,
+  });
 
   final List<ContentAssetSummary> assets;
+  final Set<String> deletingIds;
+  final void Function(ContentAssetSummary) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -161,16 +241,26 @@ class _AssetGrid extends StatelessWidget {
       itemCount: assets.length,
       itemBuilder: (context, index) => StaggeredItem(
         index: index,
-        child: _AssetCard(asset: assets[index]),
+        child: _AssetCard(
+          asset: assets[index],
+          isDeleting: deletingIds.contains(assets[index].id),
+          onDelete: onDelete,
+        ),
       ),
     );
   }
 }
 
 class _AssetCard extends StatelessWidget {
-  const _AssetCard({required this.asset});
+  const _AssetCard({
+    required this.asset,
+    required this.isDeleting,
+    required this.onDelete,
+  });
 
   final ContentAssetSummary asset;
+  final bool isDeleting;
+  final void Function(ContentAssetSummary) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -207,22 +297,49 @@ class _AssetCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.all(SpacingTokens.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Design ${asset.id.substring(0, 8)}',
-                      style: theme.textTheme.bodyMedium,
-                      overflow: TextOverflow.ellipsis,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Design ${asset.id.substring(0, 8)}',
+                            style: theme.textTheme.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            asset.variantCount > 0
+                                ? '${asset.variantCount} platform variant'
+                                    '${asset.variantCount == 1 ? '' : 's'}'
+                                : asset.approvalStatus,
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      asset.variantCount > 0
-                          ? '${asset.variantCount} platform variant'
-                              '${asset.variantCount == 1 ? '' : 's'}'
-                          : asset.approvalStatus,
-                      style: theme.textTheme.labelSmall,
-                    ),
+                    // Its own onPressed claims the tap, so pressing it never
+                    // opens the editor (the card's InkWell). Disabled while a
+                    // delete for this design is already in flight.
+                    isDeleting
+                        ? const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Delete',
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 18,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => onDelete(asset),
+                          ),
                   ],
                 ),
               ),

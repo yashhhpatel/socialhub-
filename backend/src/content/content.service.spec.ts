@@ -5,7 +5,12 @@ import { ContentService } from './content.service';
 describe('ContentService', () => {
   let service: ContentService;
   let prisma: {
-    contentAsset: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    contentAsset: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+    };
   };
 
   beforeEach(() => {
@@ -14,6 +19,7 @@ describe('ContentService', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
     };
     service = new ContentService(prisma as never);
@@ -36,6 +42,42 @@ describe('ContentService', () => {
           canvasJson: { width: 1080, height: 1080, layers: [] },
         },
       });
+    });
+  });
+
+  describe('delete', () => {
+    it('deletes an asset the org owns', async () => {
+      prisma.contentAsset.findUnique.mockResolvedValue({
+        id: 'asset_1',
+        orgId: 'org_1',
+      });
+      prisma.contentAsset.delete.mockResolvedValue({});
+
+      await service.delete('asset_1', 'org_1');
+
+      expect(prisma.contentAsset.delete).toHaveBeenCalledWith({
+        where: { id: 'asset_1' },
+      });
+    });
+
+    it("404s (and never deletes) another org's asset", async () => {
+      prisma.contentAsset.findUnique.mockResolvedValue({
+        id: 'asset_1',
+        orgId: 'other_org',
+      });
+
+      await expect(service.delete('asset_1', 'org_1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.contentAsset.delete).not.toHaveBeenCalled();
+    });
+
+    it('404s a missing asset', async () => {
+      prisma.contentAsset.findUnique.mockResolvedValue(null);
+      await expect(service.delete('missing', 'org_1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.contentAsset.delete).not.toHaveBeenCalled();
     });
   });
 

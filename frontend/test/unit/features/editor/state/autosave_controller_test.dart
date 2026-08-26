@@ -43,6 +43,10 @@ class _FakeContentRepository implements ContentRepository {
       throw UnimplementedError('not exercised by autosave tests');
 
   @override
+  Future<void> deleteAsset(String assetId) async =>
+      throw UnimplementedError('not exercised by autosave tests');
+
+  @override
   Future<void> uploadMasterRender({
     required String assetId,
     required Uint8List pngBytes,

@@ -83,6 +83,17 @@ export class ContentService {
   }
 
   /**
+   * Permanently deletes a design, org-scoped. Its variants, comments, and
+   * publish jobs are removed by the schema's cascade rules (see schema.prisma).
+   * Idempotent from the caller's view: a missing/other-org id 404s, same as
+   * every other scoped operation here.
+   */
+  async delete(id: string, orgId: string): Promise<void> {
+    await this.findByIdScoped(id, orgId);
+    await this.prisma.contentAsset.delete({ where: { id } });
+  }
+
+  /**
    * Same scoping rules as [findByIdScoped], but includes the asset's
    * per-platform variants.
    *

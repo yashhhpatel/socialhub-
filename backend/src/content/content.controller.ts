@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -103,6 +104,22 @@ export class ContentController {
     @Body() dto: UpdateContentAssetDto,
   ): Promise<ContentAssetDto> {
     return this.contentService.update(id, req.user.orgId, dto);
+  }
+
+  /**
+   * Permanently deletes a design and its dependents (variants, comments, and
+   * any publish jobs) via the schema's cascade rules. Org-scoped: another
+   * org's id 404s rather than 403, matching the rest of this controller.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
+  async remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.contentService.delete(id, req.user.orgId);
   }
 
   /**

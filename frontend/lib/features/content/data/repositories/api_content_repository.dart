@@ -52,6 +52,11 @@ class ApiContentRepository implements ContentRepository {
   }
 
   @override
+  Future<void> deleteAsset(String assetId) async {
+    await _dio.delete<void>('/content/assets/$assetId');
+  }
+
+  @override
   Future<void> uploadMasterRender({
     required String assetId,
     required Uint8List pngBytes,
