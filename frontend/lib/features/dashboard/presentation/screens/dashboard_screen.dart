@@ -8,6 +8,7 @@ import '../../../../core/theme/breakpoints.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_dashboard_repository.dart';
 import '../../domain/entities/dashboard_summary.dart';
+import '../widgets/greeting_header.dart';
 import '../widgets/recent_activity_card.dart';
 import '../widgets/stat_card.dart';
 
@@ -58,6 +59,8 @@ class _DashboardContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const GreetingHeader(),
+          const SizedBox(height: SpacingTokens.lg),
           Text('Overview', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: SpacingTokens.xs),
           Text(
