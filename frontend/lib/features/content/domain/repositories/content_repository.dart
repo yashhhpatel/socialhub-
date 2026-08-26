@@ -33,6 +33,10 @@ abstract class ContentRepository {
   /// straight into the editor for it.
   Future<String> createAsset({required CanvasDocument document});
 
+  /// Permanently deletes a design (and its variants/comments/jobs, via the
+  /// backend cascade). Used by the content library's delete action.
+  Future<void> deleteAsset(String assetId);
+
   /// Uploads a flattened PNG render of the canvas and attaches it to the
   /// asset as its master image — the precondition for variant generation
   /// (Milestone 4.1).
