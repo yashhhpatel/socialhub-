@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/theme/platform_style.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/analytics_overview.dart';
 import '../state/analytics_controller.dart';
@@ -118,25 +119,11 @@ class _Dashboard extends StatelessWidget {
   }
 }
 
-String _platformLabel(String p) => '${p[0].toUpperCase()}${p.substring(1)}';
+String _platformLabel(String p) => PlatformStyle.label(p);
 
 /// A stable, distinct colour per platform for the bars and legend.
-Color _platformColor(String platform, ColorScheme scheme) {
-  switch (platform) {
-    case 'instagram':
-      return const Color(0xFFE1306C);
-    case 'facebook':
-      return const Color(0xFF1877F2);
-    case 'threads':
-      return const Color(0xFF444444);
-    case 'x':
-      return const Color(0xFF1DA1F2);
-    case 'linkedin':
-      return const Color(0xFF0A66C2);
-    default:
-      return scheme.primary;
-  }
-}
+Color _platformColor(String platform, ColorScheme scheme) =>
+    PlatformStyle.color(platform, scheme);
 
 String _compact(int n) {
   if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
@@ -195,8 +182,24 @@ class _PlatformBarChart extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 84,
-                  child: Text(_platformLabel(b.platform), style: theme.textTheme.bodySmall),
+                  width: 92,
+                  child: Row(
+                    children: [
+                      Icon(
+                        PlatformStyle.icon(b.platform),
+                        size: 14,
+                        color: _platformColor(b.platform, theme.colorScheme),
+                      ),
+                      const SizedBox(width: SpacingTokens.xs),
+                      Expanded(
+                        child: Text(
+                          _platformLabel(b.platform),
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Expanded(
                   child: Stack(
@@ -297,7 +300,12 @@ class _TopPosts extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(
               backgroundColor: _platformColor(p.platform, theme.colorScheme),
-              radius: 6,
+              radius: 14,
+              child: Icon(
+                PlatformStyle.icon(p.platform),
+                size: 14,
+                color: Colors.white,
+              ),
             ),
             title: Text('${_platformLabel(p.platform)} · post ${p.externalPostId ?? p.publishJobId}'),
             subtitle: Text(
