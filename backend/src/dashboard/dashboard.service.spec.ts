@@ -78,12 +78,12 @@ describe('DashboardService', () => {
       {
         status: 'published',
         updatedAt: new Date(now - 60_000),
-        variant: { platform: 'instagram' },
+        socialAccount: { platform: 'instagram' },
       },
       {
         status: 'scheduled',
         updatedAt: new Date(now - 3_600_000),
-        variant: { platform: 'x' },
+        socialAccount: { platform: 'x' },
       },
     ]);
     prisma.socialAccount.findMany.mockResolvedValue([
@@ -116,7 +116,7 @@ describe('DashboardService', () => {
       Array.from({ length: 8 }, (_, i) => ({
         status: 'published',
         updatedAt: new Date(base - i * 1000),
-        variant: { platform: 'instagram' },
+        socialAccount: { platform: 'instagram' },
       })),
     );
     const summary = await service.summary('org1');

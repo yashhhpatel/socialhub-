@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  CarouselPublishRequest,
   PublishRequest,
   PublishResult,
   PlatformAdapter,
@@ -75,6 +76,7 @@ export class ThreadsAdapter implements PlatformAdapter {
     return {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 500, // Threads' documented post text limit
+      maxCarouselItems: 20, // Threads carousels take 2–20 items.
       maxVideoDurationSeconds: 300, // 5 minutes
       imageSpec: {
         // 1:1 — the safe default that displays without Threads re-cropping,
@@ -276,6 +278,103 @@ export class ThreadsAdapter implements PlatformAdapter {
     if (!data.id) {
       throw new Error('Threads returned no post id.');
     }
+    return data.id;
+  }
+
+  async publishCarousel(
+    request: CarouselPublishRequest,
+  ): Promise<PublishResult> {
+    // Threads carousel: an item container per image (is_carousel_item), a
+    // parent CAROUSEL container, then threads_publish on the parent.
+    const childIds: string[] = [];
+    for (const imageUrl of request.mediaUrls) {
+      childIds.push(await this.createCarouselItem(request, imageUrl));
+    }
+    const parentId = await this.createCarouselContainer(request, childIds);
+    return {
+      externalPostId: await this.publishCreationId(request, parentId),
+    };
+  }
+
+  private async createCarouselItem(
+    request: CarouselPublishRequest,
+    imageUrl: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      media_type: 'IMAGE',
+      image_url: imageUrl,
+      is_carousel_item: 'true',
+      access_token: request.accessToken,
+    });
+    const response = await fetch(
+      `${API_BASE}/${request.externalAccountId}/threads`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Threads carousel item creation failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Threads returned no carousel item id.');
+    return data.id;
+  }
+
+  private async createCarouselContainer(
+    request: CarouselPublishRequest,
+    childIds: string[],
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      media_type: 'CAROUSEL',
+      children: childIds.join(','),
+      text: request.caption,
+      access_token: request.accessToken,
+    });
+    const response = await fetch(
+      `${API_BASE}/${request.externalAccountId}/threads`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Threads carousel container creation failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Threads returned no carousel container id.');
+    return data.id;
+  }
+
+  private async publishCreationId(
+    request: CarouselPublishRequest,
+    creationId: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      creation_id: creationId,
+      access_token: request.accessToken,
+    });
+    const response = await fetch(
+      `${API_BASE}/${request.externalAccountId}/threads_publish`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Threads publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Threads returned no post id.');
     return data.id;
   }
 }

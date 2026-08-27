@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  CarouselPublishRequest,
   PublishRequest,
   PublishResult,
   PlatformAdapter,
@@ -83,6 +84,7 @@ export class LinkedInAdapter implements PlatformAdapter {
     return {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 3000, // LinkedIn's post commentary limit
+      maxCarouselItems: 20, // LinkedIn multi-image posts (2–20 here).
       maxVideoDurationSeconds: 1800, // 30 minutes
       imageSpec: {
         // 1.91:1 — LinkedIn's recommended shared-image ratio, so a
@@ -312,6 +314,87 @@ export class LinkedInAdapter implements PlatformAdapter {
     if (!postId) {
       throw new Error('LinkedIn returned no post id.');
     }
+    return postId;
+  }
+
+  async publishCarousel(
+    request: CarouselPublishRequest,
+  ): Promise<PublishResult> {
+    // LinkedIn multi-image: register + upload each image for an image URN,
+    // then create one post whose content is a multiImage of those URNs.
+    const author = `urn:li:person:${request.externalAccountId}`;
+    const imageUrns: string[] = [];
+    for (const imageUrl of request.mediaUrls) {
+      const { uploadUrl, imageUrn } = await this.initializeImageUpload(
+        author,
+        request.accessToken,
+      );
+      await this.uploadImageBytesFromUrl(uploadUrl, imageUrl, request.accessToken);
+      imageUrns.push(imageUrn);
+    }
+    return {
+      externalPostId: await this.createMultiImagePost(author, imageUrns, request),
+    };
+  }
+
+  private async uploadImageBytesFromUrl(
+    uploadUrl: string,
+    imageUrl: string,
+    accessToken: string,
+  ): Promise<void> {
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(
+        `Could not fetch a carousel image for upload: ${imageResponse.status}`,
+      );
+    }
+    const bytes = await imageResponse.arrayBuffer();
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: bytes,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `LinkedIn image upload failed: ${response.status} ${await response.text()}`,
+      );
+    }
+  }
+
+  private async createMultiImagePost(
+    author: string,
+    imageUrns: string[],
+    request: CarouselPublishRequest,
+  ): Promise<string> {
+    const response = await fetch(`${REST_BASE}/posts`, {
+      method: 'POST',
+      headers: this.restHeaders(request.accessToken),
+      body: JSON.stringify({
+        author,
+        commentary: request.caption,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED',
+          targetEntities: [],
+          thirdPartyDistributionChannels: [],
+        },
+        content: {
+          multiImage: {
+            images: imageUrns.map((id) => ({ id, altText: '' })),
+          },
+        },
+        lifecycleState: 'PUBLISHED',
+        isReshareDisabledByAuthor: false,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `LinkedIn carousel publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const postId =
+      response.headers.get('x-restli-id') ?? response.headers.get('x-linkedin-id');
+    if (!postId) throw new Error('LinkedIn returned no post id.');
     return postId;
   }
 }

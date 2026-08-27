@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/network/auth_token_store.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../publish/presentation/widgets/carousel_composer.dart';
 import '../../data/api_media_repository.dart';
 import '../../data/file_picker.dart';
 import '../../domain/media_item.dart';
@@ -93,6 +94,14 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
                   ],
                 ),
               ),
+              if (loggedIn) ...[
+                OutlinedButton.icon(
+                  onPressed: () => showCarouselComposer(context),
+                  icon: const Icon(Icons.collections_outlined),
+                  label: const Text('New carousel'),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+              ],
               FilledButton.icon(
                 onPressed: _uploading ? null : _pickAndUpload,
                 icon: _uploading

@@ -89,7 +89,9 @@ export class DashboardService {
         select: {
           status: true,
           updatedAt: true,
-          variant: { select: { platform: true } },
+          // Read platform from the account, not the variant: a carousel job
+          // has no variant, but always has a target account.
+          socialAccount: { select: { platform: true } },
         },
       }),
       this.prisma.socialAccount.findMany({
@@ -109,7 +111,7 @@ export class DashboardService {
     const events: { at: Date; description: string; icon: string }[] = [];
 
     for (const job of jobs) {
-      const platform = platformLabel(job.variant.platform);
+      const platform = platformLabel(job.socialAccount.platform);
       if (job.status === PublishJobStatus.published) {
         events.push({
           at: job.updatedAt,

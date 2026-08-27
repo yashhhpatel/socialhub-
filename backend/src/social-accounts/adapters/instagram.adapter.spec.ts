@@ -148,3 +148,42 @@ describe('InstagramAdapter', () => {
     });
   });
 });
+
+describe('InstagramAdapter publishCarousel', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const request = {
+    mediaUrls: ['https://cdn.test/a.png', 'https://cdn.test/b.png'],
+    caption: 'my carousel',
+    externalAccountId: 'ig_123',
+    accessToken: 'tok',
+  };
+
+  it('creates a child container per image, a CAROUSEL parent, then publishes', async () => {
+    const fetchMock = mockFetchSequence([
+      { ok: true, json: { id: 'child_1' } }, // item 1
+      { ok: true, json: { id: 'child_2' } }, // item 2
+      { ok: true, json: { id: 'parent_1' } }, // carousel container
+      { ok: true, json: { id: 'post_1' } }, // media_publish
+    ]);
+
+    const result = await makeAdapter().publishCarousel(request);
+
+    expect(result.externalPostId).toBe('post_1');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // The parent container is created as a CAROUSEL listing both children.
+    const parentBody = (fetchMock.mock.calls[2][1] as { body: URLSearchParams })
+      .body as unknown as URLSearchParams;
+    expect(parentBody.get('media_type')).toBe('CAROUSEL');
+    expect(parentBody.get('children')).toBe('child_1,child_2');
+    expect(parentBody.get('caption')).toBe('my carousel');
+  });
+
+  it('throws with the platform error text when a child container fails', async () => {
+    mockFetchSequence([{ ok: false, text: 'bad image url' }]);
+    await expect(makeAdapter().publishCarousel(request)).rejects.toThrow(
+      /carousel item creation failed/i,
+    );
+  });
+});

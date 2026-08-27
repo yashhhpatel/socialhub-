@@ -138,6 +138,7 @@ model Organization {
   subscription     Subscription?
   invoices         Invoice[]
   mediaAssets      MediaAsset[]
+  carouselPosts    CarouselPost[]
   createdAt        DateTime        @default(now())
 
   @@map("organization")
@@ -527,8 +528,16 @@ model ContentVariant {
 /// history is what analytics attribution (Phase 10) walks back through.
 model PublishJob {
   id              String           @id @default(uuid())
-  variantId       String
-  variant         ContentVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  // A publish job targets EITHER a rendered content variant (the design
+  // editor flow) OR a carousel of media-library images (Phase: carousel
+  // posts). Exactly one of variantId / carouselPostId is set; the service
+  // enforces that. variantId became optional when carousels were added — no
+  // existing row is affected (all had a variant), and analytics tolerates a
+  // null variantId for carousel jobs.
+  variantId       String?
+  variant         ContentVariant?  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  carouselPostId  String?
+  carouselPost    CarouselPost?    @relation(fields: [carouselPostId], references: [id], onDelete: Cascade)
   socialAccountId String
   // Restrict, not Cascade: disconnecting an account must not silently
   // delete the record of everything ever published through it.
@@ -554,7 +563,30 @@ model PublishJob {
 
   @@index([status, scheduledAt])
   @@index([variantId])
+  @@index([carouselPostId])
   @@map("publish_job")
+}
+
+/// A multi-image "carousel" post assembled from Media Library uploads
+/// (Phase: carousel posts). Unlike a ContentVariant (one rendered image from
+/// the design editor), a carousel is an ORDERED list of already-hosted media
+/// URLs plus one caption, published as a single native carousel/album on the
+/// platform. Ordered by array position. Org-scoped and cascade-deleted with
+/// the org; `createdById` is the author notified about the publish outcome.
+model CarouselPost {
+  id           String       @id @default(uuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// Ordered, publicly-reachable media URLs (from the media library). The
+  /// array order IS the carousel order.
+  mediaUrls    String[]
+  caption      String?
+  createdById  String
+  createdAt    DateTime     @default(now())
+  publishJobs  PublishJob[]
+
+  @@index([orgId])
+  @@map("carousel_post")
 }
 
 /// A normalized snapshot of one published post's performance (Phase 10).

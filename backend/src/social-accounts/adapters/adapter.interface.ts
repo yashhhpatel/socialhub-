@@ -58,6 +58,13 @@ export interface PlatformCapabilities {
   maxVideoDurationSeconds?: number;
   imageSpec: PlatformImageSpec;
   rateLimit: PlatformRateLimit;
+  /**
+   * Maximum number of images a single native carousel/album post accepts on
+   * this platform (e.g. Instagram 10, X 4). Undefined means the platform has
+   * no multi-image post type, so carousels are not offered for it. A carousel
+   * always implies at least 2 items.
+   */
+  maxCarouselItems?: number;
 }
 
 /** Result of completing an OAuth authorization-code exchange. */
@@ -89,6 +96,19 @@ export interface PublishRequest {
   imageUrl: string;
   caption: string;
   /** The platform's own id for the connected account. */
+  externalAccountId: string;
+  accessToken: string;
+}
+
+/**
+ * What to publish for a carousel: an ordered list of publicly-reachable image
+ * URLs (2..capabilities().maxCarouselItems) plus one caption, published as a
+ * single native carousel/album post.
+ */
+export interface CarouselPublishRequest {
+  /** Ordered, publicly-reachable image URLs. Order IS the carousel order. */
+  mediaUrls: string[];
+  caption: string;
   externalAccountId: string;
   accessToken: string;
 }
@@ -161,4 +181,15 @@ export interface PlatformAdapter {
    * thing that tells a user what to actually change.
    */
   publish(request: PublishRequest): Promise<PublishResult>;
+
+  /**
+   * Publishes an ordered set of images as one native carousel/album post
+   * (Phase: carousel posts). Same IRREVERSIBLE contract as publish(): a
+   * successful call creates one real, publicly visible post; implementations
+   * must not retry internally; errors throw with the platform's own text.
+   *
+   * Only called for platforms whose capabilities() report maxCarouselItems;
+   * the caller validates the item count against that ceiling first.
+   */
+  publishCarousel(request: CarouselPublishRequest): Promise<PublishResult>;
 }

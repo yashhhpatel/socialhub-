@@ -26,7 +26,7 @@ export class PlatformBreakdownType {
 @ObjectType()
 export class PostMetricType {
   @Field() publishJobId: string;
-  @Field() variantId: string;
+  @Field(() => String, { nullable: true }) variantId: string | null;
   @Field() platform: string;
   @Field(() => String, { nullable: true }) externalPostId: string | null;
   @Field(() => MetricsType) metrics: MetricsType;
@@ -36,7 +36,7 @@ export class PostMetricType {
 @ObjectType()
 export class TopPostType {
   @Field() publishJobId: string;
-  @Field() variantId: string;
+  @Field(() => String, { nullable: true }) variantId: string | null;
   @Field() platform: string;
   @Field(() => String, { nullable: true }) externalPostId: string | null;
   @Field(() => MetricsType) metrics: MetricsType;

@@ -11,6 +11,7 @@ describe('PublishingService', () => {
     contentVariant: { findUnique: jest.Mock };
     contentAsset: { findUnique: jest.Mock };
     socialAccount: { findUnique: jest.Mock };
+    carouselPost: { create: jest.Mock; findUnique: jest.Mock };
     publishJob: {
       create: jest.Mock;
       update: jest.Mock;
@@ -20,7 +21,11 @@ describe('PublishingService', () => {
     };
   };
   let instagramAdapter: { publish: jest.Mock };
-  let xAdapter: { publish: jest.Mock };
+  let xAdapter: {
+    publish: jest.Mock;
+    capabilities?: jest.Mock;
+    publishCarousel?: jest.Mock;
+  };
   let facebookAdapter: { publish: jest.Mock };
   let threadsAdapter: { publish: jest.Mock };
   let linkedinAdapter: { publish: jest.Mock };
@@ -72,6 +77,21 @@ describe('PublishingService', () => {
         findUnique: jest.fn().mockResolvedValue({ createdById: 'u1' }),
       },
       socialAccount: { findUnique: jest.fn().mockResolvedValue(connectedAccount) },
+      carouselPost: {
+        create: jest.fn().mockResolvedValue({
+          id: 'car_1',
+          orgId: 'org_1',
+          createdById: 'u1',
+          mediaUrls: ['https://cdn.test/a.png', 'https://cdn.test/b.png'],
+          caption: null,
+        }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'car_1',
+          createdById: 'u1',
+          mediaUrls: ['https://cdn.test/a.png', 'https://cdn.test/b.png'],
+          caption: null,
+        }),
+      },
       publishJob: {
         create: jest.fn().mockResolvedValue(jobRow),
         update: jest.fn((args) => ({ ...jobRow, ...args.data })),
@@ -81,7 +101,13 @@ describe('PublishingService', () => {
       },
     };
     instagramAdapter = { publish: jest.fn() };
-    xAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'tweet_9' }) };
+    xAdapter = {
+      publish: jest.fn().mockResolvedValue({ externalPostId: 'tweet_9' }),
+      capabilities: jest.fn(() => ({ maxCarouselItems: 4 })),
+      publishCarousel: jest
+        .fn()
+        .mockResolvedValue({ externalPostId: 'x_carousel_9' }),
+    };
     facebookAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'fb_9' }) };
     threadsAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'th_9' }) };
     linkedinAdapter = { publish: jest.fn().mockResolvedValue({ externalPostId: 'li_9' }) };
@@ -531,6 +557,112 @@ describe('PublishingService', () => {
       });
       await expect(service.cancelScheduled('job_1', 'org_1')).rejects.toThrow(NotFoundException);
       expect(prisma.publishJob.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('carousel posts (media-library multi-image)', () => {
+    const media = ['https://cdn.test/a.png', 'https://cdn.test/b.png'];
+
+    it('validates, persists the carousel + a queued job, and enqueues', async () => {
+      const job = await service.publishCarouselNow('org_1', 'u1', 'sa_1', media, 'hi');
+      expect(prisma.carouselPost.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orgId: 'org_1',
+            createdById: 'u1',
+            mediaUrls: media,
+          }),
+        }),
+      );
+      expect(prisma.publishJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ carouselPostId: 'car_1', status: 'queued' }),
+        }),
+      );
+      expect(xQueue.add).toHaveBeenCalledTimes(1);
+      expect(job.status).toBe('queued');
+    });
+
+    it('rejects fewer than 2 images', async () => {
+      await expect(
+        service.publishCarouselNow('org_1', 'u1', 'sa_1', ['https://cdn.test/only.png']),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(prisma.carouselPost.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects more than the platform maximum (X = 4)', async () => {
+      const five = ['1', '2', '3', '4', '5'].map((n) => `https://cdn.test/${n}.png`);
+      await expect(
+        service.publishCarouselNow('org_1', 'u1', 'sa_1', five),
+      ).rejects.toThrow(/at most 4/);
+    });
+
+    it('rejects an account from another org (404)', async () => {
+      prisma.socialAccount.findUnique.mockResolvedValue({
+        ...connectedAccount,
+        orgId: 'other',
+      });
+      await expect(
+        service.publishCarouselNow('org_1', 'u1', 'sa_1', media),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('does not call the adapter synchronously — the worker publishes', async () => {
+      await service.publishCarouselNow('org_1', 'u1', 'sa_1', media);
+      expect(xAdapter.publishCarousel).not.toHaveBeenCalled();
+    });
+
+    it('executePublish routes a carousel job to publishCarousel and marks it published', async () => {
+      prisma.publishJob.findUnique.mockResolvedValue({
+        id: 'job_c',
+        variantId: null,
+        carouselPostId: 'car_1',
+        socialAccountId: 'sa_1',
+        status: 'queued',
+        attemptCount: 0,
+      });
+
+      await service.executePublish(
+        { publishJobId: 'job_c' },
+        { attemptsMade: 0, maxAttempts: 3 },
+      );
+
+      expect(xAdapter.publishCarousel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaUrls: ['https://cdn.test/a.png', 'https://cdn.test/b.png'],
+          externalAccountId: 'x_123',
+        }),
+      );
+      expect(prisma.publishJob.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'published',
+            externalPostId: 'x_carousel_9',
+          }),
+        }),
+      );
+    });
+
+    it('schedules a future carousel without enqueuing', async () => {
+      prisma.publishJob.create.mockResolvedValue({ id: 'job_s', status: 'scheduled' });
+      const future = new Date(Date.now() + 3_600_000);
+
+      const job = await service.scheduleCarousel(
+        'org_1',
+        'u1',
+        'sa_1',
+        media,
+        future,
+        'later',
+      );
+
+      expect(prisma.publishJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ carouselPostId: 'car_1', status: 'scheduled' }),
+        }),
+      );
+      expect(xQueue.add).not.toHaveBeenCalled();
+      expect(job.status).toBe('scheduled');
     });
   });
 });

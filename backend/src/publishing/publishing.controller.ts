@@ -23,6 +23,7 @@ import {
   PublishJobSummaryDto,
   PublishNowResponseDto,
 } from './dto/publish-job.dto';
+import { PublishCarouselDto } from './dto/publish-carousel.dto';
 import { PublishNowDto } from './dto/publish-now.dto';
 import { SchedulePublishDto } from './dto/schedule-publish.dto';
 import { PublishingService } from './publishing.service';
@@ -79,6 +80,38 @@ export class PublishingController {
       new Date(dto.scheduledAt),
       dto.caption,
     );
+    return { jobId: job.id, status: job.status };
+  }
+
+  /**
+   * Publishes (or schedules, when `scheduledAt` is given) an ordered set of
+   * media-library images as one native carousel post. 202 + a job to poll,
+   * exactly like /publish/now and /publish/schedule.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
+  @Post('carousel')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async publishCarousel(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: PublishCarouselDto,
+  ): Promise<PublishNowResponseDto> {
+    const job = dto.scheduledAt
+      ? await this.publishingService.scheduleCarousel(
+          req.user.orgId,
+          req.user.userId,
+          dto.socialAccountId,
+          dto.mediaUrls,
+          new Date(dto.scheduledAt),
+          dto.caption,
+        )
+      : await this.publishingService.publishCarouselNow(
+          req.user.orgId,
+          req.user.userId,
+          dto.socialAccountId,
+          dto.mediaUrls,
+          dto.caption,
+        );
     return { jobId: job.id, status: job.status };
   }
 

@@ -21,5 +21,15 @@ abstract class PublishRepository {
     String? caption,
   });
 
+  /// Publishes (or, when [scheduledAt] is set, schedules) an ordered set of
+  /// media-library image URLs as one native carousel/album post. Irreversible
+  /// on publish. The per-platform item ceiling is enforced by the backend.
+  Future<void> publishCarousel({
+    required String socialAccountId,
+    required List<String> mediaUrls,
+    String? caption,
+    DateTime? scheduledAt,
+  });
+
   Future<PublishJob> job(String jobId);
 }
