@@ -90,4 +90,12 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
   }
+
+  /// Permanently removes one notification — scoped to the owner so a user can
+  /// only delete their own. Idempotent: a missing/foreign id deletes nothing.
+  async delete(id: string, userId: string): Promise<void> {
+    await this.prisma.notification.deleteMany({
+      where: { id, userId },
+    });
+  }
 }

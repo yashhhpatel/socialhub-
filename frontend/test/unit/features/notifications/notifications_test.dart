@@ -10,18 +10,25 @@ class _FakeRepo implements ApiNotificationsRepository {
   _FakeRepo(this._items);
   final List<AppNotification> _items;
   bool markedAll = false;
+  final List<String> deleted = [];
 
   @override
-  Future<List<AppNotification>> list({int limit = 30}) async => _items;
+  Future<List<AppNotification>> list({int limit = 30}) async =>
+      _items.where((n) => !deleted.contains(n.id)).toList();
   @override
   Future<int> unreadCount() async => _items.where((n) => !n.isRead).length;
   @override
   Future<void> markRead(String id) async {}
   @override
   Future<void> markAllRead() async => markedAll = true;
+  @override
+  Future<void> delete(String id) async => deleted.add(id);
 }
 
-AppNotification _n({String id = 'n1', String title = 'Post published', bool read = false}) =>
+AppNotification _n(
+        {String id = 'n1',
+        String title = 'Post published',
+        bool read = false,}) =>
     AppNotification(
       id: id,
       type: 'publish_succeeded',
@@ -95,13 +102,41 @@ void main() {
     expect(repo.markedAll, isTrue);
   });
 
+  testWidgets('deletes a notification from the panel', (tester) async {
+    final repo = _FakeRepo([
+      _n(title: 'Post published'),
+      _n(id: 'n2', title: 'Invite accepted'),
+    ]);
+    final overrides = <Override>[
+      notificationsRepositoryProvider.overrideWithValue(repo),
+      unreadNotificationsCountProvider.overrideWith((ref) async => 2),
+      notificationsListProvider.overrideWith((ref) async => repo.list()),
+    ];
+    await tester.pumpWidget(_host(overrides: overrides));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notifications'));
+    await tester.pumpAndSettle();
+
+    // Each tile carries a delete affordance; dismiss the first one.
+    expect(find.byTooltip('Delete notification'), findsNWidgets(2));
+    await tester.tap(find.byTooltip('Delete notification').first);
+    await tester.pumpAndSettle();
+
+    expect(repo.deleted, ['n1']);
+    // The panel refetched and the dismissed item is gone.
+    expect(find.text('Post published'), findsNothing);
+    expect(find.text('Invite accepted'), findsOneWidget);
+  });
+
   testWidgets('shows the empty state when there are no notifications',
       (tester) async {
     final repo = _FakeRepo([]);
     final overrides = <Override>[
       notificationsRepositoryProvider.overrideWithValue(repo),
       unreadNotificationsCountProvider.overrideWith((ref) async => 0),
-      notificationsListProvider.overrideWith((ref) async => <AppNotification>[]),
+      notificationsListProvider
+          .overrideWith((ref) async => <AppNotification>[]),
     ];
     await tester.pumpWidget(_host(overrides: overrides));
     await tester.pumpAndSettle();

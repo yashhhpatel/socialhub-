@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -53,5 +54,15 @@ export class NotificationsController {
   @Post('read-all')
   async markAllRead(@Req() req: AuthedRequest): Promise<void> {
     await this.notifications.markAllRead(req.user.userId);
+  }
+
+  /// Dismisses (permanently deletes) one of the caller's own notifications.
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
+  async remove(
+    @Req() req: AuthedRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.notifications.delete(id, req.user.userId);
   }
 }

@@ -9,6 +9,7 @@ describe('NotificationsService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       updateMany: jest.Mock;
+      deleteMany: jest.Mock;
     };
   };
 
@@ -19,6 +20,7 @@ describe('NotificationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(3),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     service = new NotificationsService(prisma as unknown as PrismaService);
@@ -84,6 +86,13 @@ describe('NotificationsService', () => {
     expect(prisma.notification.updateMany).toHaveBeenCalledWith({
       where: { userId: 'u1', readAt: null },
       data: { readAt: expect.any(Date) },
+    });
+  });
+
+  it('delete is scoped to the owner so a user can only remove their own', async () => {
+    await service.delete('n1', 'u1');
+    expect(prisma.notification.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'n1', userId: 'u1' },
     });
   });
 });

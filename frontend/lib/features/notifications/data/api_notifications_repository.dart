@@ -31,6 +31,9 @@ class ApiNotificationsRepository {
       _dio.post<void>('/notifications/$id/read');
 
   Future<void> markAllRead() => _dio.post<void>('/notifications/read-all');
+
+  /// Dismisses (permanently deletes) one of the caller's own notifications.
+  Future<void> delete(String id) => _dio.delete<void>('/notifications/$id');
 }
 
 final notificationsRepositoryProvider =
@@ -43,8 +46,7 @@ final notificationsRepositoryProvider =
 /// 401 — the bell just shows no badge.
 final unreadNotificationsCountProvider =
     FutureProvider.autoDispose<int>((ref) async {
-  final loggedIn =
-      ref.watch(authTokenStoreProvider.select((t) => t != null));
+  final loggedIn = ref.watch(authTokenStoreProvider.select((t) => t != null));
   if (!loggedIn) return 0;
   try {
     return await ref.watch(notificationsRepositoryProvider).unreadCount();

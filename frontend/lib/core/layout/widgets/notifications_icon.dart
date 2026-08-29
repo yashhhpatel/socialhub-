@@ -51,7 +51,8 @@ class NotificationsIcon extends ConsumerWidget {
               top: 6,
               child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   constraints: const BoxConstraints(minWidth: 16),
                   decoration: BoxDecoration(
                     color: AppColors.error,
@@ -124,6 +125,7 @@ class _NotificationsPanel extends ConsumerWidget {
                     _NotificationTile(
                       notification: shown[i],
                       onTap: () => _openItem(context, ref, shown[i]),
+                      onDelete: () => _deleteItem(ref, shown[i]),
                     ),
                   ],
                 ],
@@ -152,13 +154,33 @@ class _NotificationsPanel extends ConsumerWidget {
       context.go(n.linkPath!);
     }
   }
+
+  /// Dismisses a notification and refreshes the panel + unread badge. The
+  /// delete is best-effort — a failed request shouldn't wedge the panel.
+  Future<void> _deleteItem(WidgetRef ref, AppNotification n) async {
+    try {
+      await ref.read(notificationsRepositoryProvider).delete(n.id);
+    } catch (_) {
+      // best-effort
+    }
+    ref.invalidate(notificationsListProvider);
+    ref.invalidate(unreadNotificationsCountProvider);
+  }
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.notification, required this.onTap});
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final AppNotification notification;
   final VoidCallback onTap;
+
+  /// Dismisses this notification. The button consumes its own tap, so pressing
+  /// it deletes without also triggering the tile's [onTap].
+  final VoidCallback onDelete;
 
   IconData get _icon => switch (notification.type) {
         'publish_succeeded' => Icons.check_circle_outline,
@@ -206,6 +228,16 @@ class _NotificationTile extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            IconButton(
+              tooltip: 'Delete notification',
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              splashRadius: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+              onPressed: onDelete,
+              icon: const Icon(Icons.close),
             ),
           ],
         ),
