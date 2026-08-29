@@ -39,10 +39,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    # Inter is the product typeface (see core/theme/tokens/typography_tokens).
-    # Bundled as the variable font so a single file covers every weight — the
-    # theme's fontWeight values map onto its wght axis. Without this the
-    # 'Inter' family name silently fell back to the platform default.
-    - family: Inter
+    # Lato is the product typeface (see core/theme/app_theme.dart). Lato is not
+    # a variable font, so we bundle its static weights and tag each with its
+    # `weight`. The theme requests 400/500/600/700; Flutter renders 400 and 700
+    # from these files exactly and resolves 500/600 to the nearest bundled
+    # weight (→ 400 and → 700). Without the family declared here the 'Lato'
+    # name would silently fall back to the platform default.
+    - family: Lato
       fonts:
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/Lato-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Lato-Bold.ttf
+          weight: 700
