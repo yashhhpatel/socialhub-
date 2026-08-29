@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/skeleton.dart';
+import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/breakpoints.dart';
@@ -108,10 +110,7 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
           const _BestTimesBar(),
           const SizedBox(height: SpacingTokens.md),
           jobsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () => const _CalendarSkeleton(),
             // Logged out: show the normal empty calendar (browsable).
             error: (error, _) => isUnauthorized(error)
                 ? const _EmptyCalendar()
@@ -174,7 +173,8 @@ class _BestTimesBar extends ConsumerWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.schedule, size: 16, color: theme.colorScheme.primary),
+                Icon(Icons.schedule,
+                    size: 16, color: theme.colorScheme.primary,),
                 const SizedBox(width: SpacingTokens.xs),
                 Text('Best times to post', style: theme.textTheme.labelLarge),
               ],
@@ -256,51 +256,58 @@ class _JobTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
-      shape: RoundedRectangleBorder(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+      child: TapScale(
+        hoverElevation: true,
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: theme.dividerColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+        child: Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: theme.dividerColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _platformLabel(job.platform),
-                        style: theme.textTheme.titleSmall,
+                      Row(
+                        children: [
+                          Text(
+                            _platformLabel(job.platform),
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          const SizedBox(width: SpacingTokens.sm),
+                          _StatusChip(status: job.status),
+                        ],
                       ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      _StatusChip(status: job.status),
+                      const SizedBox(height: 4),
+                      Text(_subtitle(job), style: theme.textTheme.bodySmall),
+                      if (job.status == ScheduledJobStatus.failed &&
+                          job.lastError != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          job.lastError!,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: theme.colorScheme.error),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(_subtitle(job), style: theme.textTheme.bodySmall),
-                  if (job.status == ScheduledJobStatus.failed &&
-                      job.lastError != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      job.lastError!,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.error),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                if (job.isCancellable)
+                  TextButton(
+                    onPressed: () => _confirmCancel(context, ref),
+                    child: const Text('Cancel'),
+                  ),
+              ],
             ),
-            if (job.isCancellable)
-              TextButton(
-                onPressed: () => _confirmCancel(context, ref),
-                child: const Text('Cancel'),
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -439,16 +446,44 @@ class _SchedulerError extends StatelessWidget {
 String _platformLabel(String platform) => PlatformStyle.label(platform);
 
 const _months = <String>[
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 const _monthsLong = <String>[
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-const _weekdayLabels = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const _weekdayLabels = <String>[
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun',
+];
 
 String _formatWhen(DateTime instant) {
   final local = instant.toLocal();
@@ -1009,5 +1044,41 @@ class _PostChip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Shimmer placeholder shown while the calendar's jobs load.
+class _CalendarSkeleton extends StatelessWidget {
+  const _CalendarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget row() => Container(
+          margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              Skeleton.circle(34),
+              const SizedBox(width: SpacingTokens.sm),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Skeleton(width: 120, height: 12),
+                    SizedBox(height: 6),
+                    Skeleton(width: 80, height: 10),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Column(children: [for (var i = 0; i < 4; i++) row()]);
   }
 }

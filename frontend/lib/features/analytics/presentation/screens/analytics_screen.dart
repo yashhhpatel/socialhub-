@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/platform_style.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -56,10 +57,7 @@ class AnalyticsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: SpacingTokens.lg),
           overviewAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(SpacingTokens.xl),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () => const _AnalyticsSkeleton(),
             // Logged out: show the normal empty analytics state (browsable).
             error: (error, _) => isUnauthorized(error)
                 ? const _EmptyAnalytics()
@@ -93,10 +91,20 @@ class _Dashboard extends StatelessWidget {
           spacing: SpacingTokens.md,
           runSpacing: SpacingTokens.md,
           children: [
-            _StatTile(label: 'Impressions', value: t.impressions, icon: Icons.visibility_outlined),
-            _StatTile(label: 'Reach', value: t.reach, icon: Icons.groups_outlined),
-            _StatTile(label: 'Engagement', value: t.engagement, icon: Icons.favorite_outline),
-            _StatTile(label: 'Posts', value: overview.postCount, icon: Icons.article_outlined),
+            _StatTile(
+                label: 'Impressions',
+                value: t.impressions,
+                icon: Icons.visibility_outlined,),
+            _StatTile(
+                label: 'Reach', value: t.reach, icon: Icons.groups_outlined,),
+            _StatTile(
+                label: 'Engagement',
+                value: t.engagement,
+                icon: Icons.favorite_outline,),
+            _StatTile(
+                label: 'Posts',
+                value: overview.postCount,
+                icon: Icons.article_outlined,),
           ],
         ),
         const SizedBox(height: SpacingTokens.lg),
@@ -132,7 +140,8 @@ String _compact(int n) {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value, required this.icon});
+  const _StatTile(
+      {required this.label, required this.value, required this.icon,});
 
   final String label;
   final int value;
@@ -142,19 +151,39 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: 180,
-      padding: const EdgeInsets.all(SpacingTokens.md),
+      width: 190,
+      padding: const EdgeInsets.all(SpacingTokens.lg),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(_compact(value), style: theme.textTheme.headlineSmall),
-          Text(label, style: theme.textTheme.bodySmall),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Text(
+            _compact(value),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -212,11 +241,13 @@ class _PlatformBarChart extends StatelessWidget {
                         ),
                       ),
                       FractionallySizedBox(
-                        widthFactor: (b.metrics.impressions / max).clamp(0.0, 1.0),
+                        widthFactor:
+                            (b.metrics.impressions / max).clamp(0.0, 1.0),
                         child: Container(
                           height: 22,
                           decoration: BoxDecoration(
-                            color: _platformColor(b.platform, theme.colorScheme),
+                            color:
+                                _platformColor(b.platform, theme.colorScheme),
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
@@ -249,7 +280,8 @@ class _ComparisonTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final head = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500);
+    final head =
+        theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -307,7 +339,8 @@ class _TopPosts extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-            title: Text('${_platformLabel(p.platform)} · post ${p.externalPostId ?? p.publishJobId}'),
+            title: Text(
+                '${_platformLabel(p.platform)} · post ${p.externalPostId ?? p.publishJobId}',),
             subtitle: Text(
               '${_compact(p.metrics.impressions)} impressions · '
               '${_compact(p.metrics.likes)} likes · ${_compact(p.metrics.comments)} comments',
@@ -382,7 +415,8 @@ class _EmptyAnalytics extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bar_chart_outlined, size: 40, color: theme.colorScheme.onSurfaceVariant),
+          Icon(Icons.bar_chart_outlined,
+              size: 40, color: theme.colorScheme.onSurfaceVariant,),
           const SizedBox(height: SpacingTokens.md),
           Text('No analytics yet', style: theme.textTheme.titleMedium),
           const SizedBox(height: SpacingTokens.xs),
@@ -414,6 +448,50 @@ class _AnalyticsError extends StatelessWidget {
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
+    );
+  }
+}
+
+/// Shimmer placeholder shown while the overview loads — mirrors the real
+/// layout (a row of stat tiles and two section cards) so the transition is calm.
+class _AnalyticsSkeleton extends StatelessWidget {
+  const _AnalyticsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget card(double height) => Container(
+          height: height,
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Skeleton.circle(40),
+              const SizedBox(height: SpacingTokens.md),
+              const Skeleton(width: 80, height: 22),
+              const SizedBox(height: SpacingTokens.sm),
+              const Skeleton(width: 110, height: 12),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: SpacingTokens.md,
+          runSpacing: SpacingTokens.md,
+          children: [
+            for (var i = 0; i < 4; i++) SizedBox(width: 150, child: card(156)),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        card(180),
+      ],
     );
   }
 }
