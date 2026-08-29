@@ -9,14 +9,15 @@ import 'app_colors.dart';
 /// - Elevation 0 everywhere; surfaces are separated by 1px [AppColors.border],
 ///   never by shadows.
 /// - Card radius 12; button and input radius 8.
-/// - Inter type scale: headings Bold 700, section titles SemiBold 600, body
-///   Regular 400, buttons/nav/labels Medium 500.
+/// - Lato type scale: headings Bold 700, section titles SemiBold 600, body
+///   Regular 400, buttons/nav/labels Medium 500. Lato ships only static
+///   weights, so 500/600 resolve to the nearest bundled weight (400/700).
 ///
 /// Flutter 3.22 note: this SDK's ThemeData takes `CardTheme` / `DialogTheme` /
 /// `TabBarTheme` (not the `*ThemeData` variants introduced in later SDKs).
 final ThemeData midnightStudioTheme = _build();
 
-const String _fontFamily = 'Inter';
+const String _fontFamily = 'Lato';
 const double _cardRadius = 12;
 const double _controlRadius = 8;
 
@@ -327,7 +328,7 @@ OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
       borderSide: BorderSide(color: color, width: width),
     );
 
-/// Inter type scale. Weights follow the product spec:
+/// Lato type scale. Weights follow the product spec:
 /// headings Bold 700, section titles SemiBold 600, body Regular 400,
 /// buttons/nav/labels Medium 500.
 TextTheme _textTheme() => const TextTheme(
