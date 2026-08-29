@@ -7,6 +7,7 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_content_repository.dart';
 import '../../domain/entities/content_asset_summary.dart';
@@ -57,7 +58,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete design?'),
-        content: Text('"$name" will be permanently deleted. This cannot be undone.'),
+        content:
+            Text('"$name" will be permanently deleted. This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () =>
@@ -178,9 +180,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               data: (assets) {
                 // Hide optimistically-deleted designs (removed instantly, no
                 // refetch). Falls back to the empty state once the last one goes.
-                final visible = assets
-                    .where((a) => !_deletedIds.contains(a.id))
-                    .toList();
+                final visible =
+                    assets.where((a) => !_deletedIds.contains(a.id)).toList();
                 return KeyedSubtree(
                   key: const ValueKey('data'),
                   child: visible.isEmpty
@@ -317,13 +318,24 @@ class _AssetCard extends StatelessWidget {
                             style: theme.textTheme.bodyMedium,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            asset.variantCount > 0
-                                ? '${asset.variantCount} platform variant'
-                                    '${asset.variantCount == 1 ? '' : 's'}'
-                                : asset.approvalStatus,
-                            style: theme.textTheme.labelSmall,
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              _StatusBadge(status: asset.approvalStatus),
+                              if (asset.variantCount > 0) ...[
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '${asset.variantCount} variant'
+                                    '${asset.variantCount == 1 ? '' : 's'}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -403,6 +415,35 @@ class _LibraryError extends StatelessWidget {
           const SizedBox(height: SpacingTokens.md),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
+      ),
+    );
+  }
+}
+
+/// A small colored pill for a design's approval status.
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (Color color, String label) = switch (status) {
+      'approved' => (AppColors.success, 'Approved'),
+      'pending_approval' => (AppColors.warning, 'Pending'),
+      'rejected' => (AppColors.error, 'Rejected'),
+      _ => (theme.colorScheme.onSurfaceVariant, 'Draft'),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall
+            ?.copyWith(color: color, fontWeight: FontWeight.w500),
       ),
     );
   }
