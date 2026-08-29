@@ -31,6 +31,7 @@ import '../../features/scheduler/presentation/screens/scheduler_screen.dart';
 import '../../features/content/presentation/screens/content_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/editor/editor_screen.dart';
+import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/info/info_page_screen.dart';
 import '../../features/media_library/presentation/screens/media_library_screen.dart';
 import '../../features/organizations/presentation/screens/organizations_screen.dart';
@@ -264,18 +265,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: child,
         ),
         routes: [
-          // Root is the public home: it renders the main SocialHub page
-          // (the dashboard overview) inside the shell for everyone, so an
-          // unauthenticated visitor lands here instead of being bounced to
-          // /login. Signed-in users are sent on to /dashboard so the rest of
-          // the authenticated experience is unchanged. `/` itself is not in
+          // Root is the public home: a marketing-style landing (HomeScreen)
+          // for signed-out visitors, rendered inside the shell so it carries
+          // the header/footer with Login + Sign-up CTAs. Signed-in users are
+          // sent on to /dashboard (the personalized, real-data dashboard) so
+          // the authenticated experience is unchanged. `/` is not in
           // navDestinations, so authRedirect leaves it publicly reachable.
           GoRoute(
             path: '/',
             name: 'root',
             redirect: (context, state) =>
                 ref.read(authTokenStoreProvider) != null ? '/dashboard' : null,
-            builder: (context, state) => const DashboardScreen(),
+            builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
             path: '/dashboard',

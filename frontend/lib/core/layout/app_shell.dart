@@ -49,6 +49,7 @@ class AppShell extends ConsumerWidget {
     void handleDestinationSelected(String path) => context.go(path);
     void handleOpenSettings() => context.go('/settings');
     void handleLogin() => context.go('/login');
+    void handleRegister() => context.go('/register');
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -64,6 +65,7 @@ class AppShell extends ConsumerWidget {
         userRole: role,
         isAuthenticated: isAuthenticated,
         onLogin: handleLogin,
+        onRegister: handleRegister,
         onLogout: handleLogout,
         onOpenSettings: handleOpenSettings,
         onDestinationSelected: handleDestinationSelected,
