@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  CarouselPublishRequest,
   PublishRequest,
   PublishResult,
   PlatformAdapter,
@@ -20,7 +21,18 @@ const MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
 // offline.access is required to receive a refresh_token at all — without
 // it, the access token simply expires after 2 hours with no way to renew
 // short of the user re-authorizing.
-const SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
+//
+// media.write is required to upload images to X's /2/media/upload endpoint;
+// without it that call returns 403 Forbidden and no post with an image (a
+// single image or a carousel) can ever publish. Adding it means existing
+// connections must RECONNECT to obtain a token carrying the new scope.
+const SCOPES = [
+  'tweet.read',
+  'tweet.write',
+  'users.read',
+  'media.write',
+  'offline.access',
+];
 
 interface XTokenResponse {
   token_type: string;
@@ -67,6 +79,7 @@ export class XAdapter implements PlatformAdapter {
     return {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 280, // free/basic tier; Pro tier allows up to 25,000
+      maxCarouselItems: 4, // X posts take up to 4 images.
       maxVideoDurationSeconds: 140,
       imageSpec: {
         // 16:9 — X crops taller images in the timeline preview, so
@@ -280,6 +293,74 @@ export class XAdapter implements PlatformAdapter {
     if (!mediaId) {
       throw new Error('X returned no media id.');
     }
+    return mediaId;
+  }
+
+  async publishCarousel(
+    request: CarouselPublishRequest,
+  ): Promise<PublishResult> {
+    // X attaches up to 4 images to one post: upload each for a media id, then
+    // create the tweet with all of them.
+    const mediaIds: string[] = [];
+    for (const imageUrl of request.mediaUrls) {
+      mediaIds.push(await this.uploadMediaFromUrl(imageUrl, request.accessToken));
+    }
+
+    const response = await fetch(TWEETS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${request.accessToken}`,
+      },
+      body: JSON.stringify({
+        text: request.caption,
+        media: { media_ids: mediaIds },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `X carousel publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { data?: { id?: string } };
+    if (!data.data?.id) throw new Error('X returned no post id.');
+    return { externalPostId: data.data.id };
+  }
+
+  /** Uploads one image URL to X, returning its media id. */
+  private async uploadMediaFromUrl(
+    imageUrl: string,
+    accessToken: string,
+  ): Promise<string> {
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(
+        `Could not fetch a carousel image for upload: ${imageResponse.status}`,
+      );
+    }
+    const bytes = await imageResponse.arrayBuffer();
+
+    const form = new FormData();
+    form.append('media', new Blob([bytes], { type: 'image/png' }), 'image.png');
+    form.append('media_category', 'tweet_image');
+
+    const response = await fetch(MEDIA_UPLOAD_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `X media upload failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as {
+      id?: string;
+      media_id_string?: string;
+      data?: { id?: string };
+    };
+    const mediaId = data.data?.id ?? data.id ?? data.media_id_string;
+    if (!mediaId) throw new Error('X returned no media id.');
     return mediaId;
   }
 }

@@ -3,7 +3,8 @@ import { CanonicalMetrics } from './ingestion/metric-normalization';
 /** One published post's metrics, flattened for aggregation. */
 export interface MetricRow {
   publishJobId: string;
-  variantId: string;
+  /** Null for carousel jobs, which publish media directly (no content variant). */
+  variantId: string | null;
   platform: string;
   externalPostId: string | null;
   metrics: CanonicalMetrics;
@@ -18,7 +19,7 @@ export interface PlatformBreakdown {
 
 export interface TopPost {
   publishJobId: string;
-  variantId: string;
+  variantId: string | null;
   platform: string;
   externalPostId: string | null;
   metrics: CanonicalMetrics;

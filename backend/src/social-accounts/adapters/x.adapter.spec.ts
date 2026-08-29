@@ -43,7 +43,7 @@ describe('XAdapter', () => {
       expect(() => adapter.getAuthorizationUrl('state')).toThrow(/codeChallenge/);
     });
 
-    it('builds a URL with the correct host, PKCE params, and all 4 required scopes', () => {
+    it('builds a URL with the correct host, PKCE params, and all required scopes', () => {
       const adapter = makeAdapter();
       const url = new URL(adapter.getAuthorizationUrl('test-state', 'test-challenge'));
 
@@ -55,7 +55,14 @@ describe('XAdapter', () => {
 
       const scopes = url.searchParams.get('scope')?.split(' ');
       expect(scopes).toEqual(
-        expect.arrayContaining(['tweet.read', 'tweet.write', 'users.read', 'offline.access']),
+        expect.arrayContaining([
+          'tweet.read',
+          'tweet.write',
+          'users.read',
+          // Required to upload images to X — without it media upload 403s.
+          'media.write',
+          'offline.access',
+        ]),
       );
     });
   });

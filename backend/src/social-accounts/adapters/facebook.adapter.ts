@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  CarouselPublishRequest,
   PublishRequest,
   PublishResult,
   PlatformAdapter,
@@ -101,6 +102,7 @@ export class FacebookAdapter implements PlatformAdapter {
       // documented hard limit so pre-flight validation never rejects a
       // caption the platform would actually accept.
       maxCaptionLength: 63206,
+      maxCarouselItems: 10, // Facebook multi-photo posts (2–10 here).
       maxVideoDurationSeconds: 14400, // 240 minutes, the Page video ceiling
       imageSpec: {
         // 1.91:1 — the ratio Facebook itself recommends for a feed image, so
@@ -293,5 +295,65 @@ export class FacebookAdapter implements PlatformAdapter {
       throw new Error('Facebook returned no post id.');
     }
     return { externalPostId: postId };
+  }
+
+  async publishCarousel(
+    request: CarouselPublishRequest,
+  ): Promise<PublishResult> {
+    // Facebook multi-photo: upload each photo UNPUBLISHED to get its fbid,
+    // then create one feed story attaching them all via attached_media.
+    const mediaFbids: string[] = [];
+    for (const imageUrl of request.mediaUrls) {
+      mediaFbids.push(await this.uploadUnpublishedPhoto(request, imageUrl));
+    }
+
+    const body = new URLSearchParams({
+      message: request.caption,
+      access_token: request.accessToken,
+    });
+    mediaFbids.forEach((fbid, i) => {
+      body.append('attached_media[' + i + ']', JSON.stringify({ media_fbid: fbid }));
+    });
+
+    const response = await fetch(`${GRAPH_BASE}/${request.externalAccountId}/feed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Facebook carousel publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string; post_id?: string };
+    const postId = data.post_id ?? data.id;
+    if (!postId) throw new Error('Facebook returned no post id.');
+    return { externalPostId: postId };
+  }
+
+  private async uploadUnpublishedPhoto(
+    request: CarouselPublishRequest,
+    imageUrl: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      url: imageUrl,
+      // Uploaded but NOT posted to the timeline; attached to the feed story
+      // below instead. This is how Facebook composes a multi-photo post.
+      published: 'false',
+      access_token: request.accessToken,
+    });
+    const response = await fetch(`${GRAPH_BASE}/${request.externalAccountId}/photos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Facebook photo upload failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Facebook returned no photo id.');
+    return data.id;
   }
 }

@@ -9,6 +9,7 @@ import {
   Platform,
   PublishJob,
   PublishJobStatus,
+  SocialAccount,
   SocialAccountStatus,
   VariantStatus,
 } from '@prisma/client';
@@ -134,6 +135,235 @@ export class PublishingService {
     return job;
   }
 
+  // ---- Carousel posts (media-library multi-image) ------------------------
+
+  /**
+   * Publishes an ordered set of media-library images as one native carousel
+   * (Phase: carousel posts). Validates synchronously, persists the carousel +
+   * a `queued` PublishJob, then enqueues onto the platform's queue — the same
+   * shape as publishNow, so the worker/retry/status machinery is shared.
+   */
+  async publishCarouselNow(
+    orgId: string,
+    createdById: string,
+    socialAccountId: string,
+    mediaUrls: string[],
+    caption?: string,
+  ): Promise<PublishJob> {
+    const { queue } = await this.loadAndValidateCarousel(
+      orgId,
+      socialAccountId,
+      mediaUrls,
+    );
+
+    const carousel = await this.prisma.carouselPost.create({
+      data: { orgId, createdById, mediaUrls, caption: caption ?? null },
+    });
+
+    const job = await this.prisma.publishJob.create({
+      data: {
+        carouselPostId: carousel.id,
+        socialAccountId,
+        status: PublishJobStatus.queued,
+        attemptCount: 0,
+      },
+    });
+
+    await queue.add(
+      'publish',
+      { publishJobId: job.id, caption },
+      PUBLISH_JOB_OPTIONS,
+    );
+
+    return job;
+  }
+
+  /** Schedules a carousel for a future time — the carousel twin of schedule(). */
+  async scheduleCarousel(
+    orgId: string,
+    createdById: string,
+    socialAccountId: string,
+    mediaUrls: string[],
+    scheduledAt: Date,
+    caption?: string,
+  ): Promise<PublishJob> {
+    if (scheduledAt.getTime() <= Date.now()) {
+      throw new UnprocessableEntityException(
+        'Scheduled time must be in the future. To publish now, omit scheduledAt.',
+      );
+    }
+
+    await this.loadAndValidateCarousel(orgId, socialAccountId, mediaUrls);
+
+    const carousel = await this.prisma.carouselPost.create({
+      data: { orgId, createdById, mediaUrls, caption: caption ?? null },
+    });
+
+    return this.prisma.publishJob.create({
+      data: {
+        carouselPostId: carousel.id,
+        socialAccountId,
+        scheduledAt,
+        caption,
+        status: PublishJobStatus.scheduled,
+        attemptCount: 0,
+      },
+    });
+  }
+
+  /**
+   * Preconditions for a carousel: the account is the org's and connected, the
+   * platform supports carousels, and the item count is within 2..max. Runs
+   * synchronously so a bad request is rejected before anything is persisted.
+   */
+  private async loadAndValidateCarousel(
+    orgId: string,
+    socialAccountId: string,
+    mediaUrls: string[],
+  ): Promise<{ account: SocialAccount; queue: Queue<PublishJobData> }> {
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: socialAccountId },
+    });
+    if (!account || account.orgId !== orgId) {
+      throw new NotFoundException('Social account not found.');
+    }
+    if (account.status !== SocialAccountStatus.connected) {
+      throw new UnprocessableEntityException(
+        `That ${account.platform} account is ${account.status}. Reconnect it before publishing.`,
+      );
+    }
+
+    const adapter = this.adapters[account.platform];
+    const queue = this.queues[account.platform];
+    const maxItems = adapter?.capabilities().maxCarouselItems;
+    if (!adapter || !queue || !maxItems) {
+      throw new UnprocessableEntityException(
+        `Carousel posts are not supported for ${account.platform}.`,
+      );
+    }
+
+    if (mediaUrls.length < 2) {
+      throw new UnprocessableEntityException('A carousel needs at least 2 images.');
+    }
+    if (mediaUrls.length > maxItems) {
+      throw new UnprocessableEntityException(
+        `${account.platform} carousels accept at most ${maxItems} images.`,
+      );
+    }
+
+    return { account, queue };
+  }
+
+  /**
+   * The carousel twin of executePublish: identical processing/attempt
+   * bookkeeping, token refresh, retry semantics and notifications, but it
+   * publishes an ordered set of media URLs via adapter.publishCarousel and
+   * notifies the carousel's author directly (there is no content asset).
+   */
+  private async executeCarouselPublish(
+    job: PublishJob,
+    data: PublishJobData,
+    ctx: { attemptsMade: number; maxAttempts: number },
+  ): Promise<void> {
+    const carousel = job.carouselPostId
+      ? await this.prisma.carouselPost.findUnique({
+          where: { id: job.carouselPostId },
+        })
+      : null;
+    const account = await this.prisma.socialAccount.findUnique({
+      where: { id: job.socialAccountId },
+    });
+    const adapter = account ? this.adapters[account.platform] : undefined;
+
+    if (!carousel || carousel.mediaUrls.length < 2 || !account || !adapter) {
+      await this.prisma.publishJob.update({
+        where: { id: job.id },
+        data: {
+          status: PublishJobStatus.failed,
+          lastError:
+            'The carousel or account this job targeted no longer exists.',
+        },
+      });
+      return;
+    }
+
+    await this.prisma.publishJob.update({
+      where: { id: job.id },
+      data: {
+        status: PublishJobStatus.processing,
+        attemptCount: ctx.attemptsMade + 1,
+      },
+    });
+
+    let accessToken: string;
+    try {
+      accessToken = await this.socialTokens.ensureFreshAccessToken(account);
+    } catch (err) {
+      if (err instanceof TokenReconnectRequiredError) {
+        await this.prisma.publishJob.update({
+          where: { id: job.id },
+          data: {
+            status: PublishJobStatus.failed,
+            lastError: `${account.platform} needs to be reconnected (token ${err.status}). Reconnect the account in Settings and republish.`,
+          },
+        });
+        await this.notifyUser(carousel.createdById, {
+          type: 'publish_failed',
+          title: 'Reconnect required',
+          body: `Your ${account.platform} account needs to be reconnected before posts can publish.`,
+        });
+        return;
+      }
+      throw err;
+    }
+
+    try {
+      const result = await adapter.publishCarousel({
+        mediaUrls: carousel.mediaUrls,
+        caption: data.caption ?? carousel.caption ?? '',
+        externalAccountId: account.externalAccountId,
+        accessToken,
+      });
+
+      await this.prisma.publishJob.update({
+        where: { id: job.id },
+        data: {
+          status: PublishJobStatus.published,
+          externalPostId: result.externalPostId,
+          lastError: null,
+        },
+      });
+
+      await this.notifyUser(carousel.createdById, {
+        type: 'publish_succeeded',
+        title: 'Post published',
+        body: `Your carousel was published to ${account.platform}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Publish failed.';
+      const isFinalAttempt = ctx.attemptsMade + 1 >= ctx.maxAttempts;
+
+      await this.prisma.publishJob.update({
+        where: { id: job.id },
+        data: {
+          status: isFinalAttempt
+            ? PublishJobStatus.failed
+            : PublishJobStatus.processing,
+          lastError: message,
+        },
+      });
+
+      if (isFinalAttempt) {
+        await this.notifyUser(carousel.createdById, {
+          type: 'publish_failed',
+          title: 'Post failed',
+          body: `Your carousel to ${account.platform} failed: ${message}`,
+        });
+      }
+      throw error;
+    }
+  }
+
   /**
    * The actual platform call, run by a per-platform worker (processors/).
    *
@@ -153,6 +383,23 @@ export class PublishingService {
     // The job was cancelled/deleted between enqueue and now. Nothing to do,
     // and nothing to retry — returning (not throwing) lets BullMQ complete it.
     if (!job) {
+      return;
+    }
+
+    // A carousel job (media-library multi-image) takes its own path.
+    if (job.carouselPostId) {
+      await this.executeCarouselPublish(job, data, ctx);
+      return;
+    }
+
+    if (!job.variantId) {
+      await this.prisma.publishJob.update({
+        where: { id: job.id },
+        data: {
+          status: PublishJobStatus.failed,
+          lastError: 'This job targets neither a variant nor a carousel.',
+        },
+      });
       return;
     }
 
@@ -281,8 +528,17 @@ export class PublishingService {
       select: { createdById: true },
     });
     if (!asset) return;
+    await this.notifyUser(asset.createdById, n);
+  }
+
+  /// Best-effort publish-outcome notification to a specific user (used by the
+  /// carousel path, whose author is known directly rather than via an asset).
+  private async notifyUser(
+    userId: string,
+    n: { type: 'publish_succeeded' | 'publish_failed'; title: string; body: string },
+  ): Promise<void> {
     await this.notifications.notifySafe({
-      userId: asset.createdById,
+      userId,
       type: n.type,
       title: n.title,
       body: n.body,

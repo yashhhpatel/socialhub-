@@ -23,6 +23,7 @@ describe('SocialAccountsService', () => {
       upsert: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
       deleteMany: jest.Mock;
     };
@@ -51,6 +52,7 @@ describe('SocialAccountsService', () => {
         upsert: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn(),
       },
@@ -408,7 +410,7 @@ describe('SocialAccountsService', () => {
   });
 
   describe('disconnect', () => {
-    it('deletes the account when it belongs to the caller\'s org', async () => {
+    it('soft-disconnects (revokes) the account when it belongs to the caller\'s org', async () => {
       prisma.socialAccount.findUnique.mockResolvedValue({
         id: 'sa_1',
         orgId: 'org_1',
@@ -416,9 +418,13 @@ describe('SocialAccountsService', () => {
 
       await service.disconnect('sa_1', 'org_1');
 
-      expect(prisma.socialAccount.delete).toHaveBeenCalledWith({
+      // Revoke, not hard-delete: published history (publish_job → account,
+      // onDelete: Restrict) must survive a disconnect.
+      expect(prisma.socialAccount.update).toHaveBeenCalledWith({
         where: { id: 'sa_1' },
+        data: { status: 'revoked', refreshTokenEnc: null },
       });
+      expect(prisma.socialAccount.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException (not a permission error) if the account belongs to a different org', async () => {
@@ -430,6 +436,7 @@ describe('SocialAccountsService', () => {
       await expect(service.disconnect('sa_1', 'org_1')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+      expect(prisma.socialAccount.update).not.toHaveBeenCalled();
       expect(prisma.socialAccount.delete).not.toHaveBeenCalled();
     });
 

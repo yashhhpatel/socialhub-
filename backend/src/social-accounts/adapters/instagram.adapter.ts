@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   OAuthConnectionResult,
+  CarouselPublishRequest,
   PublishRequest,
   PublishResult,
   PlatformAdapter,
@@ -74,6 +75,7 @@ export class InstagramAdapter implements PlatformAdapter {
     return {
       supportedMediaTypes: ['image', 'video'],
       maxCaptionLength: 2200,
+      maxCarouselItems: 10, // Instagram carousels take 2–10 items.
       maxVideoDurationSeconds: 900, // Reels; feed video limits are shorter but this is the ceiling
       imageSpec: {
         // Square feed post. Instagram also accepts 4:5 (1080x1350) and
@@ -291,6 +293,96 @@ export class InstagramAdapter implements PlatformAdapter {
     if (!data.id) {
       throw new Error('Instagram returned no post id.');
     }
+    return data.id;
+  }
+
+  async publishCarousel(
+    request: CarouselPublishRequest,
+  ): Promise<PublishResult> {
+    // Carousel = one child container per image (is_carousel_item=true), then a
+    // parent CAROUSEL container listing the children, then media_publish.
+    const childIds: string[] = [];
+    for (const imageUrl of request.mediaUrls) {
+      childIds.push(await this.createCarouselItem(request, imageUrl));
+    }
+    const parentId = await this.createCarouselContainer(request, childIds);
+    return {
+      externalPostId: await this.publishCreationId(request, parentId),
+    };
+  }
+
+  private async createCarouselItem(
+    request: CarouselPublishRequest,
+    imageUrl: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      image_url: imageUrl,
+      is_carousel_item: 'true',
+      access_token: request.accessToken,
+    });
+    const response = await fetch(`${GRAPH_BASE}/${request.externalAccountId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Instagram carousel item creation failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Instagram returned no carousel item id.');
+    return data.id;
+  }
+
+  private async createCarouselContainer(
+    request: CarouselPublishRequest,
+    childIds: string[],
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      media_type: 'CAROUSEL',
+      children: childIds.join(','),
+      caption: request.caption,
+      access_token: request.accessToken,
+    });
+    const response = await fetch(`${GRAPH_BASE}/${request.externalAccountId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Instagram carousel container creation failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Instagram returned no carousel container id.');
+    return data.id;
+  }
+
+  private async publishCreationId(
+    request: CarouselPublishRequest,
+    creationId: string,
+  ): Promise<string> {
+    const body = new URLSearchParams({
+      creation_id: creationId,
+      access_token: request.accessToken,
+    });
+    const response = await fetch(
+      `${GRAPH_BASE}/${request.externalAccountId}/media_publish`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Instagram publish failed: ${response.status} ${await response.text()}`,
+      );
+    }
+    const data = (await response.json()) as { id?: string };
+    if (!data.id) throw new Error('Instagram returned no post id.');
     return data.id;
   }
 }

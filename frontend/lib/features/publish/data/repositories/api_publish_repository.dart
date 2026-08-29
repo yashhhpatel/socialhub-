@@ -54,6 +54,26 @@ class ApiPublishRepository implements PublishRepository {
   }
 
   @override
+  Future<void> publishCarousel({
+    required String socialAccountId,
+    required List<String> mediaUrls,
+    String? caption,
+    DateTime? scheduledAt,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/publish/carousel',
+      data: {
+        'socialAccountId': socialAccountId,
+        'mediaUrls': mediaUrls,
+        if (caption != null) 'caption': caption,
+        // Sent as UTC ISO-8601; the backend validates it's in the future.
+        if (scheduledAt != null)
+          'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      },
+    );
+  }
+
+  @override
   Future<PublishJob> job(String jobId) async {
     final response = await _dio.get<Map<String, dynamic>>('/publish/jobs/$jobId');
     return PublishJob.fromJson(response.data!);

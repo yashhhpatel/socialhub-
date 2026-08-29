@@ -197,7 +197,12 @@ class _SocialAccountsScreenState extends ConsumerState<SocialAccountsScreen> {
 
   SocialAccount? _accountFor(List<SocialAccount> accounts, SocialPlatform platform) {
     for (final account in accounts) {
-      if (account.platform == platform) return account;
+      // Only a CONNECTED account counts as this platform's active connection —
+      // a disconnected (revoked) row lingers to preserve publish history, but
+      // the card should read "Not connected" and offer Connect again.
+      if (account.platform == platform && account.status == 'connected') {
+        return account;
+      }
     }
     return null;
   }
