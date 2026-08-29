@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/platform_style.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/social_account.dart';
 import '../../domain/entities/social_platform.dart';
@@ -27,18 +28,11 @@ class PlatformConnectionCard extends StatelessWidget {
   final VoidCallback onConnect;
   final VoidCallback onDisconnect;
 
-  IconData get _icon => switch (platform) {
-        SocialPlatform.instagram => Icons.camera_alt_outlined,
-        SocialPlatform.facebook => Icons.facebook,
-        SocialPlatform.threads => Icons.tag,
-        SocialPlatform.x => Icons.alternate_email,
-        SocialPlatform.linkedin => Icons.business_center_outlined,
-      };
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isConnected = account != null;
+    final brand = PlatformStyle.color(platform.apiValue, colorScheme);
 
     return TapScale(
       hoverElevation: true,
@@ -53,13 +47,16 @@ class PlatformConnectionCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+                color: brand.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(_icon, color: colorScheme.primary),
+              child: Icon(
+                PlatformStyle.icon(platform.apiValue),
+                color: brand,
+              ),
             ),
             const SizedBox(width: SpacingTokens.md),
             Expanded(
@@ -68,23 +65,32 @@ class PlatformConnectionCard extends StatelessWidget {
                 children: [
                   Text(
                     platform.label,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isConnected
-                        ? 'Connected · ${account!.externalAccountId}'
-                        : platform.isConnectable
-                            ? 'Not connected'
-                            : 'Coming soon',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isConnected
-                          ? AppColors.success
-                          : colorScheme.onSurface.withOpacity(0.55),
-                      fontWeight:
-                          isConnected ? FontWeight.w500 : FontWeight.w400,
-                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _StatusPill(
+                        connected: isConnected,
+                        connectable: platform.isConnectable,
+                      ),
+                      if (isConnected) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            account!.externalAccountId,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurface.withOpacity(0.55),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -127,6 +133,39 @@ class PlatformConnectionCard extends StatelessWidget {
               ),
             )
           : const Text('Connect'),
+    );
+  }
+}
+
+/// Small colored pill summarising a platform's connection status.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.connected, required this.connectable});
+
+  final bool connected;
+  final bool connectable;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (Color color, String label) = connected
+        ? (AppColors.success, 'Connected')
+        : connectable
+            ? (scheme.onSurfaceVariant, 'Not connected')
+            : (AppColors.warning, 'Coming soon');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 }
