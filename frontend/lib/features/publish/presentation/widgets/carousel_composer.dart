@@ -69,12 +69,26 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   int get _maxItems =>
       _account == null ? 20 : _maxItemsForApi(_account!.platform);
 
-  bool get _canSubmit =>
-      !_submitting &&
-      _account != null &&
-      _selected.length >= 2 &&
-      _selected.length <= _maxItems &&
-      (_scheduledAt == null || _scheduledAt!.isAfter(DateTime.now()));
+  bool get _canSubmit => _disabledReason == null && !_submitting;
+
+  /// Why Publish/Schedule is currently unavailable, or null when it's ready.
+  /// Surfaced inline so the (theme-tinted) button never looks clickable
+  /// without saying what's missing.
+  String? get _disabledReason {
+    if (_account == null) return 'Choose an account to publish to.';
+    if (_selected.length < 2) {
+      return 'Tap at least 2 images above to include them'
+          '${_selected.length == 1 ? ' (1 selected)' : ''}.';
+    }
+    if (_selected.length > _maxItems) {
+      return '${PlatformStyle.label(_account!.platform)} allows at most '
+          '$_maxItems images — remove ${_selected.length - _maxItems}.';
+    }
+    if (_scheduledAt != null && !_scheduledAt!.isAfter(DateTime.now())) {
+      return 'Pick a time in the future.';
+    }
+    return null;
+  }
 
   void _toggle(MediaItem item) {
     setState(() {
@@ -319,6 +333,29 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
               ),
             const SizedBox(height: SpacingTokens.lg),
 
+            // Inline reason the action is unavailable — the themed button stays
+            // tinted even when disabled, so say what's missing.
+            if (!_submitting && _disabledReason != null) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: SpacingTokens.xs),
+                  Expanded(
+                    child: Text(
+                      _disabledReason!,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+            ],
+
             // --- Actions ----------------------------------------------------
             Row(
               children: [
@@ -394,20 +431,31 @@ class _SelectableTile extends StatelessWidget {
                 color: theme.colorScheme.primary.withOpacity(0.15),
               ),
             ),
-          if (selected)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: CircleAvatar(
-                radius: 11,
-                backgroundColor: theme.colorScheme.primary,
-                child: Text(
-                  '${order + 1}',
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: theme.colorScheme.onPrimary),
-                ),
-              ),
-            ),
+          // Corner indicator: a numbered badge when selected, an empty circle
+          // when not — so the tile clearly reads as tappable/selectable.
+          Positioned(
+            top: 4,
+            right: 4,
+            child: selected
+                ? CircleAvatar(
+                    radius: 11,
+                    backgroundColor: theme.colorScheme.primary,
+                    child: Text(
+                      '${order + 1}',
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.colorScheme.onPrimary),
+                    ),
+                  )
+                : Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withOpacity(0.35),
+                      border: Border.all(color: Colors.white70, width: 1.5),
+                    ),
+                  ),
+          ),
         ],
       ),
     );
