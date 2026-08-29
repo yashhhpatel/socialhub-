@@ -265,17 +265,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: child,
         ),
         routes: [
-          // Root is the public home: a marketing-style landing (HomeScreen)
-          // for signed-out visitors, rendered inside the shell so it carries
-          // the header/footer with Login + Sign-up CTAs. Signed-in users are
-          // sent on to /dashboard (the personalized, real-data dashboard) so
-          // the authenticated experience is unchanged. `/` is not in
-          // navDestinations, so authRedirect leaves it publicly reachable.
+          // Root is the app Home — a clean SocialHub overview (welcome, quick
+          // navigation cards, and a real-data overview) shown to EVERYONE,
+          // signed in or out. It no longer redirects to /dashboard: Home and
+          // Dashboard are distinct destinations (both in the nav). Rendered
+          // inside the shell so it carries the header/footer.
           GoRoute(
             path: '/',
             name: 'root',
-            redirect: (context, state) =>
-                ref.read(authTokenStoreProvider) != null ? '/dashboard' : null,
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(

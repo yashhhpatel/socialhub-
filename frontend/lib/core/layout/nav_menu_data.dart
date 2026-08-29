@@ -64,6 +64,11 @@ class NavCategory {
 
 const List<NavCategory> navMenu = [
   NavCategory(
+    label: 'Home',
+    icon: Icons.home_outlined,
+    path: '/',
+  ),
+  NavCategory(
     label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     path: '/dashboard',
