@@ -27,6 +27,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     required this.userRole,
     required this.isAuthenticated,
     required this.onLogin,
+    required this.onRegister,
     required this.onLogout,
     required this.onOpenSettings,
     required this.onDestinationSelected,
@@ -38,6 +39,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final String userRole;
   final bool isAuthenticated;
   final VoidCallback onLogin;
+  final VoidCallback onRegister;
   final VoidCallback onLogout;
   final VoidCallback onOpenSettings;
   final ValueChanged<String> onDestinationSelected;
@@ -143,17 +145,27 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             onLogout: onLogout,
             onOpenSettings: onOpenSettings,
           )
-        else
+        else ...[
+          // On the narrow bar, keep only the primary Sign-up CTA; the wider
+          // bar shows a secondary Log-in alongside it.
+          if (!isMobile) ...[
+            TextButton(
+              onPressed: onLogin,
+              child: const Text('Log in'),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+          ],
           FilledButton(
-            onPressed: onLogin,
+            onPressed: onRegister,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpacingTokens.md,
                 vertical: 10,
               ),
             ),
-            child: const Text('Log in'),
+            child: const Text('Sign up'),
           ),
+        ],
       ],
     );
   }

@@ -12,10 +12,26 @@ import 'package:flutter/material.dart';
 class PlatformStyle {
   const PlatformStyle._();
 
-  /// Title-cased platform name for labels ("instagram" → "Instagram").
-  static String label(String platform) => platform.isEmpty
-      ? platform
-      : '${platform[0].toUpperCase()}${platform.substring(1)}';
+  /// Properly-cased brand name for a platform ("linkedin" → "LinkedIn",
+  /// "x" → "X"). Falls back to a title-cased form for anything unknown.
+  static String label(String platform) {
+    switch (platform) {
+      case 'instagram':
+        return 'Instagram';
+      case 'facebook':
+        return 'Facebook';
+      case 'threads':
+        return 'Threads';
+      case 'x':
+        return 'X';
+      case 'linkedin':
+        return 'LinkedIn';
+      default:
+        return platform.isEmpty
+            ? platform
+            : '${platform[0].toUpperCase()}${platform.substring(1)}';
+    }
+  }
 
   /// The Material icon used for a platform across the app.
   static IconData icon(String platform) {
