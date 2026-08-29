@@ -9,8 +9,8 @@ import 'app_colors.dart';
 /// - Elevation 0 everywhere; surfaces are separated by 1px [AppColors.border],
 ///   never by shadows.
 /// - Card radius 12; button and input radius 8.
-/// - Inter, 16px body, two weights only (400 regular, 500 medium). Headings
-///   never go above w500.
+/// - Inter type scale: headings Bold 700, section titles SemiBold 600, body
+///   Regular 400, buttons/nav/labels Medium 500.
 ///
 /// Flutter 3.22 note: this SDK's ThemeData takes `CardTheme` / `DialogTheme` /
 /// `TabBarTheme` (not the `*ThemeData` variants introduced in later SDKs).
@@ -194,8 +194,7 @@ ThemeData _build() {
         borderRadius: BorderRadius.circular(_controlRadius),
         side: const BorderSide(color: AppColors.border),
       ),
-      textStyle:
-          textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+      textStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
@@ -328,37 +327,50 @@ OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
       borderSide: BorderSide(color: color, width: width),
     );
 
-/// Inter, 16px body, two weights only — 400 regular and 500 medium. Headings
-/// never exceed w500 (no bold headings).
+/// Inter type scale. Weights follow the product spec:
+/// headings Bold 700, section titles SemiBold 600, body Regular 400,
+/// buttons/nav/labels Medium 500.
 TextTheme _textTheme() => const TextTheme(
+      displaySmall: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 40,
+        fontWeight: FontWeight.w700,
+        height: 1.15,
+      ),
       headlineLarge: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 32,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w700,
         height: 1.2,
       ),
       headlineMedium: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 24,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w700,
         height: 1.25,
+      ),
+      headlineSmall: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        height: 1.3,
       ),
       titleLarge: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 20,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         height: 1.3,
       ),
       titleMedium: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 16,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         height: 1.35,
       ),
       titleSmall: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         height: 1.35,
       ),
       bodyLarge: TextStyle(

@@ -41,9 +41,8 @@ class AppShell extends ConsumerWidget {
     final isAuthenticated = session != null;
     final isMobile = Breakpoints.isMobile(context);
 
-    // The public home lives at `/` but shows the dashboard overview, so
-    // highlight the Dashboard nav item there too.
-    final highlightPath = currentPath == '/' ? '/dashboard' : currentPath;
+    // `/` is Home now (its own destination), so highlight the path as-is.
+    final highlightPath = currentPath;
 
     void handleLogout() => ref.read(authControllerProvider.notifier).logout();
     void handleDestinationSelected(String path) => context.go(path);
