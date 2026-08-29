@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/motion/form_skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_brand_kit_repository.dart';
@@ -45,7 +46,8 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
 
   bool _isValidHex(String value) {
     final v = value.trim();
-    return RegExp(r'^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$').hasMatch(v);
+    return RegExp(r'^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$')
+        .hasMatch(v);
   }
 
   Future<void> _save() async {
@@ -79,13 +81,14 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: kitAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const FormSkeleton(),
         // Logged out: show the page header + a browsable note (editing gates
         // on save), not a blocking wall.
         error: (error, _) => isUnauthorized(error)
             ? const _BrandKitLoggedOut()
             : Center(
-                child: Text('Could not load your brand kit: ${describeApiError(error)}'),
+                child: Text(
+                    'Could not load your brand kit: ${describeApiError(error)}',),
               ),
         data: (kit) {
           _hydrate(kit);
@@ -106,7 +109,9 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
                   final value = _colorController.text.trim();
                   if (!_isValidHex(value)) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Enter a valid hex colour, e.g. #1A2B3C.')),
+                      const SnackBar(
+                          content:
+                              Text('Enter a valid hex colour, e.g. #1A2B3C.'),),
                     );
                     return;
                   }
@@ -357,11 +362,13 @@ class _LogoSection extends StatelessWidget {
                   child: Image.network(
                     logoUrl!,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image_outlined),
                   ),
                 ),
                 const SizedBox(width: SpacingTokens.md),
-                Expanded(child: Text(logoUrl!, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(logoUrl!, overflow: TextOverflow.ellipsis),),
                 TextButton(onPressed: onClear, child: const Text('Remove')),
               ],
             ),

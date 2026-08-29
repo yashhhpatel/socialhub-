@@ -33,7 +33,8 @@ class ApiBrandKitRepository {
       if (logoUrl != null) 'logoUrl': logoUrl,
       if (logoPublicId != null) 'logoPublicId': logoPublicId,
     };
-    final response = await _dio.patch<Map<String, dynamic>>('/brand-kits', data: body);
+    final response =
+        await _dio.patch<Map<String, dynamic>>('/brand-kits', data: body);
     return BrandKit.fromJson(response.data!);
   }
 }

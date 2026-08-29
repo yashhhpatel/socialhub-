@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/motion/form_skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_organizations_repository.dart';
@@ -30,18 +31,14 @@ class OrganizationsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: SpacingTokens.lg),
           orgAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(SpacingTokens.xl),
-                child: CircularProgressIndicator(),
-              ),
-            ),
+            loading: () => const FormSkeleton(),
             // Logged out: skip the data-only overview card entirely (rather
             // than a blocking wall) — the page's header and the Manage links
             // below stay fully browsable.
             error: (e, _) => isUnauthorized(e)
                 ? const SizedBox.shrink()
-                : Text('Could not load your organization: ${describeApiError(e)}'),
+                : Text(
+                    'Could not load your organization: ${describeApiError(e)}',),
             data: (org) => _Overview(org: org),
           ),
           const SizedBox(height: SpacingTokens.lg),
@@ -84,7 +81,9 @@ class _Overview extends StatelessWidget {
               Expanded(
                 child: Text(org.name, style: theme.textTheme.titleLarge),
               ),
-              Chip(label: Text('${org.planTier[0].toUpperCase()}${org.planTier.substring(1)} plan')),
+              Chip(
+                  label: Text(
+                      '${org.planTier[0].toUpperCase()}${org.planTier.substring(1)} plan',),),
             ],
           ),
           const SizedBox(height: SpacingTokens.md),
@@ -129,7 +128,11 @@ class _ManageGrid extends StatelessWidget {
 
   static const _links = [
     (icon: Icons.people_outline, label: 'Team & roles', route: '/team'),
-    (icon: Icons.format_paint_outlined, label: 'White label', route: '/white-label'),
+    (
+      icon: Icons.format_paint_outlined,
+      label: 'White label',
+      route: '/white-label'
+    ),
     (icon: Icons.palette_outlined, label: 'Brand kit', route: '/brand-kit'),
     (icon: Icons.link, label: 'Connected accounts', route: '/settings'),
   ];
@@ -157,7 +160,9 @@ class _ManageGrid extends StatelessWidget {
                   children: [
                     Icon(link.icon, color: theme.colorScheme.primary),
                     const SizedBox(width: SpacingTokens.sm),
-                    Expanded(child: Text(link.label, style: theme.textTheme.bodyLarge)),
+                    Expanded(
+                        child:
+                            Text(link.label, style: theme.textTheme.bodyLarge),),
                     const Icon(Icons.chevron_right, size: 18),
                   ],
                 ),

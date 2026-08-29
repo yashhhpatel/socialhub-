@@ -39,10 +39,12 @@ class ApiOrganizationsRepository {
   }
 }
 
-final organizationsRepositoryProvider = Provider<ApiOrganizationsRepository>((ref) {
+final organizationsRepositoryProvider =
+    Provider<ApiOrganizationsRepository>((ref) {
   return ApiOrganizationsRepository(ref.watch(apiClientProvider));
 });
 
-final orgOverviewProvider = FutureProvider.autoDispose<OrgOverview>((ref) async {
+final orgOverviewProvider =
+    FutureProvider.autoDispose<OrgOverview>((ref) async {
   return ref.watch(organizationsRepositoryProvider).getOverview();
 });

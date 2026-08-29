@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/motion/form_skeleton.dart';
 import '../../core/network/api_error_message.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/tokens/spacing_tokens.dart';
@@ -39,13 +40,17 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
   }
 
   bool _validColor(String v) =>
-      v.isEmpty || RegExp(r'^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$').hasMatch(v);
+      v.isEmpty ||
+      RegExp(r'^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$')
+          .hasMatch(v);
 
   Future<void> _save(String orgId) async {
     final color = _colorController.text.trim();
     if (!_validColor(color)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid hex colour, e.g. #1A2B3C, or leave it blank.')),
+        const SnackBar(
+            content: Text(
+                'Enter a valid hex colour, e.g. #1A2B3C, or leave it blank.',),),
       );
       return;
     }
@@ -64,7 +69,9 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
       messenger.showSnackBar(const SnackBar(content: Text('Branding saved.')));
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not save branding: ${describeApiError(error)}')),
+        SnackBar(
+            content:
+                Text('Could not save branding: ${describeApiError(error)}'),),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -79,18 +86,21 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const FormSkeleton(),
         // Logged out: show the page header + a browsable, non-blocking note
         // (branding editing itself is admin-only and gated on save).
         error: (e, _) => isUnauthorized(e)
             ? const _WhiteLabelLoggedOut()
-            : Center(child: Text('Could not load your account: ${describeApiError(e)}')),
+            : Center(
+                child: Text(
+                    'Could not load your account: ${describeApiError(e)}',),),
         data: (user) {
           if (!user.isAdmin) return const _AdminsOnly();
           final wlAsync = ref.watch(whiteLabelProvider);
           return wlAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Could not load branding: ${describeApiError(e)}')),
+            loading: () => const FormSkeleton(),
+            error: (e, _) => Center(
+                child: Text('Could not load branding: ${describeApiError(e)}'),),
             data: (wl) {
               _hydrate(wl);
               return Column(
@@ -187,10 +197,12 @@ class _Preview extends StatelessWidget {
                     ? Image.network(
                         logoUrl,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image_outlined, color: AppColors.textMuted),
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_outlined,
+                            color: AppColors.textMuted,),
                       )
-                    : const Icon(Icons.image_outlined, color: AppColors.textMuted),
+                    : const Icon(Icons.image_outlined,
+                        color: AppColors.textMuted,),
               ),
               const SizedBox(width: SpacingTokens.md),
               FilledButton(
@@ -245,11 +257,13 @@ class _AdminsOnly extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock_outline, size: 40, color: theme.colorScheme.onSurfaceVariant),
+          Icon(Icons.lock_outline,
+              size: 40, color: theme.colorScheme.onSurfaceVariant,),
           const SizedBox(height: SpacingTokens.md),
           Text('Admins only', style: theme.textTheme.titleMedium),
           const SizedBox(height: SpacingTokens.xs),
-          Text('Branding is managed by admins and the owner.', style: theme.textTheme.bodySmall),
+          Text('Branding is managed by admins and the owner.',
+              style: theme.textTheme.bodySmall,),
         ],
       ),
     );
