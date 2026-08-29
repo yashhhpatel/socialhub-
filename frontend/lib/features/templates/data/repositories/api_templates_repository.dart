@@ -42,6 +42,9 @@ class ApiTemplatesRepository {
     );
     return TemplateSummary.fromJson(response.data!);
   }
+
+  /// Deletes one of the org's own templates. The backend 404s another org's.
+  Future<void> delete(String id) => _dio.delete<void>('/templates/$id');
 }
 
 final templatesRepositoryProvider = Provider<ApiTemplatesRepository>((ref) {

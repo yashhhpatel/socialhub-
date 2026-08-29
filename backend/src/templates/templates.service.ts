@@ -59,6 +59,17 @@ export class TemplatesService {
     });
   }
 
+  /**
+   * Deletes one of the org's OWN templates (from the library or the
+   * marketplace). Scoped through findByIdScoped so an org can only ever delete
+   * a template it owns — another org's template 404s rather than deleting.
+   * Nothing references a Template by FK, so this is a plain delete.
+   */
+  async delete(id: string, orgId: string): Promise<void> {
+    await this.findByIdScoped(id, orgId); // 404s another org's template
+    await this.prisma.template.delete({ where: { id } });
+  }
+
   // --- Marketplace (Milestone 14.1) ---
 
   /**

@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 
@@ -25,12 +36,14 @@ export class TemplatesController {
   @Get()
   async list(@Req() req: AuthenticatedRequest): Promise<TemplateSummaryDto[]> {
     const templates = await this.templatesService.list(req.user.orgId);
+    // Every row here belongs to the caller's org, so all are deletable.
     return templates.map((t) => ({
       id: t.id,
       name: t.name,
       category: t.category,
       thumbnailUrl: t.thumbnailUrl,
       createdAt: t.createdAt,
+      isOwn: true,
     }));
   }
 
@@ -49,8 +62,21 @@ export class TemplatesController {
       category: t.category,
       thumbnailUrl: t.thumbnailUrl,
       createdAt: t.createdAt,
+      isOwn: true,
       canvasJson: t.canvasJson,
     };
+  }
+
+  /** Deletes one of the caller's own templates. 404s another org's template. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.editor)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.templatesService.delete(id, req.user.orgId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -67,6 +93,7 @@ export class TemplatesController {
       category: t.category,
       thumbnailUrl: t.thumbnailUrl,
       createdAt: t.createdAt,
+      isOwn: true,
       canvasJson: t.canvasJson,
     };
   }

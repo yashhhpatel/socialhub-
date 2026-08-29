@@ -6,6 +6,7 @@ class TemplateSummary {
     required this.name,
     this.category,
     this.thumbnailUrl,
+    this.isOwn = false,
   });
 
   final String id;
@@ -13,11 +14,17 @@ class TemplateSummary {
   final String? category;
   final String? thumbnailUrl;
 
-  factory TemplateSummary.fromJson(Map<String, dynamic> json) => TemplateSummary(
+  /// Whether the current org owns this template — the only ones it may delete.
+  /// Always true in the library; per-row in the marketplace.
+  final bool isOwn;
+
+  factory TemplateSummary.fromJson(Map<String, dynamic> json) =>
+      TemplateSummary(
         id: json['id'] as String,
         name: json['name'] as String,
         category: json['category'] as String?,
         thumbnailUrl: json['thumbnailUrl'] as String?,
+        isOwn: json['isOwn'] as bool? ?? false,
       );
 }
 
