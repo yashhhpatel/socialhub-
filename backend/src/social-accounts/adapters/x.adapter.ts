@@ -21,7 +21,18 @@ const MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
 // offline.access is required to receive a refresh_token at all — without
 // it, the access token simply expires after 2 hours with no way to renew
 // short of the user re-authorizing.
-const SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
+//
+// media.write is required to upload images to X's /2/media/upload endpoint;
+// without it that call returns 403 Forbidden and no post with an image (a
+// single image or a carousel) can ever publish. Adding it means existing
+// connections must RECONNECT to obtain a token carrying the new scope.
+const SCOPES = [
+  'tweet.read',
+  'tweet.write',
+  'users.read',
+  'media.write',
+  'offline.access',
+];
 
 interface XTokenResponse {
   token_type: string;
