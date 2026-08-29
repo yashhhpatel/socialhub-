@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Platform, SocialAccount } from '@prisma/client';
+import { Platform, SocialAccount, SocialAccountStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { PlanLimitsService } from '../billing/plan-limits.service';
@@ -157,7 +157,20 @@ export class SocialAccountsService {
       throw new NotFoundException('Social account not found.');
     }
 
-    await this.prisma.socialAccount.delete({ where: { id: accountId } });
+    // SOFT disconnect: mark revoked and drop the refresh token, rather than
+    // hard-deleting. The row is referenced by publish_job with onDelete:
+    // Restrict precisely so published history survives a disconnect — a
+    // DELETE throws a FK violation once the account has ever published.
+    // Reconnecting the same account later reactivates this row (the connect
+    // upsert keys on orgId+platform+externalAccountId), now with a fresh
+    // token/scope.
+    await this.prisma.socialAccount.update({
+      where: { id: accountId },
+      data: {
+        status: SocialAccountStatus.revoked,
+        refreshTokenEnc: null,
+      },
+    });
   }
 
   // --- Meta compliance: deauthorize & data deletion callbacks ---
