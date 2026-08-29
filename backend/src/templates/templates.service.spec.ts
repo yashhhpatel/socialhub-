@@ -5,7 +5,12 @@ import { TemplatesService } from './templates.service';
 describe('TemplatesService', () => {
   let service: TemplatesService;
   let prisma: {
-    template: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
+    template: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      delete: jest.Mock;
+    };
   };
 
   const canvasJson = { width: 1080, height: 1080, layers: [] };
@@ -16,6 +21,7 @@ describe('TemplatesService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         create: jest.fn((args) => ({ id: 'tpl_1', ...args.data })),
+        delete: jest.fn().mockResolvedValue(undefined),
       },
     };
     service = new TemplatesService(prisma as never);
@@ -78,6 +84,27 @@ describe('TemplatesService', () => {
       const args = prisma.template.create.mock.calls[0][0];
       expect(args.data.category).toBeNull();
       expect(args.data.thumbnailUrl).toBeNull();
+    });
+  });
+
+  describe('delete', () => {
+    it('deletes a template the org owns', async () => {
+      prisma.template.findUnique.mockResolvedValue({ id: 'tpl_1', orgId: 'org_1' });
+
+      await service.delete('tpl_1', 'org_1');
+
+      expect(prisma.template.delete).toHaveBeenCalledWith({
+        where: { id: 'tpl_1' },
+      });
+    });
+
+    it('404s and deletes nothing for another org\'s template', async () => {
+      prisma.template.findUnique.mockResolvedValue({ id: 'tpl_1', orgId: 'other' });
+
+      await expect(service.delete('tpl_1', 'org_1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.template.delete).not.toHaveBeenCalled();
     });
   });
 });

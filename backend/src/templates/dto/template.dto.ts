@@ -9,6 +9,12 @@ export class TemplateSummaryDto {
   category!: string | null;
   thumbnailUrl!: string | null;
   createdAt!: Date;
+  /**
+   * Whether the calling org owns this template — the only ones it may delete.
+   * Always true for the org's own library (`GET /templates`); per-row in the
+   * marketplace, where most rows belong to other orgs.
+   */
+  isOwn!: boolean;
 }
 
 /** Full template including the canvas payload to clone into a new asset. */

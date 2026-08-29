@@ -13,7 +13,8 @@ class ApiMarketplaceRepository {
 
   final Dio _dio;
 
-  Future<List<TemplateSummary>> search({String? search, String? category}) async {
+  Future<List<TemplateSummary>> search(
+      {String? search, String? category,}) async {
     final response = await _dio.get<List<dynamic>>(
       '/templates/marketplace',
       queryParameters: {
@@ -33,9 +34,15 @@ class ApiMarketplaceRepository {
 
   /// Clones a public template into the caller's org, returning the new copy.
   Future<TemplateSummary> clone(String templateId) async {
-    final response = await _dio.post<Map<String, dynamic>>('/templates/$templateId/clone');
+    final response =
+        await _dio.post<Map<String, dynamic>>('/templates/$templateId/clone');
     return TemplateSummary.fromJson(response.data!);
   }
+
+  /// Deletes one of the caller's own published templates (same endpoint as the
+  /// library). The backend 404s a template the caller's org doesn't own.
+  Future<void> delete(String templateId) =>
+      _dio.delete<void>('/templates/$templateId');
 }
 
 final marketplaceRepositoryProvider = Provider<ApiMarketplaceRepository>((ref) {
@@ -51,7 +58,9 @@ class MarketplaceQuery {
 
   @override
   bool operator ==(Object other) =>
-      other is MarketplaceQuery && other.search == search && other.category == category;
+      other is MarketplaceQuery &&
+      other.search == search &&
+      other.category == category;
 
   @override
   int get hashCode => Object.hash(search, category);

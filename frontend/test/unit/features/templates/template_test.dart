@@ -15,6 +15,20 @@ void main() {
       expect(t.category, isNull);
       expect(t.thumbnailUrl, isNull);
     });
+
+    test('defaults isOwn to false when the flag is absent', () {
+      final t = TemplateSummary.fromJson({'id': 'tpl_1', 'name': 'Promo'});
+      expect(t.isOwn, isFalse);
+    });
+
+    test('parses isOwn when the backend marks the row as the caller\'s own', () {
+      final t = TemplateSummary.fromJson({
+        'id': 'tpl_1',
+        'name': 'Promo',
+        'isOwn': true,
+      });
+      expect(t.isOwn, isTrue);
+    });
   });
 
   group('TemplateDetail.fromJson', () {

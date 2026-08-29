@@ -35,16 +35,20 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final detail = await ref.read(templatesRepositoryProvider).get(summary.id);
+      final detail =
+          await ref.read(templatesRepositoryProvider).get(summary.id);
       final document = CanvasDocument.fromJson(detail.canvasJson);
-      final assetId =
-          await ref.read(contentRepositoryProvider).createAsset(document: document);
+      final assetId = await ref
+          .read(contentRepositoryProvider)
+          .createAsset(document: document);
       if (!mounted) return;
       router.go('/editor/$assetId');
     } catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not start from template: ${describeApiError(error)}')),
+        SnackBar(
+            content: Text(
+                'Could not start from template: ${describeApiError(error)}',),),
       );
       setState(() => _startingId = null);
     }
@@ -55,11 +59,55 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
     try {
       await ref.read(marketplaceRepositoryProvider).publish(template.id);
       messenger.showSnackBar(
-        SnackBar(content: Text('“${template.name}” published to the marketplace.')),
+        SnackBar(
+            content: Text('“${template.name}” published to the marketplace.'),),
       );
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not publish: ${describeApiError(error)}')),
+        SnackBar(
+            content: Text('Could not publish: ${describeApiError(error)}'),),
+      );
+    }
+  }
+
+  /// Confirms, then deletes one of the org's own templates. The dialog is
+  /// resolved before any async work (no stranded barrier), and the list is
+  /// refreshed on success.
+  Future<void> _confirmDelete(TemplateSummary template) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete template?'),
+        content: Text(
+          '“${template.name}” will be permanently deleted. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(templatesRepositoryProvider).delete(template.id);
+      ref.invalidate(templatesProvider);
+      messenger.showSnackBar(
+        SnackBar(content: Text('“${template.name}” deleted.')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Delete failed: ${describeApiError(error)}')),
       );
     }
   }
@@ -88,7 +136,8 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
             error: (error, _) => isUnauthorized(error)
                 ? const _EmptyTemplates()
                 : Center(
-                    child: Text('Could not load templates: ${describeApiError(error)}'),
+                    child: Text(
+                        'Could not load templates: ${describeApiError(error)}',),
                   ),
             data: (templates) {
               if (templates.isEmpty) return const _EmptyTemplates();
@@ -112,6 +161,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                       starting: _startingId == templates[i].id,
                       onUse: () => _startFrom(templates[i]),
                       onPublish: () => _publish(templates[i]),
+                      onDelete: () => _confirmDelete(templates[i]),
                     ),
                   ),
                 ),
@@ -154,6 +204,7 @@ class _TemplateCard extends StatelessWidget {
     required this.starting,
     required this.onUse,
     required this.onPublish,
+    required this.onDelete,
   });
 
   final TemplateSummary template;
@@ -162,6 +213,9 @@ class _TemplateCard extends StatelessWidget {
 
   /// Publishes this template to the public marketplace (Milestone 14.2).
   final VoidCallback onPublish;
+
+  /// Deletes this template (only offered for the org's own templates).
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +240,9 @@ class _TemplateCard extends StatelessWidget {
                       errorBuilder: (_, __, ___) =>
                           const Center(child: Icon(Icons.image_outlined)),
                     )
-                  : const Center(child: Icon(Icons.dashboard_customize_outlined, size: 32)),
+                  : const Center(
+                      child:
+                          Icon(Icons.dashboard_customize_outlined, size: 32),),
             ),
           ),
           Padding(
@@ -212,7 +268,8 @@ class _TemplateCard extends StatelessWidget {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Use template'),
                       ),
@@ -222,6 +279,14 @@ class _TemplateCard extends StatelessWidget {
                       onPressed: onPublish,
                       icon: const Icon(Icons.storefront_outlined),
                     ),
+                    if (template.isOwn)
+                      IconButton(
+                        tooltip: 'Delete template',
+                        visualDensity: VisualDensity.compact,
+                        color: theme.colorScheme.error,
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
                   ],
                 ),
               ],

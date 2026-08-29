@@ -21,13 +21,18 @@ interface AuthenticatedRequest extends Request {
   user: { userId: string; email: string; role: UserRole; orgId: string };
 }
 
-function toSummary(t: Omit<Template, 'canvasJson'>): TemplateSummaryDto {
+function toSummary(
+  t: Omit<Template, 'canvasJson'>,
+  callerOrgId: string,
+): TemplateSummaryDto {
   return {
     id: t.id,
     name: t.name,
     category: t.category,
     thumbnailUrl: t.thumbnailUrl,
     createdAt: t.createdAt,
+    // The caller may only delete templates its own org published.
+    isOwn: t.orgId === callerOrgId,
   };
 }
 
@@ -46,9 +51,12 @@ export class MarketplaceController {
   /** Public listing across all orgs — any authenticated user may browse. */
   @UseGuards(JwtAuthGuard)
   @Get('marketplace')
-  async marketplace(@Query() query: SearchMarketplaceDto): Promise<TemplateSummaryDto[]> {
+  async marketplace(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: SearchMarketplaceDto,
+  ): Promise<TemplateSummaryDto[]> {
     const results = await this.templates.searchMarketplace(query);
-    return results.map(toSummary);
+    return results.map((t) => toSummary(t, req.user.orgId));
   }
 
   /** Publishes one of the caller's own templates to the marketplace. */
@@ -60,7 +68,7 @@ export class MarketplaceController {
     @Param('id') id: string,
   ): Promise<TemplateSummaryDto> {
     const t = await this.templates.publish(req.user.orgId, id, req.user.userId);
-    return toSummary(t);
+    return toSummary(t, req.user.orgId);
   }
 
   /** Clones a public template into the caller's org. */
@@ -72,6 +80,6 @@ export class MarketplaceController {
     @Param('id') id: string,
   ): Promise<TemplateSummaryDto> {
     const t = await this.templates.clone(req.user.orgId, id);
-    return toSummary(t);
+    return toSummary(t, req.user.orgId);
   }
 }

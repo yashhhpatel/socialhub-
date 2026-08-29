@@ -72,6 +72,49 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     }
   }
 
+  /// Confirms, then deletes one of the caller's OWN published templates.
+  /// Refreshes the marketplace results and the user's library.
+  Future<void> _confirmDelete(TemplateSummary template) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete template?'),
+        content: Text(
+          '“${template.name}” will be removed from the marketplace and your '
+          'library. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(marketplaceRepositoryProvider).delete(template.id);
+      ref.invalidate(marketplaceResultsProvider(_query));
+      ref.invalidate(templatesProvider);
+      messenger.showSnackBar(
+        SnackBar(content: Text('“${template.name}” deleted.')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Delete failed: ${describeApiError(error)}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -117,7 +160,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 ),
               ),
               const SizedBox(width: SpacingTokens.sm),
-              FilledButton(onPressed: _applySearch, child: const Text('Search')),
+              FilledButton(
+                  onPressed: _applySearch, child: const Text('Search'),),
             ],
           ),
           const SizedBox(height: SpacingTokens.lg),
@@ -128,7 +172,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             error: (error, _) => isUnauthorized(error)
                 ? const _EmptyMarketplace()
                 : Center(
-                    child: Text('Could not load the marketplace: ${describeApiError(error)}'),
+                    child: Text(
+                        'Could not load the marketplace: ${describeApiError(error)}',),
                   ),
             data: (results) {
               if (results.isEmpty) return const _EmptyMarketplace();
@@ -151,6 +196,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       template: results[i],
                       cloning: _cloningId == results[i].id,
                       onClone: () => _clone(results[i]),
+                      onDelete: () => _confirmDelete(results[i]),
                     ),
                   ),
                 ),
@@ -192,11 +238,15 @@ class _MarketplaceCard extends StatelessWidget {
     required this.template,
     required this.cloning,
     required this.onClone,
+    required this.onDelete,
   });
 
   final TemplateSummary template;
   final bool cloning;
   final VoidCallback onClone;
+
+  /// Deletes this template — only offered for the caller's own published ones.
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -218,9 +268,11 @@ class _MarketplaceCard extends StatelessWidget {
                   ? Image.network(
                       template.thumbnailUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.image_outlined)),
+                      errorBuilder: (_, __, ___) =>
+                          const Center(child: Icon(Icons.image_outlined)),
                     )
-                  : const Center(child: Icon(Icons.storefront_outlined, size: 32)),
+                  : const Center(
+                      child: Icon(Icons.storefront_outlined, size: 32),),
             ),
           ),
           Padding(
@@ -237,19 +289,31 @@ class _MarketplaceCard extends StatelessWidget {
                 if (template.category != null)
                   Text(template.category!, style: theme.textTheme.bodySmall),
                 const SizedBox(height: SpacingTokens.sm),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: cloning ? null : onClone,
-                    icon: cloning
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.copy_all_outlined, size: 16),
-                    label: const Text('Clone'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: cloning ? null : onClone,
+                        icon: cloning
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.copy_all_outlined, size: 16),
+                        label: const Text('Clone'),
+                      ),
+                    ),
+                    if (template.isOwn)
+                      IconButton(
+                        tooltip: 'Delete template',
+                        visualDensity: VisualDensity.compact,
+                        color: theme.colorScheme.error,
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -270,7 +334,8 @@ class _EmptyMarketplace extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.storefront_outlined, size: 40, color: theme.colorScheme.onSurfaceVariant),
+          Icon(Icons.storefront_outlined,
+              size: 40, color: theme.colorScheme.onSurfaceVariant,),
           const SizedBox(height: SpacingTokens.md),
           Text('No public templates found', style: theme.textTheme.titleMedium),
           const SizedBox(height: SpacingTokens.xs),

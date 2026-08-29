@@ -11,10 +11,15 @@ import 'package:socialhub/features/templates/domain/entities/template.dart';
 /// results). Records the last query it was asked for, so the test can assert
 /// the search/filter reached the backend call.
 class _FakeMarketplaceRepo extends ApiMarketplaceRepository {
-  _FakeMarketplaceRepo() : super(Dio());
+  _FakeMarketplaceRepo({this.isOwn = false}) : super(Dio());
+
+  /// Whether the single card returned is flagged as the caller's own — the
+  /// only case in which a delete control is offered.
+  final bool isOwn;
 
   String? lastSearch;
   String? lastCategory;
+  String? deletedId;
 
   @override
   Future<List<TemplateSummary>> search({String? search, String? category}) async {
@@ -24,8 +29,13 @@ class _FakeMarketplaceRepo extends ApiMarketplaceRepository {
     // observable in the widget tree.
     final label = search == null || search.isEmpty ? 'Everything' : 'Match:$search';
     return [
-      TemplateSummary(id: 't1', name: label, category: category),
+      TemplateSummary(id: 't1', name: label, category: category, isOwn: isOwn),
     ];
+  }
+
+  @override
+  Future<void> delete(String templateId) async {
+    deletedId = templateId;
   }
 }
 
@@ -69,5 +79,32 @@ void main() {
     expect(repo.lastCategory, 'Promotions');
     // ...and the filtered result is rendered.
     expect(find.text('Match:promo'), findsOneWidget);
+  });
+
+  testWidgets('offers no delete control for a template the caller does not own',
+      (tester) async {
+    await _pump(tester, _FakeMarketplaceRepo());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Delete template'), findsNothing);
+  });
+
+  testWidgets('deletes the caller\'s own template after confirming',
+      (tester) async {
+    final repo = _FakeMarketplaceRepo(isOwn: true);
+    await _pump(tester, repo);
+    await tester.pumpAndSettle();
+
+    // The delete affordance only appears on an owned card.
+    await tester.tap(find.byTooltip('Delete template'));
+    await tester.pumpAndSettle();
+
+    // Confirm in the dialog.
+    expect(find.text('Delete template?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repo.deletedId, 't1');
+    expect(find.textContaining('deleted'), findsOneWidget);
   });
 }
