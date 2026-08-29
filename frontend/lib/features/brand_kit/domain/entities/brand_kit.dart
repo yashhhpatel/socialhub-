@@ -27,8 +27,7 @@ class BrandKit {
   final String? logoUrl;
   final String? logoPublicId;
 
-  bool get isEmpty =>
-      colors.isEmpty && fonts.isEmpty && logoUrl == null;
+  bool get isEmpty => colors.isEmpty && fonts.isEmpty && logoUrl == null;
 
   String? get primaryColor => colors.isNotEmpty ? colors.first : null;
 
@@ -42,8 +41,12 @@ class BrandKit {
 
   factory BrandKit.fromJson(Map<String, dynamic> json) => BrandKit(
         id: json['id'] as String,
-        colors: [for (final c in (json['colors'] as List<dynamic>? ?? [])) c as String],
-        fonts: [for (final f in (json['fonts'] as List<dynamic>? ?? [])) f as String],
+        colors: [
+          for (final c in (json['colors'] as List<dynamic>? ?? [])) c as String,
+        ],
+        fonts: [
+          for (final f in (json['fonts'] as List<dynamic>? ?? [])) f as String,
+        ],
         logoUrl: json['logoUrl'] as String?,
         logoPublicId: json['logoPublicId'] as String?,
       );
