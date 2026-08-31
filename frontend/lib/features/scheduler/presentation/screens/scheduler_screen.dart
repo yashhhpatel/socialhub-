@@ -9,6 +9,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/breakpoints.dart';
 import '../../../../core/theme/platform_style.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../ai_suite/data/repositories/api_ai_suite_repository.dart';
 import '../../domain/entities/scheduled_job.dart';
@@ -77,34 +78,21 @@ class _SchedulerScreenState extends ConsumerState<SchedulerScreen> {
   @override
   Widget build(BuildContext context) {
     final jobsAsync = ref.watch(schedulerJobsProvider);
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Calendar', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      'Everything scheduled and recently published, across platforms.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: () => ref.invalidate(schedulerJobsProvider),
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
+          PageHeader(
+            title: 'Calendar',
+            subtitle:
+                'Everything scheduled and recently published, across platforms.',
+            trailing: IconButton(
+              tooltip: 'Refresh',
+              onPressed: () => ref.invalidate(schedulerJobsProvider),
+              icon: const Icon(Icons.refresh),
+            ),
           ),
           const SizedBox(height: SpacingTokens.md),
           const _BestTimesBar(),

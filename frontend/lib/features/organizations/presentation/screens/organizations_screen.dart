@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/form_skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_organizations_repository.dart';
 
@@ -23,11 +24,9 @@ class OrganizationsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Organization', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Your workspace at a glance, and everything that manages it.',
-            style: theme.textTheme.bodyMedium,
+          const PageHeader(
+            title: 'Organization',
+            subtitle: 'Your workspace at a glance, and everything that manages it.',
           ),
           const SizedBox(height: SpacingTokens.lg),
           orgAsync.when(

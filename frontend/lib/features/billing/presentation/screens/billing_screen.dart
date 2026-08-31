@@ -6,6 +6,7 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/platform/external_redirect.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../auth/presentation/state/current_user_provider.dart';
 import '../../data/api_billing_repository.dart';
@@ -55,7 +56,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final overviewAsync = ref.watch(billingOverviewProvider);
     final isAdmin =
         ref.watch(currentUserProvider).valueOrNull?.isAdmin ?? false;
@@ -65,11 +65,9 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Billing', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Manage your plan, usage, and payment details.',
-            style: theme.textTheme.bodyMedium,
+          const PageHeader(
+            title: 'Billing',
+            subtitle: 'Manage your plan, usage, and payment details.',
           ),
           const SizedBox(height: SpacingTokens.lg),
           overviewAsync.when(

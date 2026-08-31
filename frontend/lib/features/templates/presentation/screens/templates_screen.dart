@@ -6,6 +6,7 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/data/repositories/api_content_repository.dart';
 import '../../../editor/canvas/models/canvas_document.dart';
@@ -115,18 +116,16 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   @override
   Widget build(BuildContext context) {
     final templatesAsync = ref.watch(templatesProvider);
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Templates', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Start a new design from a saved template. Save any design as a template from the editor.',
-            style: theme.textTheme.bodyMedium,
+          const PageHeader(
+            title: 'Templates',
+            subtitle:
+                'Start a new design from a saved template. Save any design as a template from the editor.',
           ),
           const SizedBox(height: SpacingTokens.lg),
           templatesAsync.when(

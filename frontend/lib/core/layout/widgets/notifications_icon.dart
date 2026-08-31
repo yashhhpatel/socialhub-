@@ -124,6 +124,7 @@ class _NotificationsPanel extends ConsumerWidget {
                     _NotificationTile(
                       notification: shown[i],
                       onTap: () => _openItem(context, ref, shown[i]),
+                      onDelete: () => _deleteItem(ref, shown[i]),
                     ),
                   ],
                 ],
@@ -152,13 +153,33 @@ class _NotificationsPanel extends ConsumerWidget {
       context.go(n.linkPath!);
     }
   }
+
+  /// Dismisses one notification. Best-effort — a failed delete leaves the item
+  /// in place rather than surfacing an error in the panel. Refreshes the list
+  /// (so the row disappears) and the unread badge.
+  Future<void> _deleteItem(WidgetRef ref, AppNotification n) async {
+    try {
+      await ref.read(notificationsRepositoryProvider).delete(n.id);
+    } catch (_) {
+      // best-effort
+    }
+    ref.invalidate(notificationsListProvider);
+    ref.invalidate(unreadNotificationsCountProvider);
+  }
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.notification, required this.onTap});
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final AppNotification notification;
   final VoidCallback onTap;
+
+  /// Removes this notification from the list (hits DELETE /notifications/:id).
+  final VoidCallback onDelete;
 
   IconData get _icon => switch (notification.type) {
         'publish_succeeded' => Icons.check_circle_outline,
@@ -206,6 +227,19 @@ class _NotificationTile extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            // Dismiss control — its own IconButton wins the gesture over the
+            // row's InkWell, so removing an item never also opens it.
+            IconButton(
+              tooltip: 'Dismiss',
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              color: theme.colorScheme.onSurfaceVariant,
+              icon: const Icon(Icons.close_rounded),
             ),
           ],
         ),

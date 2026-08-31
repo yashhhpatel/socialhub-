@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/platform_style.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../domain/entities/analytics_overview.dart';
 import '../state/analytics_controller.dart';
@@ -22,38 +23,29 @@ class AnalyticsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overviewAsync = ref.watch(analyticsOverviewProvider);
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Analytics', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      'Performance across every connected platform.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
+          PageHeader(
+            title: 'Analytics',
+            subtitle: 'Performance across every connected platform.',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                overviewAsync.maybeWhen(
+                  data: (o) => _LastUpdated(at: o.lastUpdated),
+                  orElse: () => const SizedBox.shrink(),
                 ),
-              ),
-              overviewAsync.maybeWhen(
-                data: (o) => _LastUpdated(at: o.lastUpdated),
-                orElse: () => const SizedBox.shrink(),
-              ),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: () => ref.invalidate(analyticsOverviewProvider),
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
+                IconButton(
+                  tooltip: 'Refresh',
+                  onPressed: () => ref.invalidate(analyticsOverviewProvider),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: SpacingTokens.lg),
           overviewAsync.when(

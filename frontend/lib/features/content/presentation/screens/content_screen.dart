@@ -8,6 +8,7 @@ import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_content_repository.dart';
 import '../../domain/entities/content_asset_summary.dart';
@@ -122,40 +123,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   @override
   Widget build(BuildContext context) {
     final library = ref.watch(contentLibraryProvider);
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Content', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      'Create once, then publish everywhere.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: _creating ? null : _createAndOpen,
-                icon: _creating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add),
-                label: const Text('New design'),
-              ),
-            ],
+          PageHeader(
+            title: 'Content',
+            subtitle: 'Create once, then publish everywhere.',
+            trailing: FilledButton.icon(
+              onPressed: _creating ? null : _createAndOpen,
+              icon: _creating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: const Text('New design'),
+            ),
           ),
           const SizedBox(height: SpacingTokens.lg),
           // Cross-fade skeleton → real content as the library loads (motion).

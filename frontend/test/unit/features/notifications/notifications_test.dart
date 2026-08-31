@@ -10,6 +10,7 @@ class _FakeRepo implements ApiNotificationsRepository {
   _FakeRepo(this._items);
   final List<AppNotification> _items;
   bool markedAll = false;
+  String? deletedId;
 
   @override
   Future<List<AppNotification>> list({int limit = 30}) async => _items;
@@ -19,6 +20,8 @@ class _FakeRepo implements ApiNotificationsRepository {
   Future<void> markRead(String id) async {}
   @override
   Future<void> markAllRead() async => markedAll = true;
+  @override
+  Future<void> delete(String id) async => deletedId = id;
 }
 
 AppNotification _n({String id = 'n1', String title = 'Post published', bool read = false}) =>
@@ -93,6 +96,26 @@ void main() {
     expect(find.text('Post published'), findsOneWidget);
     expect(find.text('Invite accepted'), findsOneWidget);
     expect(repo.markedAll, isTrue);
+  });
+
+  testWidgets('dismissing a notification deletes it via the repository',
+      (tester) async {
+    final repo = _FakeRepo([_n(title: 'Post failed')]);
+    final overrides = <Override>[
+      notificationsRepositoryProvider.overrideWithValue(repo),
+      unreadNotificationsCountProvider.overrideWith((ref) async => 1),
+      notificationsListProvider.overrideWith((ref) async => repo.list()),
+    ];
+    await tester.pumpWidget(_host(overrides: overrides));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notifications'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pumpAndSettle();
+
+    expect(repo.deletedId, 'n1');
   });
 
   testWidgets('shows the empty state when there are no notifications',

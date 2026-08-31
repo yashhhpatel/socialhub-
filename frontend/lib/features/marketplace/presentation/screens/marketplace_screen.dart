@@ -7,6 +7,7 @@ import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/network/auth_token_store.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/state/templates_controller.dart';
@@ -117,7 +118,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final resultsAsync = ref.watch(marketplaceResultsProvider(_query));
 
     return Padding(
@@ -125,11 +125,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Marketplace', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Public templates from the community. Clone one into your workspace.',
-            style: theme.textTheme.bodyMedium,
+          const PageHeader(
+            title: 'Marketplace',
+            subtitle:
+                'Public templates from the community. Clone one into your workspace.',
           ),
           const SizedBox(height: SpacingTokens.md),
           Row(

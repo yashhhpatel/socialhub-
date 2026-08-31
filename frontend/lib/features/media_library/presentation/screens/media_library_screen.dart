@@ -7,6 +7,7 @@ import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/network/auth_token_store.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../publish/presentation/widgets/carousel_composer.dart';
 import '../../data/api_media_repository.dart';
@@ -98,7 +99,6 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final loggedIn = ref.watch(authTokenStoreProvider) != null;
     final library = ref.watch(mediaLibraryProvider);
 
@@ -107,42 +107,34 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Media Library',
-                        style: theme.textTheme.headlineMedium,),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      'Upload images and videos and reuse their hosted URLs anywhere.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
+          PageHeader(
+            title: 'Media Library',
+            subtitle:
+                'Upload images and videos and reuse their hosted URLs anywhere.',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (loggedIn) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => showCarouselComposer(context),
+                    icon: const Icon(Icons.collections_outlined),
+                    label: const Text('New carousel'),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                ],
+                FilledButton.icon(
+                  onPressed: _uploading ? null : _pickAndUpload,
+                  icon: _uploading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.upload_file),
+                  label: const Text('Upload'),
                 ),
-              ),
-              if (loggedIn) ...[
-                OutlinedButton.icon(
-                  onPressed: () => showCarouselComposer(context),
-                  icon: const Icon(Icons.collections_outlined),
-                  label: const Text('New carousel'),
-                ),
-                const SizedBox(width: SpacingTokens.sm),
               ],
-              FilledButton.icon(
-                onPressed: _uploading ? null : _pickAndUpload,
-                icon: _uploading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.upload_file),
-                label: const Text('Upload'),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: SpacingTokens.lg),
           if (!loggedIn)

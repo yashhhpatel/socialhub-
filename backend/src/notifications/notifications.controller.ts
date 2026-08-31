@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -53,5 +54,17 @@ export class NotificationsController {
   @Post('read-all')
   async markAllRead(@Req() req: AuthedRequest): Promise<void> {
     await this.notifications.markAllRead(req.user.userId);
+  }
+
+  /// Dismisses (permanently deletes) one notification. Scoped to the owner in
+  /// the service, so deleting another user's — or an already-gone — row is a
+  /// no-op rather than an error.
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
+  async remove(
+    @Req() req: AuthedRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.notifications.delete(id, req.user.userId);
   }
 }

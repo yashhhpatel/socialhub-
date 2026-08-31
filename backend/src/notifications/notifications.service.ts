@@ -90,4 +90,13 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
   }
+
+  /// Permanently removes one notification — scoped to the owner so a user can
+  /// only delete their own. Idempotent: deleting a row that's already gone (or
+  /// belongs to someone else) is a silent no-op rather than an error.
+  async delete(id: string, userId: string): Promise<void> {
+    await this.prisma.notification.deleteMany({
+      where: { id, userId },
+    });
+  }
 }
