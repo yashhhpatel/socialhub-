@@ -48,9 +48,34 @@ class ApiPublishRepository implements PublishRepository {
       },
     );
 
-    // POST /publish/now returns only { jobId, status } — read the full
-    // job back so the caller gets externalPostId and lastError too.
-    return job(response.data!['jobId'] as String);
+    // /publish/now is queue-backed: it returns a `queued` job and a worker
+    // runs it a moment later (queued → processing → published | failed). Poll
+    // the job until it reaches a terminal state so the caller sees the real
+    // outcome (externalPostId on success, lastError on failure) instead of the
+    // still-queued row.
+    return _pollUntilTerminal(response.data!['jobId'] as String);
+  }
+
+  /// Terminal publish states — nothing changes after these.
+  static const _terminal = {
+    PublishJobStatus.published,
+    PublishJobStatus.failed,
+    PublishJobStatus.cancelled,
+  };
+
+  /// Polls a job (~1s cadence) until it settles or the budget runs out. The
+  /// last-read job is returned either way — if it's still processing after the
+  /// budget, the caller reports it as in-progress rather than failed.
+  Future<PublishJob> _pollUntilTerminal(String jobId) async {
+    const maxAttempts = 30; // ~30s ceiling
+    var current = await job(jobId);
+    var attempts = 0;
+    while (!_terminal.contains(current.status) && attempts < maxAttempts) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      current = await job(jobId);
+      attempts++;
+    }
+    return current;
   }
 
   @override
