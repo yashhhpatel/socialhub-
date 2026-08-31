@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/tokens/spacing_tokens.dart';
+import '../content_bounds.dart';
 import '../nav_menu_data.dart';
 import 'notifications_icon.dart';
 import 'user_profile_menu.dart';
@@ -70,13 +71,21 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: SizedBox(
               height: 64,
-              child: Padding(
-                // ~24px of breathing room on each edge, so the brand and the
-                // right-hand controls sit close to the navbar edges.
-                padding:
-                    const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
-                child:
-                    isMobile ? _buildMobile(context) : _buildDesktop(context),
+              // The bar itself stays full-bleed (background + bottom border);
+              // its content is centred to the shared content width so the
+              // brand and controls line up with the page content below.
+              child: ContentBounds(
+                child: Padding(
+                  // ~24px of breathing room on each edge, so the brand and the
+                  // right-hand controls sit close to the content edges.
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
+                  child: Center(
+                    child: isMobile
+                        ? _buildMobile(context)
+                        : _buildDesktop(context),
+                  ),
+                ),
               ),
             ),
           ),

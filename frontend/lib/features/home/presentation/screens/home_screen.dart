@@ -14,6 +14,7 @@ import '../../../dashboard/data/api_dashboard_repository.dart';
 import '../../../dashboard/domain/entities/dashboard_summary.dart';
 import '../../../dashboard/presentation/widgets/greeting_header.dart';
 import '../../../dashboard/presentation/widgets/stat_card.dart';
+import '../widgets/home_info_sections.dart';
 
 /// The app Home (`/`) — a clean SocialHub overview shown to everyone, signed in
 /// or out: a welcome, a real-data overview (reusing the dashboard summary), and
@@ -39,6 +40,10 @@ class HomeScreen extends ConsumerWidget {
           const StaggeredItem(index: 1, child: _OverviewSection()),
           const SizedBox(height: SpacingTokens.xl),
           const StaggeredItem(index: 2, child: _QuickNav()),
+          const SizedBox(height: SpacingTokens.xxl),
+          // "What SocialHub is and does" — informational sections so a new
+          // visitor understands the product without navigating away.
+          HomeInfoSections(loggedIn: loggedIn),
         ],
       ),
     );

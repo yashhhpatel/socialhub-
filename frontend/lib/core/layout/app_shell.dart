@@ -6,6 +6,7 @@ import '../../features/auth/presentation/state/auth_controller.dart';
 import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../theme/app_background.dart';
 import '../theme/breakpoints.dart';
+import 'content_bounds.dart';
 import 'widgets/app_footer.dart';
 import 'widgets/nav_drawer.dart';
 import 'widgets/top_nav_bar.dart';
@@ -82,7 +83,10 @@ class AppShell extends ConsumerWidget {
                 const EmailVerificationBanner(),
                 ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: child,
+                  // Centre the routed content within a shared max width so it
+                  // never stretches edge to edge on wide screens; pages keep
+                  // their own edge padding for the gutter below that width.
+                  child: ContentBounds(child: child),
                 ),
                 const AppFooter(),
               ],

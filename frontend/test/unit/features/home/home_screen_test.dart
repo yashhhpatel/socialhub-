@@ -86,6 +86,28 @@ void main() {
     expect(find.text('Quick navigation'), findsOneWidget);
     expect(find.text('Content', skipOffstage: false), findsOneWidget);
     expect(find.text('Analytics', skipOffstage: false), findsOneWidget);
+
+    // Informational sections explaining the product to a new visitor.
+    expect(
+      find.text('How SocialHub works', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Multi-platform publishing', skipOffstage: false),
+      findsOneWidget,
+    );
+    // Supported platforms (via PlatformStyle).
+    expect(find.text('Instagram', skipOffstage: false), findsOneWidget);
+    expect(find.text('LinkedIn', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('signed out: CTA band routes to register', (tester) async {
+    await _pump(tester, loggedIn: false);
+    final cta = find.text('Create your account');
+    await tester.ensureVisible(cta);
+    await tester.tap(cta);
+    await tester.pumpAndSettle();
+    expect(find.text('REGISTER'), findsOneWidget);
   });
 
   testWidgets('signed out: Get started routes to register', (tester) async {

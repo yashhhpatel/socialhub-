@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/tokens/spacing_tokens.dart';
+import '../content_bounds.dart';
 
 // Footer chrome, from the Midnight Studio palette: a surface backdrop with a
 // 1px border, primary text and muted secondary text.
@@ -59,7 +60,7 @@ class AppFooter extends StatelessWidget {
         // centred block on wide screens, consistent on every page.
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1120),
+            constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
             // ignore: prefer_const_constructors, prefer_const_literals_to_create_immutables
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
