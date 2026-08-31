@@ -146,11 +146,15 @@ class _ManageGrid extends StatelessWidget {
         for (final link in _links)
           SizedBox(
             width: 220,
+            // Fixed height so every card matches regardless of whether its
+            // label wraps to a second line (e.g. "Connected accounts").
+            height: 60,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => context.go(link.route),
               child: Container(
-                padding: const EdgeInsets.all(SpacingTokens.md),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: theme.dividerColor),
@@ -160,8 +164,13 @@ class _ManageGrid extends StatelessWidget {
                     Icon(link.icon, color: theme.colorScheme.primary),
                     const SizedBox(width: SpacingTokens.sm),
                     Expanded(
-                        child:
-                            Text(link.label, style: theme.textTheme.bodyLarge),),
+                      child: Text(
+                        link.label,
+                        style: theme.textTheme.bodyLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     const Icon(Icons.chevron_right, size: 18),
                   ],
                 ),
