@@ -179,21 +179,25 @@ class _OverviewStats extends StatelessWidget {
         icon: Icons.schedule,
         label: 'Scheduled',
         value: '${summary.scheduledPosts}',
+        accentColor: AppColors.warning,
       ),
       StatCard(
         icon: Icons.check_circle_outline,
         label: 'Published',
         value: '${summary.publishedPosts}',
+        accentColor: AppColors.success,
       ),
       StatCard(
         icon: Icons.edit_outlined,
         label: 'Drafts',
         value: '${summary.drafts}',
+        accentColor: AppColors.accent,
       ),
       StatCard(
         icon: Icons.link,
         label: 'Connected accounts',
         value: '${summary.connectedAccounts}',
+        accentColor: const Color(0xFF1DA1F2),
       ),
     ];
 

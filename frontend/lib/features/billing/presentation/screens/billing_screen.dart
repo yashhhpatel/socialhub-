@@ -69,7 +69,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             title: 'Billing',
             subtitle: 'Manage your plan, usage, and payment details.',
           ),
-          const SizedBox(height: SpacingTokens.lg),
+          const SizedBox(height: SpacingTokens.xl),
           overviewAsync.when(
             loading: () => const _BillingSkeleton(),
             error: (error, _) => isUnauthorized(error)
@@ -124,18 +124,18 @@ class _Content extends StatelessWidget {
           portalBusy: portalBusy,
           onManage: onManage,
         ),
-        const SizedBox(height: SpacingTokens.lg),
+        const SizedBox(height: SpacingTokens.xl),
         _UsageSection(overview: overview),
-        const SizedBox(height: SpacingTokens.lg),
-        Text('Plans', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: SpacingTokens.sm),
+        const SizedBox(height: SpacingTokens.xl),
+        Text('Plans', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: SpacingTokens.md),
         if (!overview.billingConfigured)
           Padding(
             padding: const EdgeInsets.only(bottom: SpacingTokens.md),
             child: Text(
               'Billing isn\'t set up on this server yet — plan changes are '
               'unavailable.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
@@ -147,9 +147,9 @@ class _Content extends StatelessWidget {
           onUpgrade: onUpgrade,
         ),
         if (overview.invoices.isNotEmpty) ...[
-          const SizedBox(height: SpacingTokens.lg),
-          Text('Invoices', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: SpacingTokens.sm),
+          const SizedBox(height: SpacingTokens.xl),
+          Text('Invoices', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: SpacingTokens.md),
           _InvoiceList(invoices: overview.invoices),
         ],
       ],
@@ -207,9 +207,9 @@ class _CurrentPlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(SpacingTokens.lg),
+      padding: const EdgeInsets.all(SpacingTokens.xl),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: theme.dividerColor),
       ),
       child: Row(
@@ -218,16 +218,16 @@ class _CurrentPlanCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Current plan', style: theme.textTheme.bodySmall),
-                const SizedBox(height: 2),
-                Text(
-                  _titleCase(overview.planTier),
-                  style: theme.textTheme.headlineMedium,
-                ),
+                Text('Current plan', style: theme.textTheme.bodyMedium),
                 const SizedBox(height: SpacingTokens.xs),
                 Text(
+                  _titleCase(overview.planTier),
+                  style: theme.textTheme.headlineLarge,
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
                   _subtitle(overview),
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -237,6 +237,12 @@ class _CurrentPlanCard extends StatelessWidget {
           if (isAdmin && overview.hasBillingAccount)
             OutlinedButton(
               onPressed: portalBusy ? null : onManage,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.lg,
+                  vertical: SpacingTokens.md,
+                ),
+              ),
               child: portalBusy
                   ? const SizedBox(
                       width: 16,
@@ -270,20 +276,20 @@ class _UsageSection extends StatelessWidget {
     final l = overview.limits;
     final u = overview.usage;
     return Container(
-      padding: const EdgeInsets.all(SpacingTokens.lg),
+      padding: const EdgeInsets.all(SpacingTokens.xl),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Usage', style: theme.textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.md),
+          Text('Usage', style: theme.textTheme.titleLarge),
+          const SizedBox(height: SpacingTokens.lg),
           _UsageBar(label: 'Connected accounts', used: u.socialAccounts, limit: l.maxSocialAccounts),
-          const SizedBox(height: SpacingTokens.md),
+          const SizedBox(height: SpacingTokens.lg),
           _UsageBar(label: 'Team members', used: u.teamMembers, limit: l.maxTeamMembers),
-          const SizedBox(height: SpacingTokens.md),
+          const SizedBox(height: SpacingTokens.lg),
           _UsageBar(label: 'AI credits (this month)', used: u.aiCreditsUsed, limit: l.aiCreditsPerMonth),
         ],
       ),
@@ -309,21 +315,21 @@ class _UsageBar extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+            Expanded(child: Text(label, style: theme.textTheme.bodyLarge)),
             Text(
               unlimited ? '$used / Unlimited' : '$used / $limit',
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: atLimit ? AppColors.warning : theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: SpacingTokens.sm),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
             value: unlimited ? 0 : fraction,
-            minHeight: 6,
+            minHeight: 10,
             backgroundColor: AppColors.surfaceRaised,
             color: atLimit ? AppColors.warning : AppColors.accent,
           ),
@@ -360,25 +366,22 @@ class _LoggedOutBilling extends StatelessWidget {
           ),
         ),
         const SizedBox(height: SpacingTokens.lg),
-        Wrap(
-          spacing: SpacingTokens.md,
-          runSpacing: SpacingTokens.md,
-          children: [
-            for (final p in _purchasablePlans)
-              SizedBox(
-                width: 260,
-                child: _PlanCard(
-                  tier: p.tier,
-                  name: p.name,
-                  blurb: p.blurb,
-                  isCurrent: false,
-                  // Enabled so a click is possible — it routes to login.
-                  canPurchase: true,
-                  busy: false,
-                  onUpgrade: onAction,
-                ),
-              ),
-          ],
+        _PlansLayout(
+          count: _purchasablePlans.length,
+          cardBuilder: (i, stretch) {
+            final p = _purchasablePlans[i];
+            return _PlanCard(
+              tier: p.tier,
+              name: p.name,
+              blurb: p.blurb,
+              isCurrent: false,
+              // Enabled so a click is possible — it routes to login.
+              canPurchase: true,
+              busy: false,
+              onUpgrade: onAction,
+              stretch: stretch,
+            );
+          },
         ),
       ],
     );
@@ -400,24 +403,21 @@ class _PlanGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: SpacingTokens.md,
-      runSpacing: SpacingTokens.md,
-      children: [
-        for (final p in _purchasablePlans)
-          SizedBox(
-            width: 260,
-            child: _PlanCard(
-              tier: p.tier,
-              name: p.name,
-              blurb: p.blurb,
-              isCurrent: overview.planTier == p.tier,
-              canPurchase: isAdmin && overview.billingConfigured,
-              busy: busyTier == p.tier,
-              onUpgrade: () => onUpgrade(p.tier),
-            ),
-          ),
-      ],
+    return _PlansLayout(
+      count: _purchasablePlans.length,
+      cardBuilder: (i, stretch) {
+        final p = _purchasablePlans[i];
+        return _PlanCard(
+          tier: p.tier,
+          name: p.name,
+          blurb: p.blurb,
+          isCurrent: overview.planTier == p.tier,
+          canPurchase: isAdmin && overview.billingConfigured,
+          busy: busyTier == p.tier,
+          onUpgrade: () => onUpgrade(p.tier),
+          stretch: stretch,
+        );
+      },
     );
   }
 }
@@ -431,6 +431,7 @@ class _PlanCard extends StatelessWidget {
     required this.canPurchase,
     required this.busy,
     required this.onUpgrade,
+    this.stretch = false,
   });
 
   final String tier;
@@ -441,49 +442,110 @@ class _PlanCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onUpgrade;
 
+  /// When laid out side-by-side (equal-height row), fill the row height and
+  /// pin the button to the bottom so every card's CTA lines up. When stacked
+  /// (mobile), size to content instead.
+  final bool stretch;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final button = SizedBox(
+      width: double.infinity,
+      child: isCurrent
+          ? OutlinedButton(
+              onPressed: null,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
+              ),
+              child: const Text('Current plan'),
+            )
+          : FilledButton(
+              onPressed: (canPurchase && !busy) ? onUpgrade : null,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
+              ),
+              child: busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Upgrade'),
+            ),
+    );
+
     return Container(
-      padding: const EdgeInsets.all(SpacingTokens.lg),
+      padding: const EdgeInsets.all(SpacingTokens.xl),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        color: isCurrent ? AppColors.accent.withOpacity(0.06) : null,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCurrent ? AppColors.accent : theme.dividerColor,
+          width: isCurrent ? 1.5 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: stretch ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          Text(name, style: theme.textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.xs),
+          Text(name, style: theme.textTheme.titleLarge),
+          const SizedBox(height: SpacingTokens.sm),
           Text(
             blurb,
-            style: theme.textTheme.bodySmall?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              height: 1.5,
             ),
           ),
+          if (stretch)
+            const Spacer()
+          else
+            const SizedBox(height: SpacingTokens.lg),
           const SizedBox(height: SpacingTokens.md),
-          SizedBox(
-            width: double.infinity,
-            child: isCurrent
-                ? const OutlinedButton(
-                    onPressed: null,
-                    child: Text('Current plan'),
-                  )
-                : FilledButton(
-                    onPressed: (canPurchase && !busy) ? onUpgrade : null,
-                    child: busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Upgrade'),
-                  ),
-          ),
+          button,
         ],
       ),
+    );
+  }
+}
+
+/// Lays the plan cards out equal-height side-by-side on wide screens (so every
+/// card's CTA lines up regardless of blurb length), and stacked full-width on
+/// narrow ones.
+class _PlansLayout extends StatelessWidget {
+  const _PlansLayout({required this.count, required this.cardBuilder});
+
+  final int count;
+  final Widget Function(int index, bool stretch) cardBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+        if (!wide) {
+          return Column(
+            children: [
+              for (var i = 0; i < count; i++) ...[
+                if (i > 0) const SizedBox(height: SpacingTokens.md),
+                cardBuilder(i, false),
+              ],
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < count; i++) ...[
+                if (i > 0) const SizedBox(width: SpacingTokens.md),
+                Expanded(child: cardBuilder(i, true)),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

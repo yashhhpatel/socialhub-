@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/breakpoints.dart';
 import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
@@ -78,6 +79,7 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.schedule,
                   label: 'Scheduled Posts',
                   value: '${summary.scheduledPosts}',
+                  accentColor: AppColors.warning,
                 ),
               ),
               StaggeredItem(
@@ -86,6 +88,7 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.check_circle_outline,
                   label: 'Published Posts',
                   value: '${summary.publishedPosts}',
+                  accentColor: AppColors.success,
                 ),
               ),
               StaggeredItem(
@@ -94,6 +97,7 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.edit_outlined,
                   label: 'Drafts',
                   value: '${summary.drafts}',
+                  accentColor: AppColors.accent,
                 ),
               ),
               StaggeredItem(
@@ -103,6 +107,7 @@ class _DashboardContent extends StatelessWidget {
                   label: 'Connected Accounts',
                   value: '${summary.connectedAccounts}',
                   subtitle: 'Manage in Settings',
+                  accentColor: const Color(0xFF1DA1F2),
                 ),
               ),
               StaggeredItem(
@@ -110,6 +115,7 @@ class _DashboardContent extends StatelessWidget {
                 child: StatCard(
                   icon: Icons.auto_awesome_outlined,
                   label: 'AI Credits',
+                  accentColor: AppColors.accentHover,
                   value: summary.aiCreditsUnlimited
                       ? '${summary.aiCreditsUsed}'
                       : '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
