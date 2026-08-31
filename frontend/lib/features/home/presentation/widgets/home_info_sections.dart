@@ -75,7 +75,9 @@ class _SectionHeading extends StatelessWidget {
 }
 
 /// Lays out [cards] in evenly-sized columns that reflow to fewer columns as the
-/// available width shrinks — responsive on desktop, tablet and mobile.
+/// available width shrinks — responsive on desktop, tablet and mobile. Cards in
+/// the same row share a common height (via [IntrinsicHeight] + [Expanded]), so
+/// their bottom edges line up regardless of how much text each one holds.
 class _CardsGrid extends StatelessWidget {
   const _CardsGrid({
     required this.cards,
@@ -94,13 +96,39 @@ class _CardsGrid extends StatelessWidget {
         const gap = SpacingTokens.md;
         var columns = (constraints.maxWidth / minItemWidth).floor();
         columns = columns.clamp(1, maxColumns);
-        final itemWidth = (constraints.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
+
+        final rows = <Widget>[];
+        for (var start = 0; start < cards.length; start += columns) {
+          final end =
+              (start + columns) > cards.length ? cards.length : start + columns;
+          final rowCards = cards.sublist(start, end);
+          rows.add(
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var c = 0; c < columns; c++) ...[
+                    if (c > 0) const SizedBox(width: gap),
+                    // Empty trailing slots on a partial last row keep the filled
+                    // cards the same width as the rows above.
+                    Expanded(
+                      child: c < rowCards.length
+                          ? rowCards[c]
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
           children: [
-            for (final card in cards)
-              SizedBox(width: itemWidth, child: card),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: gap),
+              rows[i],
+            ],
           ],
         );
       },
