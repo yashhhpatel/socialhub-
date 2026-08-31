@@ -236,7 +236,55 @@ export class InstagramAdapter implements PlatformAdapter {
    */
   async publish(request: PublishRequest): Promise<PublishResult> {
     const containerId = await this.createMediaContainer(request);
+    // Instagram fetches + processes the image asynchronously after the
+    // container is created. Publishing before it's done returns "Media ID is
+    // not available" (code 9007 / subcode 2207027), so wait for it to finish.
+    await this.waitForContainerReady(request.accessToken, containerId);
     return { externalPostId: await this.publishContainer(request, containerId) };
+  }
+
+  /**
+   * Polls a media container's `status_code` until Instagram has finished
+   * processing it (fetched the image, validated format/size). This is the fix
+   * for the intermittent "Media ID is not available" error: a container is not
+   * publishable the instant it's created. Meta's guidance is to poll with a
+   * few seconds between checks; images are usually ready within seconds.
+   */
+  private async waitForContainerReady(
+    accessToken: string,
+    containerId: string,
+  ): Promise<void> {
+    const maxAttempts = 20; // ~60s ceiling with the delay below
+    const delayMs = 3000;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const params = new URLSearchParams({
+        fields: 'status_code',
+        access_token: accessToken,
+      });
+      const response = await fetch(`${GRAPH_BASE}/${containerId}?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(
+          `Instagram container status check failed: ${response.status} ${await response.text()}`,
+        );
+      }
+      const data = (await response.json()) as { status_code?: string };
+      if (data.status_code === 'FINISHED') return;
+      if (data.status_code === 'ERROR' || data.status_code === 'EXPIRED') {
+        throw new Error(
+          `Instagram could not process the media (status ${data.status_code}). ` +
+            "Check that the image URL is public and meets Instagram's format requirements.",
+        );
+      }
+      // IN_PROGRESS (or not yet reported) — wait and poll again.
+      await this.delay(delayMs);
+    }
+    throw new Error(
+      'Instagram media was still processing after the wait window. Please try again in a moment.',
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async createMediaContainer(request: PublishRequest): Promise<string> {
@@ -303,9 +351,15 @@ export class InstagramAdapter implements PlatformAdapter {
     // parent CAROUSEL container listing the children, then media_publish.
     const childIds: string[] = [];
     for (const imageUrl of request.mediaUrls) {
-      childIds.push(await this.createCarouselItem(request, imageUrl));
+      const childId = await this.createCarouselItem(request, imageUrl);
+      // Each child must finish processing before the parent references it.
+      await this.waitForContainerReady(request.accessToken, childId);
+      childIds.push(childId);
     }
     const parentId = await this.createCarouselContainer(request, childIds);
+    // Wait for the parent album container to finish before publishing, same as
+    // the single-image path — avoids "Media ID is not available".
+    await this.waitForContainerReady(request.accessToken, parentId);
     return {
       externalPostId: await this.publishCreationId(request, parentId),
     };

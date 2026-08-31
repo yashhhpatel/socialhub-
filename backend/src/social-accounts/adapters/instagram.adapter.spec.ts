@@ -162,18 +162,21 @@ describe('InstagramAdapter publishCarousel', () => {
   it('creates a child container per image, a CAROUSEL parent, then publishes', async () => {
     const fetchMock = mockFetchSequence([
       { ok: true, json: { id: 'child_1' } }, // item 1
+      { ok: true, json: { status_code: 'FINISHED' } }, // item 1 ready
       { ok: true, json: { id: 'child_2' } }, // item 2
+      { ok: true, json: { status_code: 'FINISHED' } }, // item 2 ready
       { ok: true, json: { id: 'parent_1' } }, // carousel container
+      { ok: true, json: { status_code: 'FINISHED' } }, // parent ready
       { ok: true, json: { id: 'post_1' } }, // media_publish
     ]);
 
     const result = await makeAdapter().publishCarousel(request);
 
     expect(result.externalPostId).toBe('post_1');
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
 
     // The parent container is created as a CAROUSEL listing both children.
-    const parentBody = (fetchMock.mock.calls[2][1] as { body: URLSearchParams })
+    const parentBody = (fetchMock.mock.calls[4][1] as { body: URLSearchParams })
       .body as unknown as URLSearchParams;
     expect(parentBody.get('media_type')).toBe('CAROUSEL');
     expect(parentBody.get('children')).toBe('child_1,child_2');
@@ -185,5 +188,45 @@ describe('InstagramAdapter publishCarousel', () => {
     await expect(makeAdapter().publishCarousel(request)).rejects.toThrow(
       /carousel item creation failed/i,
     );
+  });
+});
+
+describe('InstagramAdapter publish', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const request = {
+    imageUrl: 'https://cdn.test/a.png',
+    caption: 'hello',
+    externalAccountId: 'ig_123',
+    accessToken: 'tok',
+  };
+
+  it('creates the container, waits for it to finish, then publishes', async () => {
+    const fetchMock = mockFetchSequence([
+      { ok: true, json: { id: 'container_1' } }, // create container
+      { ok: true, json: { status_code: 'FINISHED' } }, // status poll
+      { ok: true, json: { id: 'post_1' } }, // media_publish
+    ]);
+
+    const result = await makeAdapter().publish(request);
+
+    expect(result.externalPostId).toBe('post_1');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // The middle call is the status check on the container.
+    expect((fetchMock.mock.calls[1][0] as string)).toContain('status_code');
+    expect((fetchMock.mock.calls[1][0] as string)).toContain('container_1');
+  });
+
+  it('throws (and does not publish) when the container reports ERROR', async () => {
+    const fetchMock = mockFetchSequence([
+      { ok: true, json: { id: 'container_1' } }, // create container
+      { ok: true, json: { status_code: 'ERROR' } }, // processing failed
+    ]);
+
+    await expect(makeAdapter().publish(request)).rejects.toThrow(
+      /could not process the media/i,
+    );
+    // Never reached media_publish.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
