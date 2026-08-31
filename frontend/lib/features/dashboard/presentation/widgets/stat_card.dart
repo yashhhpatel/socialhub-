@@ -34,32 +34,39 @@ class StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(SpacingTokens.lg),
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          // A soft accent wash (top-left) fading into the surface, plus an
+          // accent-tinted border, gives each card a distinct pop of colour
+          // without turning the calm dark theme flashy.
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [accent.withOpacity(0.10), colorScheme.surface],
+          ),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outline.withOpacity(0.15)),
+          border: Border.all(color: accent.withOpacity(0.22)),
         ),
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: accent.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
+              color: accent.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 18, color: accent),
+            child: Icon(icon, size: 22, color: accent),
           ),
           const SizedBox(height: SpacingTokens.md),
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 26),
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 28),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.65),
+                  color: colorScheme.onSurface.withOpacity(0.7),
                 ),
           ),
           if (subtitle != null) ...[
