@@ -76,13 +76,31 @@ class PublishController extends StateNotifier<PublishState> {
             caption: caption,
           );
       if (!mounted) return;
-      state = job.status == PublishJobStatus.published
-          ? PublishState(phase: PublishPhase.succeeded, job: job)
-          : PublishState(
-              phase: PublishPhase.failed,
-              job: job,
-              error: job.lastError ?? 'Publish did not complete.',
-            );
+      switch (job.status) {
+        case PublishJobStatus.published:
+          state = PublishState(phase: PublishPhase.succeeded, job: job);
+        case PublishJobStatus.failed:
+        case PublishJobStatus.cancelled:
+          // Surface the platform's own message (e.g. an X media/permission
+          // error) rather than a generic one, so the cause is clear.
+          state = PublishState(
+            phase: PublishPhase.failed,
+            job: job,
+            error: job.lastError ?? 'Publish did not complete.',
+          );
+        case PublishJobStatus.queued:
+        case PublishJobStatus.scheduled:
+        case PublishJobStatus.processing:
+          // Still running after the poll budget — not a failure. It will
+          // finish in the background; point the user to where the result lands.
+          state = PublishState(
+            phase: PublishPhase.failed,
+            job: job,
+            error: 'Still publishing — this is taking longer than usual. '
+                'It will finish in the background; check your Calendar for the '
+                'result.',
+          );
+      }
     } catch (error) {
       if (!mounted) return;
       state = PublishState(phase: PublishPhase.failed, error: describeApiError(error));
