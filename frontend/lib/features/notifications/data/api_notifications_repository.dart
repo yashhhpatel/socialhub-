@@ -31,6 +31,10 @@ class ApiNotificationsRepository {
       _dio.post<void>('/notifications/$id/read');
 
   Future<void> markAllRead() => _dio.post<void>('/notifications/read-all');
+
+  /// Dismisses (permanently deletes) one notification. The backend scopes the
+  /// delete to the owner, so it only ever removes the caller's own.
+  Future<void> delete(String id) => _dio.delete<void>('/notifications/$id');
 }
 
 final notificationsRepositoryProvider =

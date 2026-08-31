@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/breakpoints.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/api_dashboard_repository.dart';
 import '../../domain/entities/dashboard_summary.dart';
@@ -58,14 +59,9 @@ class _DashboardContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Overview', style: Theme.of(context).textTheme.headlineLarge),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Here\'s what\'s happening across your connected platforms.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
-                ),
+          const PageHeader(
+            title: 'Overview',
+            subtitle: 'Here\'s what\'s happening across your connected platforms.',
           ),
           const SizedBox(height: SpacingTokens.lg),
           GridView.count(

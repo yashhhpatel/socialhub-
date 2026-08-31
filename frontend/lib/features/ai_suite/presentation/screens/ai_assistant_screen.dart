@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../content/domain/entities/content_asset_summary.dart';
 import '../../../content/presentation/state/content_library_controller.dart';
@@ -64,7 +65,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final library = ref.watch(contentLibraryProvider);
 
     return Padding(
@@ -72,12 +72,11 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('AI Assistant', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            'Analyse a design for hashtags and viral potential, and see when to post. '
-            'Captions and tone rewriting live in the publish dialog.',
-            style: theme.textTheme.bodyMedium,
+          const PageHeader(
+            title: 'AI Assistant',
+            subtitle:
+                'Analyse a design for hashtags and viral potential, and see when to post. '
+                'Captions and tone rewriting live in the publish dialog.',
           ),
           const SizedBox(height: SpacingTokens.lg),
           const _Section(

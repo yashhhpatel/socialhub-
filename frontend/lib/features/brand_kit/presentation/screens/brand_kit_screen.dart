@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/motion/form_skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
+import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../data/repositories/api_brand_kit_repository.dart';
 import '../../domain/entities/brand_kit.dart';
@@ -76,7 +77,6 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
   @override
   Widget build(BuildContext context) {
     final kitAsync = ref.watch(brandKitProvider);
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -95,11 +95,10 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Brand Kit', style: theme.textTheme.headlineMedium),
-              const SizedBox(height: SpacingTokens.xs),
-              Text(
-                'Your colours, fonts and logo — apply them to any design from the editor.',
-                style: theme.textTheme.bodyMedium,
+              const PageHeader(
+                title: 'Brand Kit',
+                subtitle:
+                    'Your colours, fonts and logo — apply them to any design from the editor.',
               ),
               const SizedBox(height: SpacingTokens.lg),
               _ColorsSection(
