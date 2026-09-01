@@ -361,7 +361,10 @@ class _MediaCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Stack(
+              child: InkWell(
+                // Tap the thumbnail to open a larger preview.
+                onTap: () => _showMediaPreview(context, media),
+                child: Stack(
                 fit: StackFit.expand,
                 children: [
                   Container(
@@ -393,6 +396,7 @@ class _MediaCard extends StatelessWidget {
                     child: _TypeBadge(isVideo: media.isVideo),
                   ),
                 ],
+              ),
               ),
             ),
             Padding(
@@ -509,6 +513,140 @@ class _Empty extends StatelessWidget {
             'Upload an image or video to get a hosted URL you can reuse.',
             style: theme.textTheme.bodySmall,
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Opens a larger, zoomable preview of one media item over a dark scrim.
+/// Images use an [InteractiveViewer] (pinch/scroll to zoom); videos show their
+/// poster enlarged (the library has no bundled video player).
+Future<void> _showMediaPreview(BuildContext context, MediaItem media) {
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.85),
+    builder: (_) => _MediaPreviewDialog(media: media),
+  );
+}
+
+class _MediaPreviewDialog extends StatelessWidget {
+  const _MediaPreviewDialog({required this.media});
+
+  final MediaItem media;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.sizeOf(context);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(SpacingTokens.lg),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: size.width * 0.92,
+          maxHeight: size.height * 0.9,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    media.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: Colors.white),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  color: Colors.white,
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Flexible(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: media.isVideo
+                    ? _VideoPreview(media: media)
+                    : InteractiveViewer(
+                        maxScale: 5,
+                        child: Image.network(
+                          media.url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const _PreviewUnavailable(),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Video preview — the poster shown large. Playback would need a video-player
+/// dependency the app doesn't bundle, so this shows the frame plus a label.
+class _VideoPreview extends StatelessWidget {
+  const _VideoPreview({required this.media});
+
+  final MediaItem media;
+
+  @override
+  Widget build(BuildContext context) {
+    if (media.posterUrl == null) return const _PreviewUnavailable(isVideo: true);
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        InteractiveViewer(
+          maxScale: 5,
+          child: Image.network(
+            media.posterUrl!,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const _PreviewUnavailable(isVideo: true),
+          ),
+        ),
+        const IgnorePointer(
+          child: Icon(Icons.play_circle_outline, size: 64, color: Colors.white70),
+        ),
+      ],
+    );
+  }
+}
+
+class _PreviewUnavailable extends StatelessWidget {
+  const _PreviewUnavailable({this.isVideo = false});
+
+  final bool isVideo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black26,
+      padding: const EdgeInsets.all(SpacingTokens.xxl),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isVideo ? Icons.videocam_outlined : Icons.broken_image_outlined,
+            size: 48,
+            color: Colors.white54,
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          const Text(
+            'Preview unavailable',
+            style: TextStyle(color: Colors.white70),
           ),
         ],
       ),

@@ -56,7 +56,9 @@ class _CarouselComposer extends ConsumerStatefulWidget {
 class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   final _caption = TextEditingController();
   final _selected = <MediaItem>[]; // selection order IS the carousel order
-  PublishTarget? _account;
+  // Destinations — the same carousel is published to every selected account,
+  // so more than one platform can be chosen at once.
+  final _accounts = <PublishTarget>[];
   DateTime? _scheduledAt; // null = publish now
   bool _submitting = false;
 
@@ -66,8 +68,25 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
     super.dispose();
   }
 
-  int get _maxItems =>
-      _account == null ? 20 : _maxItemsForApi(_account!.platform);
+  /// The strictest item ceiling across the chosen platforms — the same image
+  /// set goes to all of them, so it must satisfy the smallest limit.
+  int get _maxItems {
+    if (_accounts.isEmpty) return 20;
+    return _accounts
+        .map((a) => _maxItemsForApi(a.platform))
+        .reduce((a, b) => a < b ? a : b);
+  }
+
+  /// Label of the platform imposing that strictest ceiling, for the hint.
+  String? get _strictestLabel {
+    if (_accounts.isEmpty) return null;
+    final strictest = _accounts.reduce(
+      (a, b) => _maxItemsForApi(a.platform) <= _maxItemsForApi(b.platform)
+          ? a
+          : b,
+    );
+    return PlatformStyle.label(strictest.platform);
+  }
 
   bool get _canSubmit => _disabledReason == null && !_submitting;
 
@@ -75,19 +94,35 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   /// Surfaced inline so the (theme-tinted) button never looks clickable
   /// without saying what's missing.
   String? get _disabledReason {
-    if (_account == null) return 'Choose an account to publish to.';
+    if (_accounts.isEmpty) return 'Choose at least one account to publish to.';
     if (_selected.length < 2) {
       return 'Tap at least 2 images above to include them'
           '${_selected.length == 1 ? ' (1 selected)' : ''}.';
     }
     if (_selected.length > _maxItems) {
-      return '${PlatformStyle.label(_account!.platform)} allows at most '
+      return '$_strictestLabel allows at most '
           '$_maxItems images — remove ${_selected.length - _maxItems}.';
     }
     if (_scheduledAt != null && !_scheduledAt!.isAfter(DateTime.now())) {
       return 'Pick a time in the future.';
     }
     return null;
+  }
+
+  /// Adds/removes a destination account, trimming any images that now exceed
+  /// the (possibly stricter) combined ceiling.
+  void _toggleAccount(PublishTarget account) {
+    setState(() {
+      final i = _accounts.indexWhere((x) => x.id == account.id);
+      if (i >= 0) {
+        _accounts.removeAt(i);
+      } else {
+        _accounts.add(account);
+      }
+      if (_selected.length > _maxItems) {
+        _selected.removeRange(_maxItems, _selected.length);
+      }
+    });
   }
 
   void _toggle(MediaItem item) {
@@ -126,34 +161,50 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   Future<void> _submit() async {
     if (!_canSubmit) return;
     final messenger = ScaffoldMessenger.of(context);
-    final label = PlatformStyle.label(_account!.platform);
     final scheduled = _scheduledAt != null;
+    final targets = List<PublishTarget>.from(_accounts);
+    final mediaUrls = _selected.map((m) => m.url).toList();
+    final caption = _caption.text.isEmpty ? null : _caption.text;
     setState(() => _submitting = true);
-    try {
-      await ref.read(publishRepositoryProvider).publishCarousel(
-            socialAccountId: _account!.id,
-            mediaUrls: _selected.map((m) => m.url).toList(),
-            caption: _caption.text.isEmpty ? null : _caption.text,
-            scheduledAt: _scheduledAt,
-          );
-      if (!mounted) return;
-      // Refresh the calendar so the new job shows up there.
-      ref.invalidate(schedulerJobsProvider);
+
+    // The same carousel goes to each chosen account as its own queued job, so
+    // one platform failing doesn't cancel the others.
+    final failures = <String>[];
+    for (final target in targets) {
+      try {
+        await ref.read(publishRepositoryProvider).publishCarousel(
+              socialAccountId: target.id,
+              mediaUrls: mediaUrls,
+              caption: caption,
+              scheduledAt: _scheduledAt,
+            );
+      } catch (error) {
+        failures.add(
+          '${PlatformStyle.label(target.platform)}: ${describeApiError(error)}',
+        );
+      }
+    }
+    if (!mounted) return;
+    // Refresh the calendar so the new jobs show up there.
+    ref.invalidate(schedulerJobsProvider);
+
+    if (failures.isEmpty) {
+      final names =
+          targets.map((t) => PlatformStyle.label(t.platform)).join(', ');
       Navigator.of(context).pop();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
             scheduled
-                ? 'Carousel scheduled for $label.'
-                : 'Carousel queued to $label. Track it on the Calendar.',
+                ? 'Carousel scheduled for $names.'
+                : 'Carousel queued to $names. Track it on the Calendar.',
           ),
         ),
       );
-    } catch (error) {
-      if (!mounted) return;
+    } else {
       setState(() => _submitting = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not publish: ${describeApiError(error)}')),
+        SnackBar(content: Text('Some publishes failed — ${failures.join('; ')}')),
       );
     }
   }
@@ -211,8 +262,8 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                   runSpacing: SpacingTokens.xs,
                   children: [
                     for (final a in connected)
-                      ChoiceChip(
-                        selected: _account?.id == a.id,
+                      FilterChip(
+                        selected: _accounts.any((x) => x.id == a.id),
                         avatar: Icon(
                           PlatformStyle.icon(a.platform),
                           size: 16,
@@ -220,14 +271,7 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                               PlatformStyle.color(a.platform, theme.colorScheme),
                         ),
                         label: Text(PlatformStyle.label(a.platform)),
-                        onSelected: (_) => setState(() {
-                          _account = a;
-                          // Trim any overflow beyond the new platform's max.
-                          final max = _maxItemsForApi(a.platform);
-                          if (_selected.length > max) {
-                            _selected.removeRange(max, _selected.length);
-                          }
-                        }),
+                        onSelected: (_) => _toggleAccount(a),
                       ),
                   ],
                 );
@@ -243,7 +287,7 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                 ),
                 Text(
                   '${_selected.length} selected'
-                  '${_account != null ? ' · max $_maxItems' : ''}',
+                  '${_accounts.isNotEmpty ? ' · max $_maxItems' : ''}',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: _selected.length > _maxItems
                         ? theme.colorScheme.error
