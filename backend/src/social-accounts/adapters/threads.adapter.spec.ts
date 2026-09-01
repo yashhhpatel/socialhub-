@@ -132,6 +132,7 @@ describe('ThreadsAdapter', () => {
       const adapter = makeAdapter();
       const fetchMock = mockFetchSequence([
         { ok: true, json: { id: 'container_1' } }, // create container
+        { ok: true, json: { status: 'FINISHED' } }, // status poll
         { ok: true, json: { id: 'thread_post_9' } }, // publish
       ]);
 
@@ -142,10 +143,13 @@ describe('ThreadsAdapter', () => {
         accessToken: 'long_xyz',
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
       const [createUrl] = fetchMock.mock.calls[0] as [string, RequestInit];
-      const [publishUrl] = fetchMock.mock.calls[1] as [string, RequestInit];
+      const [statusUrl] = fetchMock.mock.calls[1] as [string, RequestInit];
+      const [publishUrl] = fetchMock.mock.calls[2] as [string, RequestInit];
       expect(createUrl).toContain('/th_user_789/threads');
+      expect(statusUrl).toContain('/container_1?');
+      expect(statusUrl).toContain('status');
       expect(publishUrl).toContain('/th_user_789/threads_publish');
       expect(result.externalPostId).toBe('thread_post_9');
     });
@@ -162,6 +166,54 @@ describe('ThreadsAdapter', () => {
           accessToken: 'long_xyz',
         }),
       ).rejects.toThrow(/Unsupported media/);
+    });
+  });
+
+  describe('publishCarousel', () => {
+    it('waits for each child AND the parent to finish before publishing', async () => {
+      const adapter = makeAdapter();
+      const fetchMock = mockFetchSequence([
+        { ok: true, json: { id: 'child_1' } }, // create item 1
+        { ok: true, json: { status: 'FINISHED' } }, // item 1 ready
+        { ok: true, json: { id: 'child_2' } }, // create item 2
+        { ok: true, json: { status: 'FINISHED' } }, // item 2 ready
+        { ok: true, json: { id: 'parent_1' } }, // create CAROUSEL parent
+        { ok: true, json: { status: 'FINISHED' } }, // parent ready
+        { ok: true, json: { id: 'thread_post_9' } }, // publish
+      ]);
+
+      const result = await adapter.publishCarousel({
+        mediaUrls: ['https://cdn/a.png', 'https://cdn/b.png'],
+        caption: 'my carousel',
+        externalAccountId: 'th_user_789',
+        accessToken: 'long_xyz',
+      });
+
+      expect(result.externalPostId).toBe('thread_post_9');
+      expect(fetchMock).toHaveBeenCalledTimes(7);
+      // The parent is created as a CAROUSEL listing both ready children.
+      const [, parentInit] = fetchMock.mock.calls[4] as [string, RequestInit];
+      const parentBody = parentInit.body as unknown as URLSearchParams;
+      expect(parentBody.get('media_type')).toBe('CAROUSEL');
+      expect(parentBody.get('children')).toBe('child_1,child_2');
+    });
+
+    it('aborts (does not publish) when a child container reports ERROR', async () => {
+      const adapter = makeAdapter();
+      const fetchMock = mockFetchSequence([
+        { ok: true, json: { id: 'child_1' } }, // create item 1
+        { ok: true, json: { status: 'ERROR' } }, // processing failed
+      ]);
+
+      await expect(
+        adapter.publishCarousel({
+          mediaUrls: ['https://cdn/a.png', 'https://cdn/b.png'],
+          caption: 'c',
+          externalAccountId: 'th_user_789',
+          accessToken: 'long_xyz',
+        }),
+      ).rejects.toThrow(/could not process the media/i);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
 });
