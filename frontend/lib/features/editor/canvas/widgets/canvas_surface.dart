@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../hit_testing.dart';
 import '../models/canvas_document.dart';
+import '../models/canvas_layer.dart';
 import '../rendering/canvas_image_cache.dart';
 import '../rendering/canvas_painter.dart';
 import '../state/canvas_controller.dart';
@@ -42,6 +44,46 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     super.dispose();
   }
 
+  /// Double-clicking a text layer edits its content — the affordance the
+  /// placeholder ("Double-click to edit") advertises. Hit-tests the point;
+  /// only text layers open the editor (other types just stay selected).
+  Future<void> _editTextAt(Offset artboardPoint) async {
+    final provider = canvasControllerProvider(widget.document);
+    final controller = ref.read(provider.notifier);
+    final hit = hitTestLayers(ref.read(provider).document.layers, artboardPoint);
+    if (hit is! TextCanvasLayer) return;
+    controller.selectLayerById(hit.id);
+
+    final controllerText = TextEditingController(text: hit.text);
+    final edited = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit text'),
+        content: TextField(
+          controller: controllerText,
+          autofocus: true,
+          maxLines: null,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Type your text…',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controllerText.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ).whenComplete(controllerText.dispose);
+
+    if (edited != null) controller.updateSelectedLayerText(edited);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = canvasControllerProvider(widget.document);
@@ -66,6 +108,8 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
         }
 
         return GestureDetector(
+          onDoubleTapDown: (details) =>
+              _editTextAt(toArtboardSpace(details.localPosition)),
           onPanStart: (details) {
             controller.selectLayerAt(toArtboardSpace(details.localPosition));
             // Brackets the drag so the whole thing is ONE undo step

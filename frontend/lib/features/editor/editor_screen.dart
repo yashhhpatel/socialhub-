@@ -112,6 +112,18 @@ class _EditorWorkspace extends ConsumerWidget {
             controller.redo,
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
             ref.read(autosaveControllerProvider(assetId).notifier).flush(),
+        // Delete / Backspace remove the selected layer. When a text field
+        // (e.g. the property panel) has focus it consumes these first, so
+        // typing a caption never deletes the layer.
+        const SingleActivator(LogicalKeyboardKey.delete):
+            controller.deleteSelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.backspace):
+            controller.deleteSelectedLayer,
+        // Ctrl/⌘+D duplicates the selection.
+        const SingleActivator(LogicalKeyboardKey.keyD, control: true):
+            controller.duplicateSelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
+            controller.duplicateSelectedLayer,
       },
       child: Focus(
         autofocus: true,
