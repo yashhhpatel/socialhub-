@@ -157,6 +157,35 @@ void main() {
     expect(publish.scheduledAt, isNull);
   });
 
+  testWidgets('caption and hashtags are combined into the published caption',
+      (tester) async {
+    final publish = _FakePublishRepo();
+    await _open(tester, publish: publish);
+
+    await tester.tap(find.widgetWithText(FilterChip, 'X'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-b')));
+    await tester.pumpAndSettle();
+
+    final captionField = find.widgetWithText(TextField, 'Caption (optional)');
+    final hashtagField = find.widgetWithText(TextField, 'Hashtags (optional)');
+    await tester.ensureVisible(captionField);
+    await tester.enterText(captionField, 'Launch day!');
+    await tester.ensureVisible(hashtagField);
+    await tester.enterText(hashtagField, 'launch, #Sale marketing');
+    await tester.pumpAndSettle();
+
+    final publishBtn = find.widgetWithText(FilledButton, 'Publish');
+    await tester.ensureVisible(publishBtn);
+    await tester.tap(publishBtn);
+    await tester.pumpAndSettle();
+
+    // Caption, blank line, then normalised hashtags (deduped, each #-prefixed).
+    expect(publish.caption, 'Launch day!\n\n#launch #Sale #marketing');
+  });
+
   testWidgets('selecting multiple platforms publishes to each of them',
       (tester) async {
     final publish = _FakePublishRepo();

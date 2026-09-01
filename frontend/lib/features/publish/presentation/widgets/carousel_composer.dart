@@ -11,15 +11,20 @@ import '../../../social_accounts/domain/entities/social_platform.dart';
 import '../../data/repositories/api_publish_repository.dart';
 import '../../domain/entities/publish_models.dart';
 
-/// Opens the carousel composer in a bottom sheet. Assembles a multi-image
-/// "carousel" post from the media library and publishes/schedules it via
-/// POST /publish/carousel. Reuses existing data (media library + the publish
-/// feature's connected-account targets); builds no new backend concepts.
+/// Opens the carousel composer in a large, responsive dialog. Assembles a
+/// multi-image "carousel" post from the media library and publishes/schedules
+/// it via POST /publish/carousel. Reuses existing data (media library + the
+/// publish feature's connected-account targets); builds no new backend
+/// concepts.
+///
+/// A large, centred dialog (not a bottom sheet) so the composer is spacious:
+/// the title and the action bar stay pinned, and the sections sit in a roomy
+/// scroll area between them — on desktop everything fits without scrolling.
+/// The dialog fills most of the screen on mobile.
 Future<void> showCarouselComposer(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showDialog<void>(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+    barrierDismissible: true,
     builder: (_) => const _CarouselComposer(),
   );
 }
@@ -55,6 +60,7 @@ class _CarouselComposer extends ConsumerStatefulWidget {
 
 class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   final _caption = TextEditingController();
+  final _hashtags = TextEditingController();
   final _selected = <MediaItem>[]; // selection order IS the carousel order
   // Destinations — the same carousel is published to every selected account,
   // so more than one platform can be chosen at once.
@@ -65,7 +71,38 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   @override
   void dispose() {
     _caption.dispose();
+    _hashtags.dispose();
     super.dispose();
+  }
+
+  /// Caption + hashtags combined into the single text the platforms accept:
+  /// the caption, then the normalised hashtags on their own line. Null when
+  /// both are empty.
+  String? _composeCaption() {
+    final caption = _caption.text.trim();
+    final tags = _normalizedHashtags();
+    final parts = [
+      if (caption.isNotEmpty) caption,
+      if (tags.isNotEmpty) tags,
+    ];
+    return parts.isEmpty ? null : parts.join('\n\n');
+  }
+
+  /// Splits the hashtags field on spaces/commas, prefixes each with a single
+  /// '#', and de-duplicates (case-insensitively) while keeping order.
+  String _normalizedHashtags() {
+    final tokens = _hashtags.text
+        .split(RegExp(r'[\s,]+'))
+        .where((t) => t.trim().isNotEmpty);
+    final seen = <String>{};
+    final out = <String>[];
+    for (final token in tokens) {
+      final bare = token.replaceAll('#', '');
+      if (bare.isEmpty) continue;
+      final tag = '#$bare';
+      if (seen.add(tag.toLowerCase())) out.add(tag);
+    }
+    return out.join(' ');
   }
 
   /// The strictest item ceiling across the chosen platforms — the same image
@@ -81,9 +118,8 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   String? get _strictestLabel {
     if (_accounts.isEmpty) return null;
     final strictest = _accounts.reduce(
-      (a, b) => _maxItemsForApi(a.platform) <= _maxItemsForApi(b.platform)
-          ? a
-          : b,
+      (a, b) =>
+          _maxItemsForApi(a.platform) <= _maxItemsForApi(b.platform) ? a : b,
     );
     return PlatformStyle.label(strictest.platform);
   }
@@ -164,7 +200,7 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
     final scheduled = _scheduledAt != null;
     final targets = List<PublishTarget>.from(_accounts);
     final mediaUrls = _selected.map((m) => m.url).toList();
-    final caption = _caption.text.isEmpty ? null : _caption.text;
+    final caption = _composeCaption();
     setState(() => _submitting = true);
 
     // The same carousel goes to each chosen account as its own queued job, so
@@ -204,7 +240,8 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
     } else {
       setState(() => _submitting = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('Some publishes failed — ${failures.join('; ')}')),
+        SnackBar(
+            content: Text('Some publishes failed — ${failures.join('; ')}'),),
       );
     }
   }
@@ -214,218 +251,276 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
     final theme = Theme.of(context);
     final media = ref.watch(mediaLibraryProvider);
     final accounts = ref.watch(_carouselTargetsProvider);
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final size = MediaQuery.sizeOf(context);
+    final isWide = size.width >= 720;
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.85,
-      maxChildSize: 0.95,
-      minChildSize: 0.5,
-      builder: (context, controller) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          SpacingTokens.lg,
-          0,
-          SpacingTokens.lg,
-          SpacingTokens.lg + bottomInset,
+    return Dialog(
+      insetPadding:
+          EdgeInsets.all(isWide ? SpacingTokens.xl : SpacingTokens.sm),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 900,
+          maxHeight: size.height * (isWide ? 0.9 : 0.96),
         ),
-        child: ListView(
-          controller: controller,
-          children: [
-            Text('New carousel post', style: theme.textTheme.titleLarge),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              'Pick 2 or more images and publish them as one carousel.',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            // --- Destination account ---------------------------------------
-            Text('Publish to', style: theme.textTheme.titleSmall),
-            const SizedBox(height: SpacingTokens.sm),
-            accounts.when(
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text(
-                'Could not load accounts: ${describeApiError(e)}',
-                style: theme.textTheme.bodySmall,
-              ),
-              data: (list) {
-                final connected = list.where((a) => a.isConnected).toList();
-                if (connected.isEmpty) {
-                  return Text(
-                    'Connect a social account in Settings first.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  );
-                }
-                return Wrap(
-                  spacing: SpacingTokens.sm,
-                  runSpacing: SpacingTokens.xs,
-                  children: [
-                    for (final a in connected)
-                      FilterChip(
-                        selected: _accounts.any((x) => x.id == a.id),
-                        avatar: Icon(
-                          PlatformStyle.icon(a.platform),
-                          size: 16,
-                          color:
-                              PlatformStyle.color(a.platform, theme.colorScheme),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SpacingTokens.xl,
+            SpacingTokens.lg,
+            SpacingTokens.xl,
+            SpacingTokens.lg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header (title + close) stays pinned above the scroll.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'New carousel post',
+                          style: theme.textTheme.titleLarge,
                         ),
-                        label: Text(PlatformStyle.label(a.platform)),
-                        onSelected: (_) => _toggleAccount(a),
-                      ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            // --- Image picker ----------------------------------------------
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Images', style: theme.textTheme.titleSmall),
-                ),
-                Text(
-                  '${_selected.length} selected'
-                  '${_accounts.isNotEmpty ? ' · max $_maxItems' : ''}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: _selected.length > _maxItems
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.onSurfaceVariant,
+                        const SizedBox(height: SpacingTokens.xs),
+                        Text(
+                          'Pick 2 or more images and publish them as one carousel.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed:
+                        _submitting ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.lg),
+              // Scrollable body — spacious inside the tall dialog, so on
+              // desktop everything fits without scrolling.
+              Expanded(
+                child: ListView(
+                  children: [
+                    // --- Destination account ---------------------------------------
+                    Text('Publish to', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: SpacingTokens.sm),
+                    accounts.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (e, _) => Text(
+                        'Could not load accounts: ${describeApiError(e)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      data: (list) {
+                        final connected =
+                            list.where((a) => a.isConnected).toList();
+                        if (connected.isEmpty) {
+                          return Text(
+                            'Connect a social account in Settings first.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,),
+                          );
+                        }
+                        return Wrap(
+                          spacing: SpacingTokens.sm,
+                          runSpacing: SpacingTokens.xs,
+                          children: [
+                            for (final a in connected)
+                              FilterChip(
+                                selected: _accounts.any((x) => x.id == a.id),
+                                avatar: Icon(
+                                  PlatformStyle.icon(a.platform),
+                                  size: 16,
+                                  color: PlatformStyle.color(
+                                      a.platform, theme.colorScheme,),
+                                ),
+                                label: Text(PlatformStyle.label(a.platform)),
+                                onSelected: (_) => _toggleAccount(a),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: SpacingTokens.lg),
+
+                    // --- Image picker ----------------------------------------------
+                    Row(
+                      children: [
+                        Expanded(
+                          child:
+                              Text('Images', style: theme.textTheme.titleSmall),
+                        ),
+                        Text(
+                          '${_selected.length} selected'
+                          '${_accounts.isNotEmpty ? ' · max $_maxItems' : ''}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: _selected.length > _maxItems
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    media.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.all(SpacingTokens.lg),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (e, _) => Text(
+                        'Could not load media: ${describeApiError(e)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      data: (items) {
+                        final images = items.where((m) => !m.isVideo).toList();
+                        if (images.length < 2) {
+                          return Text(
+                            'Upload at least 2 images to the media library first.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,),
+                          );
+                        }
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 120,
+                            mainAxisSpacing: SpacingTokens.sm,
+                            crossAxisSpacing: SpacingTokens.sm,
+                            childAspectRatio: 1,
+                          ),
+                          itemCount: images.length,
+                          itemBuilder: (context, i) => _SelectableTile(
+                            key: ValueKey('carousel-tile-${images[i].id}'),
+                            item: images[i],
+                            order: _selected
+                                .indexWhere((m) => m.id == images[i].id),
+                            onTap: () => _toggle(images[i]),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: SpacingTokens.lg),
+
+                    // --- Caption ----------------------------------------------------
+                    TextField(
+                      controller: _caption,
+                      minLines: 2,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Caption (optional)',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.md),
+
+                    // --- Hashtags ---------------------------------------------------
+                    TextField(
+                      controller: _hashtags,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Hashtags (optional)',
+                        hintText: '#marketing #launch #socialmedia',
+                        helperText:
+                            'Separate with spaces or commas — added below the caption.',
+                        prefixIcon: Icon(Icons.tag),
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.md),
+
+                    // --- Schedule ---------------------------------------------------
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Schedule for later'),
+                      subtitle: _scheduledAt == null
+                          ? const Text('Off — publishes now')
+                          : Text('Scheduled for ${_formatWhen(_scheduledAt!)}'),
+                      value: _scheduledAt != null,
+                      onChanged: (on) async {
+                        if (on) {
+                          await _pickSchedule();
+                        } else {
+                          setState(() => _scheduledAt = null);
+                        }
+                      },
+                    ),
+                    if (_scheduledAt != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _pickSchedule,
+                          icon: const Icon(Icons.edit_calendar_outlined,
+                              size: 18,),
+                          label: const Text('Change time'),
+                        ),
+                      ),
+                    const SizedBox(height: SpacingTokens.sm),
+                  ],
+                ),
+              ),
+              // Inline reason the action is unavailable — pinned above the
+              // action bar so it's always visible without scrolling.
+              if (!_submitting && _disabledReason != null) ...[
+                const SizedBox(height: SpacingTokens.md),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: SpacingTokens.xs),
+                    Expanded(
+                      child: Text(
+                        _disabledReason!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            media.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(SpacingTokens.lg),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Text(
-                'Could not load media: ${describeApiError(e)}',
-                style: theme.textTheme.bodySmall,
-              ),
-              data: (items) {
-                final images = items.where((m) => !m.isVideo).toList();
-                if (images.length < 2) {
-                  return Text(
-                    'Upload at least 2 images to the media library first.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  );
-                }
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 120,
-                    mainAxisSpacing: SpacingTokens.sm,
-                    crossAxisSpacing: SpacingTokens.sm,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: images.length,
-                  itemBuilder: (context, i) => _SelectableTile(
-                    key: ValueKey('carousel-tile-${images[i].id}'),
-                    item: images[i],
-                    order: _selected.indexWhere((m) => m.id == images[i].id),
-                    onTap: () => _toggle(images[i]),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            // --- Caption ----------------------------------------------------
-            TextField(
-              controller: _caption,
-              minLines: 2,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Caption (optional)',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-
-            // --- Schedule ---------------------------------------------------
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Schedule for later'),
-              subtitle: _scheduledAt == null
-                  ? const Text('Off — publishes now')
-                  : Text('Scheduled for ${_formatWhen(_scheduledAt!)}'),
-              value: _scheduledAt != null,
-              onChanged: (on) async {
-                if (on) {
-                  await _pickSchedule();
-                } else {
-                  setState(() => _scheduledAt = null);
-                }
-              },
-            ),
-            if (_scheduledAt != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _pickSchedule,
-                  icon: const Icon(Icons.edit_calendar_outlined, size: 18),
-                  label: const Text('Change time'),
-                ),
-              ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            // Inline reason the action is unavailable — the themed button stays
-            // tinted even when disabled, so say what's missing.
-            if (!_submitting && _disabledReason != null) ...[
+              const SizedBox(height: SpacingTokens.md),
+              // --- Actions (pinned footer) ---------------------------------
               Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
                   Expanded(
-                    child: Text(
-                      _disabledReason!,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    child: OutlinedButton(
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.md),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _canSubmit ? _submit : null,
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_scheduledAt == null ? 'Publish' : 'Schedule'),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: SpacingTokens.sm),
             ],
-
-            // --- Actions ----------------------------------------------------
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed:
-                        _submitting ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: SpacingTokens.md),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _canSubmit ? _submit : null,
-                    child: _submitting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_scheduledAt == null ? 'Publish' : 'Schedule'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -508,8 +603,18 @@ class _SelectableTile extends StatelessWidget {
 
 String _formatWhen(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final mm = dt.minute.toString().padLeft(2, '0');
   return '${dt.day} ${months[dt.month - 1]} at ${dt.hour}:$mm';
