@@ -55,7 +55,8 @@ class _TeamLoggedOut extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(teamMembersProvider);
     final invites = ref.watch(teamInvitesProvider);
-    return ListView(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         PageHeader(
           title: 'Team',
