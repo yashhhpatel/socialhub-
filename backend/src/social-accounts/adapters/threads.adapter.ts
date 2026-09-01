@@ -220,7 +220,54 @@ export class ThreadsAdapter implements PlatformAdapter {
    */
   async publish(request: PublishRequest): Promise<PublishResult> {
     const creationId = await this.createMediaContainer(request);
+    // Threads processes the container (fetches + validates the image) after
+    // creation; publishing before it's FINISHED fails. Wait for it.
+    await this.waitForContainerReady(request.accessToken, creationId);
     return { externalPostId: await this.publishContainer(request, creationId) };
+  }
+
+  /**
+   * Polls a media container's `status` until Threads has finished processing
+   * it. This is the fix for the carousel "Invalid parameter" (subcode
+   * 4279004) error: a child/parent container isn't usable the instant it's
+   * created — referencing or publishing one that's still IN_PROGRESS is
+   * rejected. Meta's guidance is to poll with a few seconds between checks.
+   */
+  private async waitForContainerReady(
+    accessToken: string,
+    containerId: string,
+  ): Promise<void> {
+    const maxAttempts = 20; // ~60s ceiling with the delay below
+    const delayMs = 3000;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const params = new URLSearchParams({
+        fields: 'status',
+        access_token: accessToken,
+      });
+      const response = await fetch(`${API_BASE}/${containerId}?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(
+          `Threads container status check failed: ${response.status} ${await response.text()}`,
+        );
+      }
+      const data = (await response.json()) as { status?: string };
+      if (data.status === 'FINISHED') return;
+      if (data.status === 'ERROR' || data.status === 'EXPIRED') {
+        throw new Error(
+          `Threads could not process the media (status ${data.status}). ` +
+            'Check that the image URL is public and meets Threads’ requirements.',
+        );
+      }
+      // IN_PROGRESS (or not yet reported) — wait and poll again.
+      await this.delay(delayMs);
+    }
+    throw new Error(
+      'Threads media was still processing after the wait window. Please try again in a moment.',
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async createMediaContainer(request: PublishRequest): Promise<string> {
@@ -288,9 +335,14 @@ export class ThreadsAdapter implements PlatformAdapter {
     // parent CAROUSEL container, then threads_publish on the parent.
     const childIds: string[] = [];
     for (const imageUrl of request.mediaUrls) {
-      childIds.push(await this.createCarouselItem(request, imageUrl));
+      const childId = await this.createCarouselItem(request, imageUrl);
+      // Each child must finish processing before the parent references it —
+      // otherwise the parent creation fails with "Invalid parameter".
+      await this.waitForContainerReady(request.accessToken, childId);
+      childIds.push(childId);
     }
     const parentId = await this.createCarouselContainer(request, childIds);
+    await this.waitForContainerReady(request.accessToken, parentId);
     return {
       externalPostId: await this.publishCreationId(request, parentId),
     };
