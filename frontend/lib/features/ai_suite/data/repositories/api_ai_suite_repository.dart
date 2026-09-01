@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/best_time_slot.dart';
 import '../../domain/entities/viral_score.dart';
+import '../demo_ai.dart';
 
 /// The Phase 12 AI-suite endpoints (Milestone 12.3): hashtags, tone rewrite,
 /// viral score, and best-time. Caption stays in the publish feature's own
@@ -54,5 +56,6 @@ final aiSuiteRepositoryProvider = Provider<ApiAiSuiteRepository>((ref) {
 
 /// Best-time recommendations for the scheduler (Milestone 12.3).
 final bestTimesProvider = FutureProvider.autoDispose<List<BestTimeSlot>>((ref) async {
+  if (ref.watch(demoModeProvider)) return demoBestTimes;
   return ref.watch(aiSuiteRepositoryProvider).bestTimes();
 });

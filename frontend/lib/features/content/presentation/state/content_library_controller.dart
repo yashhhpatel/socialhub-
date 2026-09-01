@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../editor/canvas/models/canvas_document.dart';
+import '../../data/demo_content.dart';
 import '../../data/repositories/api_content_repository.dart';
 import '../../domain/entities/content_asset_summary.dart';
 
@@ -12,7 +14,10 @@ import '../../domain/entities/content_asset_summary.dart';
 /// gives loading/error/data states for free instead of each screen
 /// reinventing them.
 final contentLibraryProvider = FutureProvider.autoDispose<List<ContentAssetSummary>>(
-  (ref) => ref.watch(contentRepositoryProvider).list(),
+  (ref) {
+    if (ref.watch(demoModeProvider)) return Future.value(demoContentAssets());
+    return ref.watch(contentRepositoryProvider).list();
+  },
 );
 
 /// Creates a blank 1080x1080 design and returns its id.

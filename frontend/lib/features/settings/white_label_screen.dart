@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/demo/demo_mode.dart';
 import '../../core/motion/form_skeleton.dart';
 import '../../core/network/api_error_message.dart';
 import '../../core/theme/app_colors.dart';
@@ -90,7 +91,7 @@ class _WhiteLabelScreenState extends ConsumerState<WhiteLabelScreen> {
         // Logged out: show the page header + a browsable, non-blocking note
         // (branding editing itself is admin-only and gated on save).
         error: (e, _) => isUnauthorized(e)
-            ? const _WhiteLabelLoggedOut()
+            ? const _WhiteLabelDemo()
             : Center(
                 child: Text(
                     'Could not load your account: ${describeApiError(e)}',),),
@@ -218,13 +219,18 @@ class _Preview extends StatelessWidget {
   }
 }
 
-/// Browsable White label page for a logged-out visitor: the page header plus a
-/// short, left-aligned note — no blocking wall.
-class _WhiteLabelLoggedOut extends StatelessWidget {
-  const _WhiteLabelLoggedOut();
+/// Browsable, populated demo of the White label editor for a signed-out
+/// visitor: sample logo + brand colour with a live preview, but the fields are
+/// read-only and Save routes to login. Replaced by the real editor after
+/// sign-in (admins only).
+class _WhiteLabelDemo extends ConsumerWidget {
+  const _WhiteLabelDemo();
+
+  static const _demoLogo = 'https://picsum.photos/seed/socialhub-brand-logo/240/240';
+  static const _demoColor = '#6C5CE7';
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,10 +242,32 @@ class _WhiteLabelLoggedOut extends StatelessWidget {
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: SpacingTokens.lg),
-        Text(
-          'Log in as an admin to customise your branding.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        TextField(
+          controller: TextEditingController(text: _demoLogo),
+          readOnly: true,
+          decoration: const InputDecoration(
+            labelText: 'Logo image URL',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        TextField(
+          controller: TextEditingController(text: _demoColor),
+          readOnly: true,
+          decoration: const InputDecoration(
+            labelText: 'Primary colour (hex)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        _Preview(logoUrl: _demoLogo, color: parseHexColor(_demoColor)),
+        const SizedBox(height: SpacingTokens.lg),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: () => redirectToLoginIfDemo(context, ref),
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Save branding'),
           ),
         ),
       ],

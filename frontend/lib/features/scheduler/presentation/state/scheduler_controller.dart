@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/demo/demo_mode.dart';
+import '../../data/demo_scheduler.dart';
 import '../../data/repositories/api_scheduler_repository.dart';
 import '../../domain/entities/scheduled_job.dart';
 
@@ -12,6 +14,7 @@ import '../../domain/entities/scheduled_job.dart';
 /// milliseconds.
 final schedulerJobsProvider = FutureProvider.autoDispose<List<ScheduledJob>>(
   (ref) async {
+    if (ref.watch(demoModeProvider)) return demoScheduledJobs();
     return ref.watch(schedulerRepositoryProvider).listJobs();
   },
 );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:socialhub/core/network/auth_token_store.dart';
 import 'package:socialhub/features/content/data/repositories/api_content_repository.dart';
 import 'package:socialhub/features/content/domain/entities/content_asset_summary.dart';
 import 'package:socialhub/features/content/domain/repositories/content_repository.dart';
@@ -77,6 +78,9 @@ Widget _host(_FakeRepo repo, List<ContentAssetSummary> assets) {
   );
   return ProviderScope(
     overrides: [
+      authTokenStoreProvider.overrideWith(
+        (ref) => const AuthTokens(accessToken: 't', refreshToken: 'r'),
+      ),
       contentRepositoryProvider.overrideWithValue(repo),
       contentLibraryProvider.overrideWith((ref) async => assets),
     ],

@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/demo/demo_mode.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/auth_token_store.dart';
 import '../domain/entities/dashboard_summary.dart';
+import 'demo_dashboard.dart';
 
 /// Talks to the real dashboard endpoint (`GET /dashboard/summary`), org-scoped
 /// server-side. No mock/fallback data — the screen surfaces loading/error
@@ -28,6 +29,7 @@ final dashboardRepositoryProvider = Provider<ApiDashboardRepository>((ref) {
 /// returns to the page; re-evaluates on login/logout via the token store.
 final dashboardSummaryProvider =
     FutureProvider.autoDispose<DashboardSummary>((ref) async {
-  ref.watch(authTokenStoreProvider.select((t) => t != null));
+  // Signed out: serve the explorable demo overview; signed in: live data.
+  if (ref.watch(demoModeProvider)) return demoDashboardSummary;
   return ref.watch(dashboardRepositoryProvider).getSummary();
 });
