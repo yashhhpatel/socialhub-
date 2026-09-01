@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/motion/form_skeleton.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/layout/widgets/page_header.dart';
@@ -52,6 +53,7 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen> {
   }
 
   Future<void> _save() async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     setState(() => _saving = true);
     try {
       await ref.read(brandKitRepositoryProvider).update(

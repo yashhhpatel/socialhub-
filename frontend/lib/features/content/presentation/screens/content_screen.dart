@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/motion/motion_switcher.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
@@ -45,6 +46,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   /// the classic "whole app frozen until refresh" bug. All state is reset in
   /// every path; on failure the design stays visible and interactive.
   Future<void> _confirmAndDelete(ContentAssetSummary asset) async {
+    // Signed out (demo): deleting is a protected action → route to login.
+    if (redirectToLoginIfDemo(context, ref)) return;
     // Guard against a duplicate request for the same design (double-click).
     if (_deletingIds.contains(asset.id)) return;
 
@@ -102,7 +105,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   String _designName(ContentAssetSummary asset) =>
       'Design ${asset.id.substring(0, 8)}';
 
+  /// Opens a design in the editor — a protected action, so in the signed-out
+  /// demo it routes to login instead.
+  void _openEditor(ContentAssetSummary asset) {
+    if (redirectToLoginIfDemo(context, ref)) return;
+    context.go('/editor/${asset.id}');
+  }
+
   Future<void> _createAndOpen() async {
+    // Signed out (demo): creating a design is protected → route to login.
+    if (redirectToLoginIfDemo(context, ref)) return;
     setState(() => _creating = true);
     try {
       final id = await createBlankAsset(ref);
@@ -177,6 +189,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                           assets: visible,
                           deletingIds: _deletingIds,
                           onDelete: _confirmAndDelete,
+                          onOpen: _openEditor,
                         ),
                 );
               },
@@ -217,11 +230,13 @@ class _AssetGrid extends StatelessWidget {
     required this.assets,
     required this.deletingIds,
     required this.onDelete,
+    required this.onOpen,
   });
 
   final List<ContentAssetSummary> assets;
   final Set<String> deletingIds;
   final void Function(ContentAssetSummary) onDelete;
+  final void Function(ContentAssetSummary) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -241,6 +256,7 @@ class _AssetGrid extends StatelessWidget {
           asset: assets[index],
           isDeleting: deletingIds.contains(assets[index].id),
           onDelete: onDelete,
+          onOpen: onOpen,
         ),
       ),
     );
@@ -252,11 +268,13 @@ class _AssetCard extends StatelessWidget {
     required this.asset,
     required this.isDeleting,
     required this.onDelete,
+    required this.onOpen,
   });
 
   final ContentAssetSummary asset;
   final bool isDeleting;
   final void Function(ContentAssetSummary) onDelete;
+  final void Function(ContentAssetSummary) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +284,7 @@ class _AssetCard extends StatelessWidget {
       hoverElevation: true,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: () => context.go('/editor/${asset.id}'),
+        onTap: () => onOpen(asset),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(

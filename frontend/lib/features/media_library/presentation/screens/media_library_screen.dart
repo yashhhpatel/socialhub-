@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/tap_scale.dart';
 import '../../../../core/network/api_error_message.dart';
@@ -86,6 +87,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
   }
 
   Future<void> _delete(MediaItem item) async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(mediaRepositoryProvider).delete(item.id);
@@ -99,7 +101,6 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final loggedIn = ref.watch(authTokenStoreProvider) != null;
     final library = ref.watch(mediaLibraryProvider);
 
     return Padding(
@@ -114,14 +115,15 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (loggedIn) ...[
-                  OutlinedButton.icon(
-                    onPressed: () => showCarouselComposer(context),
-                    icon: const Icon(Icons.collections_outlined),
-                    label: const Text('New carousel'),
-                  ),
-                  const SizedBox(width: SpacingTokens.sm),
-                ],
+                OutlinedButton.icon(
+                  onPressed: () {
+                    if (redirectToLoginIfDemo(context, ref)) return;
+                    showCarouselComposer(context);
+                  },
+                  icon: const Icon(Icons.collections_outlined),
+                  label: const Text('New carousel'),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
                 FilledButton.icon(
                   onPressed: _uploading ? null : _pickAndUpload,
                   icon: _uploading
@@ -137,10 +139,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
             ),
           ),
           const SizedBox(height: SpacingTokens.lg),
-          if (!loggedIn)
-            const _Empty()
-          else
-            library.when(
+          library.when(
               loading: () => const _MediaSkeletonGrid(),
               error: (error, _) => _LoadError(message: describeApiError(error)),
               data: (items) {

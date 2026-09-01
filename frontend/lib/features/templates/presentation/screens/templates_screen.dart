@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/motion/tap_scale.dart';
@@ -32,6 +33,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   String? _startingId;
 
   Future<void> _startFrom(TemplateSummary summary) async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     setState(() => _startingId = summary.id);
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -56,6 +58,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   }
 
   Future<void> _publish(TemplateSummary template) async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(marketplaceRepositoryProvider).publish(template.id);
@@ -75,6 +78,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   /// resolved before any async work (no stranded barrier), and the list is
   /// refreshed on success.
   Future<void> _confirmDelete(TemplateSummary template) async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: true,

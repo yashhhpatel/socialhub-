@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:socialhub/core/network/auth_token_store.dart';
 import 'package:socialhub/features/content/data/repositories/api_content_repository.dart';
 import 'package:socialhub/features/content/domain/entities/content_asset_summary.dart';
 import 'package:socialhub/features/content/domain/repositories/content_repository.dart';
@@ -56,6 +57,11 @@ ContentAssetSummary _asset(String id) => ContentAssetSummary(
 
 Widget _host(_FakeRepo repo, List<ContentAssetSummary> assets) => ProviderScope(
       overrides: [
+        // Signed in, so delete runs the real action rather than the demo's
+        // route-to-login gate.
+        authTokenStoreProvider.overrideWith(
+          (ref) => const AuthTokens(accessToken: 't', refreshToken: 'r'),
+        ),
         contentRepositoryProvider.overrideWithValue(repo),
         contentLibraryProvider.overrideWith((ref) async => assets),
       ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/network/api_error_message.dart';
 import '../../../../core/layout/widgets/page_header.dart';
@@ -36,6 +37,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Future<void> _hashtags4() async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     final id = _assetId;
     if (id == null) return;
     setState(() => _busyHashtags = true);
@@ -50,6 +52,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Future<void> _scoreIt() async {
+    if (redirectToLoginIfDemo(context, ref)) return;
     final id = _assetId;
     if (id == null) return;
     setState(() => _busyScore = true);

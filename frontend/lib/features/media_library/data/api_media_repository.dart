@@ -3,9 +3,10 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/demo/demo_mode.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/auth_token_store.dart';
 import '../domain/media_item.dart';
+import 'demo_media.dart';
 
 /// Talks to the backend /media endpoints (Phase 19). Uploads persist to the
 /// org's media library (a `MediaAsset` row), so they survive across sessions —
@@ -54,7 +55,7 @@ final mediaRepositoryProvider = Provider<ApiMediaRepository>((ref) {
 /// rather than surfacing a 401).
 final mediaLibraryProvider =
     FutureProvider.autoDispose<List<MediaItem>>((ref) async {
-  final loggedIn = ref.watch(authTokenStoreProvider.select((t) => t != null));
-  if (!loggedIn) return const [];
+  // Signed out: an explorable sample library; signed in: the real one.
+  if (ref.watch(demoModeProvider)) return demoMediaItems;
   return ref.watch(mediaRepositoryProvider).list();
 });

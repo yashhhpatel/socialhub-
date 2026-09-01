@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/app_role.dart';
+import '../../../../core/demo/demo_mode.dart';
 import '../../../../core/motion/skeleton.dart';
 import '../../../../core/motion/staggered_item.dart';
 import '../../../../core/network/api_error_message.dart';
@@ -44,15 +44,17 @@ class TeamScreen extends ConsumerWidget {
   }
 }
 
-/// Browsable team page for a logged-out visitor: the same header and an
-/// "Invite teammate" action, which routes to login instead of blocking the
-/// whole page behind a wall.
-class _TeamLoggedOut extends StatelessWidget {
+/// Browsable, populated team demo for a signed-out visitor: a sample roster
+/// and pending invites (from the demo providers), read-only — Invite, role
+/// changes and Revoke all route to login. Replaced by the real admin view
+/// after sign-in.
+class _TeamLoggedOut extends ConsumerWidget {
   const _TeamLoggedOut();
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(teamMembersProvider);
+    final invites = ref.watch(teamInvitesProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,24 +62,64 @@ class _TeamLoggedOut extends StatelessWidget {
           title: 'Team',
           subtitle: 'Manage who can access this workspace.',
           trailing: FilledButton.icon(
-            onPressed: () {
-              final from = GoRouterState.of(context).uri.toString();
-              context.go('/login?from=${Uri.encodeComponent(from)}');
-            },
+            onPressed: () => redirectToLoginIfDemo(context, ref),
             icon: const Icon(Icons.person_add_alt_1, size: 18),
             label: const Text('Invite teammate'),
           ),
         ),
         const SizedBox(height: SpacingTokens.lg),
         const _SectionHeader('Members'),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
-          child: Text(
-            'Your team members will appear here once you log in.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        members.maybeWhen(
+          data: (list) => Column(
+            children: [
+              for (final m in list)
+                Card(
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(
+                        m.email.isNotEmpty ? m.email[0].toUpperCase() : '?',
+                      ),
+                    ),
+                    title: Text(m.email),
+                    trailing: Chip(label: Text(m.role.label)),
+                  ),
+                ),
+            ],
           ),
+          orElse: () => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        const _SectionHeader('Pending invites'),
+        invites.maybeWhen(
+          data: (list) => Column(
+            children: [
+              for (final inv in list)
+                Card(
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                  child: ListTile(
+                    leading: const Icon(Icons.mail_outline),
+                    title: Text(inv.email),
+                    subtitle: Text('Invited as ${inv.role.label}'),
+                    trailing: TextButton(
+                      onPressed: () => redirectToLoginIfDemo(context, ref),
+                      child: const Text('Revoke'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          orElse: () => const SizedBox.shrink(),
         ),
       ],
     );
