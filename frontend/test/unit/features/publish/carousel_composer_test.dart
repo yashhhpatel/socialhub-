@@ -14,6 +14,7 @@ class _FakePublishRepo implements PublishRepository {
   String? caption;
   DateTime? scheduledAt;
   int calls = 0;
+  final publishedAccountIds = <String>[];
 
   @override
   Future<void> publishCarousel({
@@ -23,6 +24,7 @@ class _FakePublishRepo implements PublishRepository {
     DateTime? scheduledAt,
   }) async {
     calls++;
+    publishedAccountIds.add(socialAccountId);
     this.socialAccountId = socialAccountId;
     this.mediaUrls = mediaUrls;
     this.caption = caption;
@@ -37,6 +39,12 @@ class _FakePublishRepo implements PublishRepository {
           id: 'sa_x',
           platform: 'x',
           externalAccountId: 'x1',
+          status: 'connected',
+        ),
+        PublishTarget(
+          id: 'sa_ig',
+          platform: 'instagram',
+          externalAccountId: 'ig1',
           status: 'connected',
         ),
       ];
@@ -111,7 +119,7 @@ void main() {
     expect(publishButton().onPressed, isNull);
 
     // Pick the X account.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'X'));
+    await tester.tap(find.widgetWithText(FilterChip, 'X'));
     await tester.pumpAndSettle();
     // One image only → still disabled.
     await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
@@ -129,7 +137,7 @@ void main() {
     final publish = _FakePublishRepo();
     await _open(tester, publish: publish);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'X'));
+    await tester.tap(find.widgetWithText(FilterChip, 'X'));
     await tester.pumpAndSettle();
     // Select b then a — order should follow selection, not grid order.
     await tester.tap(find.byKey(const ValueKey('carousel-tile-b')));
@@ -147,5 +155,29 @@ void main() {
       'https://cdn.test/a.png',
     ]);
     expect(publish.scheduledAt, isNull);
+  });
+
+  testWidgets('selecting multiple platforms publishes to each of them',
+      (tester) async {
+    final publish = _FakePublishRepo();
+    await _open(tester, publish: publish);
+
+    // Choose BOTH connected accounts.
+    await tester.tap(find.widgetWithText(FilterChip, 'X'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, 'Instagram'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-b')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Publish'));
+    await tester.pumpAndSettle();
+
+    // The same carousel was published to both accounts.
+    expect(publish.calls, 2);
+    expect(publish.publishedAccountIds, containsAll(['sa_x', 'sa_ig']));
   });
 }
