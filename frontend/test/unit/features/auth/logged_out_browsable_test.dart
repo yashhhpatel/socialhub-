@@ -28,7 +28,13 @@ void main() {
             // Signed out: the profile fetch 401s.
             currentUserProvider.overrideWith((ref) async => throw _unauthorized()),
           ],
-          child: const MaterialApp(home: Scaffold(body: TeamScreen())),
+          // Mirror AppShell: a Scaffold hosting the screen inside a scroll
+          // view (the signed-out demo roster is taller than one screen).
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: TeamScreen()),
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -36,6 +42,8 @@ void main() {
       // The page renders its real content...
       expect(find.text('Team'), findsOneWidget);
       expect(find.text('Invite teammate'), findsOneWidget);
+      // ...populated with the demo roster.
+      expect(find.text('you@yourbrand.com'), findsOneWidget);
       // ...and is NOT replaced by a blocking sign-in wall or an access denial.
       expect(find.text('Sign in to continue'), findsNothing);
       expect(find.text('Admins only'), findsNothing);
