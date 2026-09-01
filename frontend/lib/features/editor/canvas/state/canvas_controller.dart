@@ -176,6 +176,140 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     );
   }
 
+  /// Sets the text of the selected [TextCanvasLayer] (double-click on the
+  /// canvas, or the property panel's text field). No-op for other types.
+  void updateSelectedLayerText(String text) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithText(text)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
+  }
+
+  /// Sets the font size of the selected [TextCanvasLayer]. No-op otherwise.
+  void updateSelectedTextFontSize(double fontSize) {
+    final id = state.selectedLayerId;
+    if (id == null || fontSize <= 0) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithFontSize(fontSize)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
+  }
+
+  /// Deletes the selected layer and clears selection. No-op if nothing is
+  /// selected (or the id no longer resolves to a layer).
+  void deleteSelectedLayer() {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final remaining =
+        state.document.layers.where((l) => l.id != id).toList();
+    if (remaining.length == state.document.layers.length) return;
+    _applyDocument(state.document.copyWithLayers(remaining), null);
+  }
+
+  /// Duplicates the selected layer — a copy offset by (20, 20), inserted
+  /// directly above the original in paint order, and selected.
+  void duplicateSelectedLayer() {
+    final selected = _selectedLayer;
+    if (selected == null) return;
+    final copy = _cloneWithOffset(selected, _nextId(), const Offset(20, 20));
+    final layers = [...state.document.layers];
+    final index = layers.indexWhere((l) => l.id == selected.id);
+    layers.insert(index + 1, copy);
+    _applyDocument(state.document.copyWithLayers(layers), copy.id);
+  }
+
+  /// Moves the selected layer one step up the paint stack (towards the
+  /// front). No-op if it's already on top or nothing is selected.
+  void bringSelectedForward() => _reorderSelected(1);
+
+  /// Moves the selected layer one step down the paint stack (towards the
+  /// back). No-op if it's already at the bottom or nothing is selected.
+  void sendSelectedBackward() => _reorderSelected(-1);
+
+  void _reorderSelected(int direction) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final layers = [...state.document.layers];
+    final i = layers.indexWhere((l) => l.id == id);
+    if (i < 0) return;
+    final j = i + direction;
+    if (j < 0 || j >= layers.length) return;
+    final moved = layers.removeAt(i);
+    layers.insert(j, moved);
+    _applyDocument(state.document.copyWithLayers(layers), id);
+  }
+
+  /// Clones any layer type with a new id, offset by [delta]. Kept here (a
+  /// switch over the sealed type) rather than on the model so the sealed
+  /// exhaustiveness check flags a missing case if a 5th layer type is added.
+  CanvasLayer _cloneWithOffset(CanvasLayer layer, String newId, Offset delta) {
+    final nx = layer.x + delta.dx;
+    final ny = layer.y + delta.dy;
+    return switch (layer) {
+      ShapeCanvasLayer s => ShapeCanvasLayer(
+          id: newId,
+          x: nx,
+          y: ny,
+          width: s.width,
+          height: s.height,
+          rotationDegrees: s.rotationDegrees,
+          opacity: s.opacity,
+          shapeKind: s.shapeKind,
+          fillColor: s.fillColor,
+        ),
+      TextCanvasLayer t => TextCanvasLayer(
+          id: newId,
+          x: nx,
+          y: ny,
+          width: t.width,
+          height: t.height,
+          rotationDegrees: t.rotationDegrees,
+          opacity: t.opacity,
+          text: t.text,
+          fontSize: t.fontSize,
+          color: t.color,
+          fontFamily: t.fontFamily,
+        ),
+      ImageCanvasLayer i => ImageCanvasLayer(
+          id: newId,
+          x: nx,
+          y: ny,
+          width: i.width,
+          height: i.height,
+          rotationDegrees: i.rotationDegrees,
+          opacity: i.opacity,
+          imageUrl: i.imageUrl,
+        ),
+      VideoCanvasLayer v => VideoCanvasLayer(
+          id: newId,
+          x: nx,
+          y: ny,
+          width: v.width,
+          height: v.height,
+          rotationDegrees: v.rotationDegrees,
+          opacity: v.opacity,
+          videoUrl: v.videoUrl,
+          posterUrl: v.posterUrl,
+          trimStartSeconds: v.trimStartSeconds,
+          trimEndSeconds: v.trimEndSeconds,
+        ),
+    };
+  }
+
+  int _idCounter = 0;
+  String _nextId() =>
+      'layer_${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
+
   /// Replaces the entire document in one undoable edit — used by
   /// whole-canvas transforms like "apply brand kit" (Milestone 9.3), where
   /// many layers change at once and there is no single selected layer the

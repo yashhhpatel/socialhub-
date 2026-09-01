@@ -155,6 +155,21 @@ class _PropertyFields extends StatelessWidget {
           onChanged: (v) => controller.updateSelectedLayerGeometry(opacity: v),
           onChangeEnd: (_) => controller.endInteraction(),
         ),
+        if (layer is TextCanvasLayer) ...[
+          const SizedBox(height: SpacingTokens.md),
+          const _SectionLabel('Text'),
+          _LayerTextField(
+            value: layer.text,
+            onChanged: controller.updateSelectedLayerText,
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          const _SectionLabel('Font size'),
+          _NumberField(
+            label: 'Size',
+            value: layer.fontSize,
+            onChanged: controller.updateSelectedTextFontSize,
+          ),
+        ],
         if (layer is ShapeCanvasLayer || layer is TextCanvasLayer) ...[
           const SizedBox(height: SpacingTokens.md),
           const _SectionLabel('Color'),
@@ -251,6 +266,64 @@ class _ColorSwatchRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Multiline text field for editing a text layer's content from the property
+/// panel. Same focus-aware resync discipline as [_NumberField]: only pulls a
+/// new value from `value` when it doesn't hold focus, so an external change
+/// (e.g. a double-click edit on the canvas) reflects here without stomping an
+/// in-progress edit. Commits on submit and on tap-outside.
+class _LayerTextField extends StatefulWidget {
+  const _LayerTextField({required this.value, required this.onChanged});
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_LayerTextField> createState() => _LayerTextFieldState();
+}
+
+class _LayerTextFieldState extends State<_LayerTextField> {
+  late final TextEditingController _textController;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.value);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LayerTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus && oldWidget.value != widget.value) {
+      _textController.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _textController,
+      focusNode: _focusNode,
+      minLines: 1,
+      maxLines: 4,
+      decoration: const InputDecoration(
+        isDense: true,
+        border: OutlineInputBorder(),
+      ),
+      onSubmitted: widget.onChanged,
+      onTapOutside: (_) => widget.onChanged(_textController.text),
     );
   }
 }

@@ -25,6 +25,10 @@ class LayerPanel extends ConsumerWidget {
 
     final reversedLayers = state.document.layers.reversed.toList();
 
+    final selectedIndex =
+        state.document.layers.indexWhere((l) => l.id == state.selectedLayerId);
+    final hasSelection = selectedIndex >= 0;
+
     return Container(
       width: 220,
       color: colorScheme.surface,
@@ -58,6 +62,81 @@ class LayerPanel extends ConsumerWidget {
                       );
                     },
                   ),
+          ),
+          const Divider(height: 1),
+          _LayerActions(
+            enabled: hasSelection,
+            canBringForward:
+                hasSelection && selectedIndex < state.document.layers.length - 1,
+            canSendBackward: hasSelection && selectedIndex > 0,
+            onBringForward: controller.bringSelectedForward,
+            onSendBackward: controller.sendSelectedBackward,
+            onDuplicate: controller.duplicateSelectedLayer,
+            onDelete: controller.deleteSelectedLayer,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Action bar for the selected layer: reorder within the stack, duplicate,
+/// or delete. Buttons disable when there's no selection (or a reorder isn't
+/// possible), rather than silently no-opping.
+class _LayerActions extends StatelessWidget {
+  const _LayerActions({
+    required this.enabled,
+    required this.canBringForward,
+    required this.canSendBackward,
+    required this.onBringForward,
+    required this.onSendBackward,
+    required this.onDuplicate,
+    required this.onDelete,
+  });
+
+  final bool enabled;
+  final bool canBringForward;
+  final bool canSendBackward;
+  final VoidCallback onBringForward;
+  final VoidCallback onSendBackward;
+  final VoidCallback onDuplicate;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.xs,
+        vertical: SpacingTokens.xs,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            tooltip: 'Bring forward',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.arrow_upward, size: 18),
+            onPressed: canBringForward ? onBringForward : null,
+          ),
+          IconButton(
+            tooltip: 'Send backward',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.arrow_downward, size: 18),
+            onPressed: canSendBackward ? onSendBackward : null,
+          ),
+          IconButton(
+            tooltip: 'Duplicate (Ctrl+D)',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.copy_all_outlined, size: 18),
+            onPressed: enabled ? onDuplicate : null,
+          ),
+          IconButton(
+            tooltip: 'Delete (Del)',
+            visualDensity: VisualDensity.compact,
+            color: colorScheme.error,
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: enabled ? onDelete : null,
           ),
         ],
       ),

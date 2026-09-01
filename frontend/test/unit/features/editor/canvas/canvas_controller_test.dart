@@ -209,5 +209,97 @@ void main() {
       expect(controller.state.document.layers.last.id, 'layer_c');
       expect(controller.state.selectedLayerId, 'layer_c');
     });
+
+    test('deleteSelectedLayer removes it and clears selection', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.deleteSelectedLayer();
+
+      expect(controller.state.document.layers.map((l) => l.id), ['layer_b']);
+      expect(controller.state.selectedLayerId, isNull);
+    });
+
+    test('deleteSelectedLayer no-ops when nothing is selected', () {
+      final controller = CanvasController(document);
+      controller.deleteSelectedLayer();
+      expect(controller.state.document.layers.length, 2);
+    });
+
+    test('duplicateSelectedLayer inserts an offset copy above and selects it',
+        () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.duplicateSelectedLayer();
+
+      final layers = controller.state.document.layers;
+      expect(layers.length, 3);
+      // Copy sits directly above the original.
+      expect(layers[0].id, 'layer_a');
+      final copy = layers[1];
+      expect(copy.id, isNot('layer_a'));
+      expect(copy.id, controller.state.selectedLayerId);
+      expect(copy.x, 20); // original x 0 + 20 offset
+      expect(copy.y, 20);
+    });
+
+    test('bringSelectedForward / sendSelectedBackward reorder the stack', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a'); // index 0 (bottom)
+      controller.bringSelectedForward();
+      expect(controller.state.document.layers.map((l) => l.id), [
+        'layer_b',
+        'layer_a',
+      ]);
+      controller.sendSelectedBackward();
+      expect(controller.state.document.layers.map((l) => l.id), [
+        'layer_a',
+        'layer_b',
+      ]);
+    });
+
+    test('reorder no-ops at the edges of the stack', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a'); // already at the bottom
+      controller.sendSelectedBackward();
+      expect(controller.state.document.layers.map((l) => l.id), [
+        'layer_a',
+        'layer_b',
+      ]);
+    });
+
+    test('text + font size edits apply only to a selected text layer', () {
+      final controller = CanvasController(
+        const CanvasDocument(
+          width: 1080,
+          height: 1080,
+          layers: [
+            TextCanvasLayer(
+              id: 'txt',
+              x: 0,
+              y: 0,
+              width: 200,
+              height: 40,
+              text: 'old',
+            ),
+          ],
+        ),
+      );
+      controller.selectLayerById('txt');
+      controller.updateSelectedLayerText('new copy');
+      controller.updateSelectedTextFontSize(48);
+
+      final layer = controller.state.document.layers.single as TextCanvasLayer;
+      expect(layer.text, 'new copy');
+      expect(layer.fontSize, 48);
+    });
+
+    test('all edits are undoable', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.deleteSelectedLayer();
+      expect(controller.state.document.layers.length, 1);
+      controller.undo();
+      expect(controller.state.document.layers.length, 2);
+    });
   });
 }
