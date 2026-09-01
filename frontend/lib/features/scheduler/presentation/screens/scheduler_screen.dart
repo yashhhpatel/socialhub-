@@ -504,60 +504,90 @@ DateTime _weekStart(DateTime d) {
   return date.subtract(Duration(days: date.weekday - 1));
 }
 
-/// Opens the day's jobs in a bottom sheet, reusing the existing job card (with
-/// its status and Cancel action) — no separate detail/edit screen exists, and
-/// the brief says not to build one.
+/// Opens the day's jobs in a large, centred dialog, reusing the existing job
+/// card (with its status and Cancel action) — no separate detail/edit screen
+/// exists, and the brief says not to build one.
+///
+/// A roomy dialog (not a half-height bottom sheet) so a day's posts and their
+/// full status/error text are visible without the content being clipped: the
+/// date header + close stay pinned, and the list sizes to its content but caps
+/// at ~90% of the screen (scrolling only when a very busy day overflows).
 void _showDaySheet(
   BuildContext context,
   DateTime day,
   List<ScheduledJob> jobs,
 ) {
-  final theme = Theme.of(context);
   final sorted = [...jobs]..sort((a, b) {
       final at = a.scheduledAt ?? a.createdAt;
       final bt = b.scheduledAt ?? b.createdAt;
       return at.compareTo(bt);
     });
-  showModalBottomSheet<void>(
+  showDialog<void>(
     context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      maxChildSize: 0.9,
-      minChildSize: 0.3,
-      builder: (context, controller) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          SpacingTokens.lg,
-          0,
-          SpacingTokens.lg,
-          SpacingTokens.lg,
+    builder: (dialogContext) {
+      final theme = Theme.of(dialogContext);
+      final size = MediaQuery.sizeOf(dialogContext);
+      final isWide = size.width >= 720;
+      return Dialog(
+        insetPadding:
+            EdgeInsets.all(isWide ? SpacingTokens.xl : SpacingTokens.sm),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 760,
+            maxHeight: size.height * (isWide ? 0.9 : 0.96),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SpacingTokens.xl,
+              SpacingTokens.lg,
+              SpacingTokens.xl,
+              SpacingTokens.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_weekdayLabels[day.weekday - 1]} ${day.day} '
+                            '${_monthsLong[day.month - 1]} ${day.year}',
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: SpacingTokens.xs),
+                          Text(
+                            '${sorted.length} post${sorted.length == 1 ? '' : 's'}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [for (final job in sorted) _JobTile(job: job)],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${_weekdayLabels[day.weekday - 1]} ${day.day} '
-              '${_monthsLong[day.month - 1]} ${day.year}',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '${sorted.length} post${sorted.length == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Expanded(
-              child: ListView(
-                controller: controller,
-                children: [for (final job in sorted) _JobTile(job: job)],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
+      );
+    },
   );
 }
 
