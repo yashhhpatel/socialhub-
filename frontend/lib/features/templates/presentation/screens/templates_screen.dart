@@ -15,6 +15,7 @@ import '../../../marketplace/data/repositories/api_marketplace_repository.dart';
 import '../../data/repositories/api_templates_repository.dart';
 import '../../domain/entities/template.dart';
 import '../state/templates_controller.dart';
+import '../widgets/template_detail_dialog.dart';
 
 /// Template gallery (Milestone 9.4). Browse the org's templates and start a
 /// new design from one — which clones the template's canvas into a fresh
@@ -117,6 +118,36 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
     }
   }
 
+  /// Opens the read-only detail view (canvas preview + metadata), with this
+  /// template's actions. Viewing is always allowed; the actions themselves
+  /// gate to login when signed out.
+  void _openDetails(TemplateSummary template) {
+    showTemplateDetail(
+      context,
+      summary: template,
+      actions: [
+        TemplateDetailAction(
+          icon: Icons.brush_outlined,
+          label: 'Use template',
+          primary: true,
+          onPressed: () => _startFrom(template),
+        ),
+        TemplateDetailAction(
+          icon: Icons.storefront_outlined,
+          label: 'Publish',
+          onPressed: () => _publish(template),
+        ),
+        if (template.isOwn)
+          TemplateDetailAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            danger: true,
+            onPressed: () => _confirmDelete(template),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final templatesAsync = ref.watch(templatesProvider);
@@ -165,6 +196,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                       onUse: () => _startFrom(templates[i]),
                       onPublish: () => _publish(templates[i]),
                       onDelete: () => _confirmDelete(templates[i]),
+                      onOpenDetails: () => _openDetails(templates[i]),
                     ),
                   ),
                 ),
@@ -208,6 +240,7 @@ class _TemplateCard extends StatelessWidget {
     required this.onUse,
     required this.onPublish,
     required this.onDelete,
+    required this.onOpenDetails,
   });
 
   final TemplateSummary template;
@@ -219,6 +252,9 @@ class _TemplateCard extends StatelessWidget {
 
   /// Deletes this template (only offered for the org's own templates).
   final VoidCallback onDelete;
+
+  /// Opens the detail view (tap the preview area).
+  final VoidCallback onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -234,18 +270,22 @@ class _TemplateCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Container(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: template.thumbnailUrl != null
-                  ? Image.network(
-                      template.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Center(child: Icon(Icons.image_outlined)),
-                    )
-                  : const Center(
-                      child:
-                          Icon(Icons.dashboard_customize_outlined, size: 32),),
+            child: InkWell(
+              // Tap the preview to see the template's full details.
+              onTap: onOpenDetails,
+              child: Container(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: template.thumbnailUrl != null
+                    ? Image.network(
+                        template.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Center(child: Icon(Icons.image_outlined)),
+                      )
+                    : const Center(
+                        child:
+                            Icon(Icons.dashboard_customize_outlined, size: 32),),
+              ),
             ),
           ),
           Padding(

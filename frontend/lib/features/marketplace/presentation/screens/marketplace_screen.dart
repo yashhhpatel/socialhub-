@@ -11,6 +11,7 @@ import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
 import '../../../templates/domain/entities/template.dart';
 import '../../../templates/presentation/state/templates_controller.dart';
+import '../../../templates/presentation/widgets/template_detail_dialog.dart';
 import '../../data/repositories/api_marketplace_repository.dart';
 
 /// Template marketplace (Milestone 14.2): browse and search public templates
@@ -116,6 +117,30 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     }
   }
 
+  /// Opens the read-only detail view (canvas preview + metadata) with this
+  /// item's actions (Clone, and Delete for the caller's own published ones).
+  void _openDetails(TemplateSummary template) {
+    showTemplateDetail(
+      context,
+      summary: template,
+      actions: [
+        TemplateDetailAction(
+          icon: Icons.copy_all_outlined,
+          label: 'Clone',
+          primary: true,
+          onPressed: () => _clone(template),
+        ),
+        if (template.isOwn)
+          TemplateDetailAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            danger: true,
+            onPressed: () => _confirmDelete(template),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(marketplaceResultsProvider(_query));
@@ -196,6 +221,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       cloning: _cloningId == results[i].id,
                       onClone: () => _clone(results[i]),
                       onDelete: () => _confirmDelete(results[i]),
+                      onOpenDetails: () => _openDetails(results[i]),
                     ),
                   ),
                 ),
@@ -238,6 +264,7 @@ class _MarketplaceCard extends StatelessWidget {
     required this.cloning,
     required this.onClone,
     required this.onDelete,
+    required this.onOpenDetails,
   });
 
   final TemplateSummary template;
@@ -246,6 +273,9 @@ class _MarketplaceCard extends StatelessWidget {
 
   /// Deletes this template — only offered for the caller's own published ones.
   final VoidCallback onDelete;
+
+  /// Opens the detail view (tap the preview area).
+  final VoidCallback onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -261,17 +291,21 @@ class _MarketplaceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Container(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: template.thumbnailUrl != null
-                  ? Image.network(
-                      template.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Center(child: Icon(Icons.image_outlined)),
-                    )
-                  : const Center(
-                      child: Icon(Icons.storefront_outlined, size: 32),),
+            child: InkWell(
+              // Tap the preview to see the item's full details.
+              onTap: onOpenDetails,
+              child: Container(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: template.thumbnailUrl != null
+                    ? Image.network(
+                        template.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Center(child: Icon(Icons.image_outlined)),
+                      )
+                    : const Center(
+                        child: Icon(Icons.storefront_outlined, size: 32),),
+              ),
             ),
           ),
           Padding(
