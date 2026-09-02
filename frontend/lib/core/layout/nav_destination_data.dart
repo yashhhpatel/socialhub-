@@ -62,7 +62,7 @@ const List<NavDestinationData> navDestinations = [
   ),
   NavDestinationData(
     path: '/media-library',
-    label: 'Media Library',
+    label: 'Create Post & Publish',
     icon: Icons.perm_media_outlined,
     selectedIcon: Icons.perm_media,
   ),

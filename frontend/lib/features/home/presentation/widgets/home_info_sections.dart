@@ -375,7 +375,7 @@ class _KeyFeatures extends StatelessWidget {
     (
       Icons.perm_media_outlined,
       Color(0xFF1DA1F2),
-      'Media library',
+      'Create Post & Publish',
       'Upload and organise images and videos once, then reuse their hosted URLs '
           'across any post.',
     ),

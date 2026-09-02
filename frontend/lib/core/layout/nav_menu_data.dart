@@ -92,7 +92,7 @@ const List<NavCategory> navMenu = [
       ),
       NavLink(
         path: '/media-library',
-        label: 'Media Library',
+        label: 'Create Post & Publish',
         description: 'Upload and reuse images & video',
         icon: Icons.perm_media_outlined,
       ),

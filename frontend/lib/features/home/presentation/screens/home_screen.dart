@@ -351,7 +351,7 @@ class _QuickNav extends StatelessWidget {
         '/calendar', AppColors.warning,),
     _NavItem(Icons.insights_outlined, 'Analytics', 'Track performance',
         '/analytics', AppColors.success,),
-    _NavItem(Icons.perm_media_outlined, 'Media Library', 'Images & video',
+    _NavItem(Icons.perm_media_outlined, 'Create Post & Publish', 'Images & video',
         '/media-library', Color(0xFF1DA1F2),),
     _NavItem(Icons.auto_awesome_outlined, 'AI Assistant', 'Captions & timing',
         '/ai-assistant', AppColors.accentHover,),

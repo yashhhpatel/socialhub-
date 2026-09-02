@@ -109,7 +109,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PageHeader(
-            title: 'Media Library',
+            title: 'Create Post & Publish',
             subtitle:
                 'Upload images and videos and reuse their hosted URLs anywhere.',
             trailing: Row(

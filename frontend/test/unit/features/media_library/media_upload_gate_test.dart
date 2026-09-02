@@ -119,7 +119,7 @@ void main() {
       // Picker opened, stayed on the Media page (no login redirect).
       expect(pickerCalled, isTrue);
       expect(find.text('LOGIN PAGE'), findsNothing);
-      expect(find.text('Media Library'), findsOneWidget);
+      expect(find.text('Create Post & Publish'), findsOneWidget);
     },
   );
 
