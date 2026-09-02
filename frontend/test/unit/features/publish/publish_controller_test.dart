@@ -38,6 +38,39 @@ class _FakeRepo implements PublishRepository {
   }) async {}
 }
 
+/// Returns queued jobs in order, one per publishNow call — lets a multi-account
+/// publish be given a different outcome for each account.
+class _SeqRepo implements PublishRepository {
+  _SeqRepo(this._jobs);
+  final List<PublishJob> _jobs;
+  int _i = 0;
+  int publishCalls = 0;
+
+  @override
+  Future<PublishJob> publishNow({
+    required String variantId,
+    required String socialAccountId,
+    String? caption,
+  }) async {
+    publishCalls++;
+    return _jobs[_i++];
+  }
+
+  @override
+  Future<PublishJob> job(String jobId) async => _jobs.last;
+  @override
+  Future<List<PublishableVariant>> variantsForAsset(String assetId) async => [];
+  @override
+  Future<List<PublishTarget>> targets() async => [];
+  @override
+  Future<void> publishCarousel({
+    required String socialAccountId,
+    required List<String> mediaUrls,
+    String? caption,
+    DateTime? scheduledAt,
+  }) async {}
+}
+
 PublishJob _job(PublishJobStatus status, {String? lastError}) => PublishJob(
       id: 'job1',
       status: status,
@@ -78,5 +111,55 @@ void main() {
     expect(state.error, contains('Still publishing'));
     // Must NOT show the misleading generic message that was shown before.
     expect(state.error, isNot('Publish did not complete.'));
+  });
+
+  test('publishMany: every account published → succeeded, count = N', () async {
+    final container = ProviderContainer(
+      overrides: [
+        publishRepositoryProvider.overrideWithValue(
+          _SeqRepo([
+            _job(PublishJobStatus.published),
+            _job(PublishJobStatus.published),
+          ]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(publishControllerProvider.notifier).publishMany([
+      (variantId: 'v1', socialAccountId: 'a1', caption: null, label: 'instagram'),
+      (variantId: 'v2', socialAccountId: 'a2', caption: null, label: 'threads'),
+    ]);
+
+    final state = container.read(publishControllerProvider);
+    expect(state.phase, PublishPhase.succeeded);
+    expect(state.successCount, 2);
+  });
+
+  test('publishMany: one account failing → failed, names that account',
+      () async {
+    final container = ProviderContainer(
+      overrides: [
+        publishRepositoryProvider.overrideWithValue(
+          _SeqRepo([
+            _job(PublishJobStatus.published),
+            _job(PublishJobStatus.failed, lastError: 'caption too long'),
+          ]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(publishControllerProvider.notifier).publishMany([
+      (variantId: 'v1', socialAccountId: 'a1', caption: null, label: 'instagram'),
+      (variantId: 'v2', socialAccountId: 'a2', caption: null, label: 'threads'),
+    ]);
+
+    final state = container.read(publishControllerProvider);
+    expect(state.phase, PublishPhase.failed);
+    expect(state.error, contains('threads'));
+    expect(state.error, contains('caption too long'));
+    // The instagram account (which succeeded) is not listed as a failure.
+    expect(state.error, isNot(contains('instagram')));
   });
 }

@@ -41,17 +41,68 @@ class _PublishModal extends ConsumerStatefulWidget {
 }
 
 class _PublishModalState extends ConsumerState<_PublishModal> {
-  int? _selectedPairIndex;
+  /// Indices into `publishablePairs` the user has selected. A Set (not a single
+  /// index) so the same design can be published to several accounts at once.
+  final Set<int> _selectedIndices = {};
 
   /// The caption that will actually be posted. Owned here rather than in
   /// CaptionPanel because the publish button needs to read it, and because
   /// it must survive the panel rebuilding as generation state changes.
   final _captionController = TextEditingController();
 
+  /// Optional hashtags, appended below the caption at publish time.
+  final _hashtagsController = TextEditingController();
+
   @override
   void dispose() {
     _captionController.dispose();
+    _hashtagsController.dispose();
     super.dispose();
+  }
+
+  /// Caption + hashtags as the single text the platforms accept: the caption,
+  /// then the normalised hashtags on their own line.
+  String _composedCaption() {
+    final caption = _captionController.text.trim();
+    final tags = _normalizedHashtags();
+    final parts = [
+      if (caption.isNotEmpty) caption,
+      if (tags.isNotEmpty) tags,
+    ];
+    return parts.join('\n\n');
+  }
+
+  /// Splits the hashtags field on spaces/commas, prefixes each with a single
+  /// '#', and de-duplicates (case-insensitively) while keeping order.
+  String _normalizedHashtags() {
+    final tokens = _hashtagsController.text
+        .split(RegExp(r'[\s,]+'))
+        .where((t) => t.trim().isNotEmpty);
+    final seen = <String>{};
+    final out = <String>[];
+    for (final token in tokens) {
+      final bare = token.replaceAll('#', '');
+      if (bare.isEmpty) continue;
+      final tag = '#$bare';
+      if (seen.add(tag.toLowerCase())) out.add(tag);
+    }
+    return out.join(' ');
+  }
+
+  /// Toggles one account in/out of the selection, seeding the caption from the
+  /// first one picked (but never over text the user has already typed).
+  void _toggle(int index, PublishOptions data) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+        final existing = data.publishablePairs[index].variant.caption;
+        if (_captionController.text.isEmpty && existing != null) {
+          _captionController.text = existing;
+        }
+      }
+    });
   }
 
   @override
@@ -90,7 +141,8 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
           const SizedBox(height: SpacingTokens.md),
           Flexible(
             child: switch (publish.phase) {
-              PublishPhase.succeeded => _PublishSucceeded(job: publish.job!),
+              PublishPhase.succeeded =>
+                _PublishSucceeded(job: publish.job, count: publish.successCount),
               PublishPhase.failed => _PublishFailed(
                   error: publish.error ?? 'Publish failed.',
                   onRetry: () => ref.read(publishControllerProvider.notifier).reset(),
@@ -100,16 +152,8 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                   error: (e, _) => Center(child: Text(describeApiError(e))),
                   data: (data) => _PairPicker(
                     options: data,
-                    selectedIndex: _selectedPairIndex,
-                    onSelect: (i) => setState(() {
-                      _selectedPairIndex = i;
-                      // Seed from the variant's stored caption, but never
-                      // over text the user has already generated or typed.
-                      final existing = data.publishablePairs[i].variant.caption;
-                      if (_captionController.text.isEmpty && existing != null) {
-                        _captionController.text = existing;
-                      }
-                    }),
+                    selectedIndices: _selectedIndices,
+                    onToggle: (i) => _toggle(i, data),
                   ),
                 ),
             },
@@ -118,18 +162,17 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
               publish.phase == PublishPhase.publishing) ...[
             options.maybeWhen(
               data: (data) {
-                final pairs = data.publishablePairs;
-                // Index can outlive the list it pointed into if options
-                // refetch while the modal is open.
-                final selected = _selectedPairIndex != null &&
-                        _selectedPairIndex! < pairs.length
-                    ? pairs[_selectedPairIndex!]
-                    : null;
+                final selected = _selectedPairs(data);
+                // Only after at least one destination is chosen: the caption's
+                // length limit is the platform's, so there is nothing to show
+                // a counter against until one is picked.
+                if (selected.isEmpty) return const SizedBox.shrink();
 
-                // Only after a destination is chosen: the caption's length
-                // limit is the platform's, so there is nothing meaningful
-                // to show a counter against until one is picked.
-                if (selected == null) return const SizedBox.shrink();
+                // Multiple platforms share the one caption, so hold it to the
+                // strictest limit among the chosen ones.
+                final maxLength = selected
+                    .map((p) => p.variant.maxCaptionLength)
+                    .reduce((a, b) => a < b ? a : b);
 
                 return Padding(
                   padding: const EdgeInsets.only(top: SpacingTokens.md),
@@ -140,8 +183,25 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                       CaptionPanel(
                         assetId: widget.assetId,
                         textController: _captionController,
-                        maxLength: selected.variant.maxCaptionLength,
+                        maxLength: maxLength,
                         enabled: !publish.inFlight,
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                      // Separate hashtags field — appended below the caption.
+                      TextField(
+                        controller: _hashtagsController,
+                        enabled: !publish.inFlight,
+                        minLines: 1,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Hashtags (optional)',
+                          hintText: '#marketing #launch',
+                          helperText: 'Separate with spaces or commas — '
+                              'added below the caption.',
+                          prefixIcon: Icon(Icons.tag),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
                       const SizedBox(height: SpacingTokens.sm),
                       AiToolsPanel(
@@ -158,16 +218,14 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
             const SizedBox(height: SpacingTokens.md),
             options.maybeWhen(
               data: (data) {
-                final pairs = data.publishablePairs;
-                final canPublish = _selectedPairIndex != null &&
-                    _selectedPairIndex! < pairs.length &&
-                    !publish.inFlight;
+                final selected = _selectedPairs(data);
+                final canPublish = selected.isNotEmpty && !publish.inFlight;
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton.icon(
                       onPressed: canPublish
-                          ? () => _scheduleSelected(pairs[_selectedPairIndex!])
+                          ? () => _scheduleSelected(selected)
                           : null,
                       icon: const Icon(Icons.schedule, size: 18),
                       label: const Text('Schedule'),
@@ -175,14 +233,17 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                     const SizedBox(width: SpacingTokens.sm),
                     FilledButton.icon(
                       onPressed: canPublish
-                          ? () {
-                              final pair = pairs[_selectedPairIndex!];
-                              ref.read(publishControllerProvider.notifier).publish(
+                          ? () => ref
+                              .read(publishControllerProvider.notifier)
+                              .publishMany([
+                                for (final pair in selected)
+                                  (
                                     variantId: pair.variant.id,
                                     socialAccountId: pair.target.id,
                                     caption: _captionArg(pair),
-                                  );
-                            }
+                                    label: pair.variant.platform,
+                                  ),
+                              ])
                           : null,
                       icon: publish.inFlight
                           ? const SizedBox(
@@ -191,7 +252,13 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.send, size: 18),
-                      label: Text(publish.inFlight ? 'Publishing…' : 'Publish now'),
+                      label: Text(
+                        publish.inFlight
+                            ? 'Publishing…'
+                            : selected.length > 1
+                                ? 'Publish to ${selected.length}'
+                                : 'Publish now',
+                      ),
                     ),
                   ],
                 );
@@ -204,18 +271,32 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
     );
   }
 
+  /// The currently-selected pairs, dropping any index that has fallen out of
+  /// range (the options list can refetch while the modal is open).
+  List<({PublishableVariant variant, PublishTarget target})> _selectedPairs(
+    PublishOptions data,
+  ) {
+    final pairs = data.publishablePairs;
+    return [
+      for (final i in _selectedIndices)
+        if (i < pairs.length) pairs[i],
+    ];
+  }
+
   /// Untouched field => null (the variant's own caption still applies);
   /// deliberately cleared => '' (the backend honours that as "no caption").
   String? _captionArg(({PublishableVariant variant, PublishTarget target}) pair) {
-    final caption = _captionController.text;
-    return caption.isEmpty && pair.variant.caption == null ? null : caption;
+    final composed = _composedCaption();
+    return composed.isEmpty && pair.variant.caption == null ? null : composed;
   }
 
-  /// Picks a future date + time and schedules the selected pair (Milestone
-  /// 7.4). The caption is resolved the same way an immediate publish does.
+  /// Picks one future date + time and schedules every selected pair for it
+  /// (Milestone 7.4). The caption is resolved the same way an immediate
+  /// publish does; one platform failing doesn't cancel the others.
   Future<void> _scheduleSelected(
-    ({PublishableVariant variant, PublishTarget target}) pair,
+    List<({PublishableVariant variant, PublishTarget target})> pairs,
   ) async {
+    if (pairs.isEmpty) return;
     final now = DateTime.now();
     final date = await showDatePicker(
       context: context,
@@ -239,22 +320,35 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
       time.minute,
     );
 
-    try {
-      await ref.read(schedulerRepositoryProvider).schedule(
-            variantId: pair.variant.id,
-            socialAccountId: pair.target.id,
-            scheduledAt: scheduledAt,
-            caption: _captionArg(pair),
-          );
-      if (!mounted) return;
+    final scheduler = ref.read(schedulerRepositoryProvider);
+    final failures = <String>[];
+    for (final pair in pairs) {
+      try {
+        await scheduler.schedule(
+          variantId: pair.variant.id,
+          socialAccountId: pair.target.id,
+          scheduledAt: scheduledAt,
+          caption: _captionArg(pair),
+        );
+      } catch (error) {
+        failures.add('${pair.variant.platform}: ${describeApiError(error)}');
+      }
+    }
+    if (!mounted) return;
+    if (failures.isEmpty) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post scheduled. See it on your calendar.')),
+        SnackBar(
+          content: Text(
+            pairs.length > 1
+                ? 'Scheduled to ${pairs.length} accounts. See them on your calendar.'
+                : 'Post scheduled. See it on your calendar.',
+          ),
+        ),
       );
-    } catch (error) {
-      if (!mounted) return;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not schedule: ${describeApiError(error)}')),
+        SnackBar(content: Text('Some did not schedule — ${failures.join('; ')}')),
       );
     }
   }
@@ -263,13 +357,13 @@ class _PublishModalState extends ConsumerState<_PublishModal> {
 class _PairPicker extends StatelessWidget {
   const _PairPicker({
     required this.options,
-    required this.selectedIndex,
-    required this.onSelect,
+    required this.selectedIndices,
+    required this.onToggle,
   });
 
   final PublishOptions options;
-  final int? selectedIndex;
-  final ValueChanged<int> onSelect;
+  final Set<int> selectedIndices;
+  final ValueChanged<int> onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -304,9 +398,9 @@ class _PairPicker extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: SpacingTokens.sm),
       itemBuilder: (context, index) {
         final pair = pairs[index];
-        final selected = selectedIndex == index;
+        final selected = selectedIndices.contains(index);
         return InkWell(
-          onTap: () => onSelect(index),
+          onTap: () => onToggle(index),
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.all(SpacingTokens.sm),
@@ -319,6 +413,12 @@ class _PairPicker extends StatelessWidget {
             ),
             child: Row(
               children: [
+                // A checkbox makes it obvious several accounts can be picked.
+                Checkbox(
+                  value: selected,
+                  onChanged: (_) => onToggle(index),
+                ),
+                const SizedBox(width: SpacingTokens.xs),
                 // The actual rendition that will be posted, at the
                 // platform's own aspect ratio.
                 ClipRRect(
@@ -349,7 +449,6 @@ class _PairPicker extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (selected) Icon(Icons.check_circle, color: theme.colorScheme.primary),
               ],
             ),
           ),
@@ -360,9 +459,12 @@ class _PairPicker extends StatelessWidget {
 }
 
 class _PublishSucceeded extends StatelessWidget {
-  const _PublishSucceeded({required this.job});
+  const _PublishSucceeded({required this.job, this.count = 1});
 
-  final PublishJob job;
+  final PublishJob? job;
+
+  /// How many accounts the design was published to.
+  final int count;
 
   @override
   Widget build(BuildContext context) {
@@ -373,10 +475,15 @@ class _PublishSucceeded extends StatelessWidget {
         children: [
           Icon(Icons.check_circle_outline, size: 44, color: theme.colorScheme.primary),
           const SizedBox(height: SpacingTokens.md),
-          Text('Published', style: theme.textTheme.titleMedium),
+          Text(
+            count > 1 ? 'Published to $count accounts' : 'Published',
+            style: theme.textTheme.titleMedium,
+          ),
           const SizedBox(height: SpacingTokens.xs),
-          if (job.externalPostId != null)
-            Text('Post id: ${job.externalPostId}', style: theme.textTheme.bodySmall),
+          // A single publish can name the post; a multi-publish can't point at
+          // one id, so it just confirms the count above.
+          if (count == 1 && job?.externalPostId != null)
+            Text('Post id: ${job!.externalPostId}', style: theme.textTheme.bodySmall),
         ],
       ),
     );

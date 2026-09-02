@@ -42,14 +42,31 @@ final publishOptionsProvider =
 enum PublishPhase { idle, publishing, succeeded, failed }
 
 class PublishState {
-  const PublishState({this.phase = PublishPhase.idle, this.job, this.error});
+  const PublishState({
+    this.phase = PublishPhase.idle,
+    this.job,
+    this.error,
+    this.successCount = 1,
+  });
 
   final PublishPhase phase;
   final PublishJob? job;
   final String? error;
 
+  /// How many accounts a successful publish reached — 1 for the single
+  /// publish path, or the number of selected accounts for [publishMany].
+  final int successCount;
+
   bool get inFlight => phase == PublishPhase.publishing;
 }
+
+/// One account to publish the same design to, in a multi-select publish.
+typedef PublishItem = ({
+  String variantId,
+  String socialAccountId,
+  String? caption,
+  String label,
+});
 
 /// Drives one publish attempt.
 ///
@@ -104,6 +121,62 @@ class PublishController extends StateNotifier<PublishState> {
     } catch (error) {
       if (!mounted) return;
       state = PublishState(phase: PublishPhase.failed, error: describeApiError(error));
+    }
+  }
+
+  /// Publishes the same design to several accounts at once (Milestone: the
+  /// publish modal's multi-select). Each account is its own publishNow call so
+  /// one platform failing doesn't cancel the others; the outcome is "succeeded"
+  /// only if every account did, otherwise "failed" with a per-account
+  /// breakdown. Deliberately no retry, for the same double-post reason as
+  /// [publish].
+  Future<void> publishMany(List<PublishItem> items) async {
+    if (items.isEmpty) return;
+    state = const PublishState(phase: PublishPhase.publishing);
+    final repository = _ref.read(publishRepositoryProvider);
+    final failures = <String>[];
+    PublishJob? lastJob;
+
+    for (final item in items) {
+      try {
+        final job = await repository.publishNow(
+          variantId: item.variantId,
+          socialAccountId: item.socialAccountId,
+          caption: item.caption,
+        );
+        lastJob = job;
+        switch (job.status) {
+          case PublishJobStatus.published:
+            break; // this account succeeded
+          case PublishJobStatus.failed:
+          case PublishJobStatus.cancelled:
+            failures.add(
+              '${item.label}: ${job.lastError ?? 'did not complete'}',
+            );
+          case PublishJobStatus.queued:
+          case PublishJobStatus.scheduled:
+          case PublishJobStatus.processing:
+            failures.add(
+              '${item.label}: still publishing — check your Calendar',
+            );
+        }
+      } catch (error) {
+        failures.add('${item.label}: ${describeApiError(error)}');
+      }
+    }
+
+    if (!mounted) return;
+    if (failures.isEmpty) {
+      state = PublishState(
+        phase: PublishPhase.succeeded,
+        job: lastJob,
+        successCount: items.length,
+      );
+    } else {
+      state = PublishState(
+        phase: PublishPhase.failed,
+        error: 'Some publishes failed:\n${failures.join('\n')}',
+      );
     }
   }
 
