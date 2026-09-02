@@ -69,19 +69,23 @@ class CanvasGuide {
 class CanvasPainter extends CustomPainter {
   CanvasPainter({
     required this.document,
-    required this.selectedLayerId,
+    required this.selectedLayerIds,
     required this.scale,
     required this.offset,
     required this.imageCache,
     this.guides = const [],
+    this.marquee,
   }) : super(repaint: imageCache);
 
   final CanvasDocument document;
-  final String? selectedLayerId;
+  final Set<String> selectedLayerIds;
   final double scale;
   final Offset offset;
   final CanvasImageCache imageCache;
   final List<CanvasGuide> guides;
+
+  /// The in-progress marquee-selection rectangle, in artboard space, or null.
+  final Rect? marquee;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -99,15 +103,37 @@ class CanvasPainter extends CustomPainter {
 
       _paintLayer(canvas, layer);
 
-      if (layer.id == selectedLayerId) {
+      if (selectedLayerIds.contains(layer.id)) {
         _paintSelectionOutline(canvas, layer);
-        _paintHandles(canvas, layer);
+        // Resize/rotate handles only make sense for a single selection.
+        if (selectedLayerIds.length == 1) _paintHandles(canvas, layer);
       }
     }
 
     _paintGuides(canvas);
+    _paintMarquee(canvas);
 
     canvas.restore();
+  }
+
+  /// Draws the marquee-selection rectangle (a translucent accent fill + border).
+  void _paintMarquee(Canvas canvas) {
+    final m = marquee;
+    if (m == null) return;
+    final rect = Rect.fromLTRB(
+      m.left * scale,
+      m.top * scale,
+      m.right * scale,
+      m.bottom * scale,
+    );
+    canvas.drawRect(rect, Paint()..color = Colors.blueAccent.withOpacity(0.12));
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..color = Colors.blueAccent
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   /// Draws the rotate knob (always) and the eight resize handles (only when
@@ -366,9 +392,10 @@ class CanvasPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CanvasPainter oldDelegate) {
     return oldDelegate.document != document ||
-        oldDelegate.selectedLayerId != selectedLayerId ||
+        !setEquals(oldDelegate.selectedLayerIds, selectedLayerIds) ||
         oldDelegate.scale != scale ||
         oldDelegate.offset != offset ||
+        oldDelegate.marquee != marquee ||
         !listEquals(oldDelegate.guides, guides);
   }
 }

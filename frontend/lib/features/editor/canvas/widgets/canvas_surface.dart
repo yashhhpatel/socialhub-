@@ -47,6 +47,10 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
   ResizeHandle? _activeHandle;
   bool _rotating = false;
 
+  /// Marquee-selection drag: the artboard-space start point and the live rect.
+  Offset? _marqueeStart;
+  Rect? _marquee;
+
   @override
   void dispose() {
     _imageCache.dispose();
@@ -105,7 +109,9 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     double effScale,
   ) {
     final local = details.localPosition;
-    final selected = _selectedLayer(state);
+    final artPoint = local / effScale;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final selected = _selectedLayer(state); // non-null only for a single selection
     if (selected != null && !selected.hidden && !selected.locked) {
       // Rotate knob (works at any rotation).
       if ((local - rotateHandleCenter(selected, effScale)).distance <=
@@ -125,8 +131,23 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
         }
       }
     }
-    controller.selectLayerAt(local / effScale);
-    controller.beginInteraction();
+
+    final hit = hitTestLayers(state.document.layers, artPoint);
+    if (hit != null) {
+      if (shift) {
+        controller.toggleLayerSelection(hit.id);
+      } else {
+        controller.selectLayerAt(artPoint); // keeps a multi selection to drag
+      }
+      controller.beginInteraction(); // ready to move
+      return;
+    }
+
+    // Empty space → marquee-select. Plain click clears first; Shift keeps the
+    // existing selection (the marquee replaces it live during the drag).
+    _marqueeStart = artPoint;
+    if (!shift) controller.clearSelection();
+    setState(() => _marquee = Rect.fromPoints(artPoint, artPoint));
   }
 
   void _onPanUpdate(
@@ -137,6 +158,13 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     double effScale,
   ) {
     final shift = HardwareKeyboard.instance.isShiftPressed;
+    if (_marqueeStart != null) {
+      final cur = details.localPosition / effScale;
+      final rect = Rect.fromPoints(_marqueeStart!, cur);
+      controller.selectLayersInRect(rect);
+      setState(() => _marquee = rect);
+      return;
+    }
     if (_activeHandle != null) {
       controller.resizeSelectedByHandle(
         _activeHandle!,
@@ -163,8 +191,9 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     _moveWithSnap(details, controller, doc, effScale, _selectedLayer(state));
   }
 
-  /// Applies drag delta with snap-to-artboard (centre + edges), streaming
-  /// guides for the snaps that engaged this frame.
+  /// Applies drag delta. For a single selection it snaps to the artboard
+  /// (centre + edges) with guides; for a multi selection (where [selected] is
+  /// null but layers are selected) it just moves them all, no snap.
   void _moveWithSnap(
     DragUpdateDetails details,
     CanvasController controller,
@@ -172,7 +201,12 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     double effScale,
     CanvasLayer? selected,
   ) {
-    if (selected == null || selected.locked) return;
+    if (selected == null) {
+      // No single selection: move the whole (possibly multi) selection plainly.
+      controller.moveSelectedLayerBy(details.delta / effScale);
+      return;
+    }
+    if (selected.locked) return;
 
     final rawDx = details.delta.dx / effScale;
     final rawDy = details.delta.dy / effScale;
@@ -220,7 +254,13 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     controller.endInteraction();
     _activeHandle = null;
     _rotating = false;
-    if (_guides.isNotEmpty) setState(() => _guides = const []);
+    _marqueeStart = null;
+    if (_guides.isNotEmpty || _marquee != null) {
+      setState(() {
+        _guides = const [];
+        _marquee = null;
+      });
+    }
   }
 
   @override
@@ -256,11 +296,12 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
               size: Size(artW, artH),
               painter: CanvasPainter(
                 document: doc,
-                selectedLayerId: state.selectedLayerId,
+                selectedLayerIds: state.selectedLayerIds,
                 scale: effScale,
                 offset: Offset.zero,
                 imageCache: _imageCache,
                 guides: _guides,
+                marquee: _marquee,
               ),
             ),
           ),
