@@ -11,21 +11,25 @@ import '../../theme/tokens/spacing_tokens.dart';
 /// treatment: `headlineLarge` title + `titleMedium` subtitle, both
 /// horizontally centered so multi-line values stay centered too.
 ///
-/// Trailing actions are preserved from the pages that had them. On desktop /
-/// tablet they sit pinned to the right of the centered title; on mobile they
-/// drop below the title (centered) so a wide button never overlaps the text.
-/// Pass a `Row(mainAxisSize: MainAxisSize.min, …)` as [trailing] for more than
-/// one action.
+/// Leading/trailing actions are preserved from the pages that had them. On
+/// desktop / tablet they sit pinned to the left ([leading]) and right
+/// ([trailing]) of the centered title; on mobile they drop below the title
+/// (centered) so a wide button never overlaps the text. Pass a
+/// `Row(mainAxisSize: MainAxisSize.min, …)` for more than one action on a side.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
     required this.title,
     this.subtitle,
+    this.leading,
     this.trailing,
   });
 
   final String title;
   final String? subtitle;
+
+  /// Optional action(s) pinned to the LEFT of the centered title on desktop.
+  final Widget? leading;
   final Widget? trailing;
 
   @override
@@ -56,7 +60,7 @@ class PageHeader extends StatelessWidget {
     // intrinsic width of the text.
     final fullWidthTexts = SizedBox(width: double.infinity, child: texts);
 
-    if (trailing == null) return fullWidthTexts;
+    if (leading == null && trailing == null) return fullWidthTexts;
 
     // Mobile: stack the actions beneath the centered title so a wide button
     // can't collide with the text on narrow widths.
@@ -67,23 +71,39 @@ class PageHeader extends StatelessWidget {
         children: [
           fullWidthTexts,
           const SizedBox(height: SpacingTokens.sm),
-          trailing!,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: SpacingTokens.sm,
+            runSpacing: SpacingTokens.sm,
+            children: [
+              if (leading != null) leading!,
+              if (trailing != null) trailing!,
+            ],
+          ),
         ],
       );
     }
 
     // Desktop / tablet: title centered across the full width, actions pinned to
-    // the right and vertically centered against the title block.
+    // the left/right and vertically centered against the title block.
     return Stack(
       alignment: Alignment.center,
       children: [
         fullWidthTexts,
-        Positioned.fill(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: trailing,
+        if (leading != null)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: leading,
+            ),
           ),
-        ),
+        if (trailing != null)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: trailing,
+            ),
+          ),
       ],
     );
   }

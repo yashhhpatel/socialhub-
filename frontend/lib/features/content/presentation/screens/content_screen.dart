@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +14,11 @@ import '../../../../core/network/api_error_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/layout/widgets/page_header.dart';
 import '../../../../core/theme/tokens/spacing_tokens.dart';
+import '../../../editor/canvas/models/canvas_document.dart';
+import '../../../editor/canvas/models/canvas_layer.dart';
+import '../../../media_library/data/api_media_repository.dart';
+import '../../../media_library/data/file_picker.dart';
+import '../../../media_library/domain/media_item.dart';
 import '../../data/repositories/api_content_repository.dart';
 import '../../domain/entities/content_asset_summary.dart';
 import '../state/content_library_controller.dart';
@@ -31,6 +39,7 @@ class ContentScreen extends ConsumerStatefulWidget {
 
 class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _creating = false;
+  bool _uploading = false;
 
   /// Deletes in flight — used to disable the card's delete button and block a
   /// second request for the same design (fixes double-click).
@@ -132,6 +141,104 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
   }
 
+  /// Uploads an image/video and turns it straight into a design: the file goes
+  /// to the media library, a design is created with it as a full-bleed layer,
+  /// and the editor opens on it — so "upload → edit → publish" is one step from
+  /// this page. Protected, so the signed-out demo routes to login first.
+  Future<void> _uploadAndCreate() async {
+    if (redirectToLoginIfDemo(context, ref)) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    try {
+      final picked = await ref.read(filePickerProvider)();
+      if (picked == null) return; // cancelled
+      setState(() => _uploading = true);
+      final media = await ref.read(mediaRepositoryProvider).upload(
+            bytes: picked.bytes,
+            name: picked.name,
+            mimeType: picked.mimeType,
+          );
+      final document = await _documentForUpload(media, picked.bytes);
+      final id =
+          await ref.read(contentRepositoryProvider).createAsset(document: document);
+      if (!mounted) return;
+      // Refresh the library so the new design is there when they come back.
+      ref.invalidate(contentLibraryProvider);
+      router.go('/editor/$id');
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Upload failed: ${describeApiError(error)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  /// Builds a single-layer design for a freshly uploaded file. Images use their
+  /// real pixel dimensions as the artboard (so nothing is stretched); videos
+  /// fall back to a square artboard since their size isn't known from the bytes.
+  Future<CanvasDocument> _documentForUpload(
+    MediaItem media,
+    Uint8List bytes,
+  ) async {
+    final layerId = 'layer_${DateTime.now().microsecondsSinceEpoch}';
+    if (media.isVideo) {
+      const side = 1080.0;
+      return CanvasDocument(
+        width: side,
+        height: side,
+        layers: [
+          VideoCanvasLayer(
+            id: layerId,
+            x: 0,
+            y: 0,
+            width: side,
+            height: side,
+            videoUrl: media.url,
+            posterUrl: media.posterUrl,
+          ),
+        ],
+      );
+    }
+    final (w, h) = await _imageArtboardSize(bytes);
+    return CanvasDocument(
+      width: w,
+      height: h,
+      layers: [
+        ImageCanvasLayer(
+          id: layerId,
+          x: 0,
+          y: 0,
+          width: w,
+          height: h,
+          imageUrl: media.url,
+        ),
+      ],
+    );
+  }
+
+  /// The uploaded image's own dimensions, scaled down so the longest side is at
+  /// most 2000px (a sane artboard ceiling). Falls back to 1080×1080 if the
+  /// bytes can't be decoded.
+  Future<(double, double)> _imageArtboardSize(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final iw = frame.image.width.toDouble();
+      final ih = frame.image.height.toDouble();
+      frame.image.dispose();
+      codec.dispose();
+      if (iw <= 0 || ih <= 0) return (1080.0, 1080.0);
+      const maxSide = 2000.0;
+      final longest = iw > ih ? iw : ih;
+      final scale = longest > maxSide ? maxSide / longest : 1.0;
+      return (iw * scale, ih * scale);
+    } catch (_) {
+      return (1080.0, 1080.0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final library = ref.watch(contentLibraryProvider);
@@ -144,6 +251,17 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           PageHeader(
             title: 'Content',
             subtitle: 'Create once, then publish everywhere.',
+            leading: OutlinedButton.icon(
+              onPressed: _uploading ? null : _uploadAndCreate,
+              icon: _uploading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload_file),
+              label: const Text('Upload'),
+            ),
             trailing: FilledButton.icon(
               onPressed: _creating ? null : _createAndOpen,
               icon: _creating
