@@ -110,7 +110,7 @@ void main() {
     await _open(tester, publish: publish);
 
     // The composer opened.
-    expect(find.text('New carousel post'), findsOneWidget);
+    expect(find.text('Create Post'), findsOneWidget);
 
     FilledButton publishButton() =>
         tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));

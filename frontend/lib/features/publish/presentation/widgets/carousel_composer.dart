@@ -282,7 +282,7 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'New carousel post',
+                          'Create Post',
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: SpacingTokens.xs),
