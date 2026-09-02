@@ -55,6 +55,13 @@ class _DashboardContent extends StatelessWidget {
             ? 2
             : 1;
 
+    // Pipeline total, for the "share of all posts" details below. Kept honest:
+    // when there are no posts at all, the cards say so rather than showing 0%.
+    final totalPosts =
+        summary.scheduledPosts + summary.publishedPosts + summary.drafts;
+    String pctOfPosts(int n) =>
+        totalPosts == 0 ? 'No posts yet' : '${(n / totalPosts * 100).round()}% of all posts';
+
     return Padding(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
@@ -79,6 +86,9 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.schedule,
                   label: 'Scheduled Posts',
                   value: '${summary.scheduledPosts}',
+                  subtitle: summary.scheduledPosts == 0
+                      ? 'Nothing scheduled'
+                      : 'Queued on your Calendar',
                   accentColor: AppColors.warning,
                 ),
               ),
@@ -88,6 +98,7 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.check_circle_outline,
                   label: 'Published Posts',
                   value: '${summary.publishedPosts}',
+                  subtitle: pctOfPosts(summary.publishedPosts),
                   accentColor: AppColors.success,
                 ),
               ),
@@ -97,6 +108,9 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.edit_outlined,
                   label: 'Drafts',
                   value: '${summary.drafts}',
+                  subtitle: summary.drafts == 0
+                      ? 'All caught up'
+                      : 'Ready to schedule',
                   accentColor: AppColors.accent,
                 ),
               ),
@@ -106,7 +120,9 @@ class _DashboardContent extends StatelessWidget {
                   icon: Icons.link,
                   label: 'Connected Accounts',
                   value: '${summary.connectedAccounts}',
-                  subtitle: 'Manage in Settings',
+                  subtitle: summary.connectedAccounts == 0
+                      ? 'Connect one in Settings'
+                      : 'Manage in Settings',
                   accentColor: const Color(0xFF1DA1F2),
                 ),
               ),
@@ -121,7 +137,9 @@ class _DashboardContent extends StatelessWidget {
                       : '${summary.aiCreditsUsed} / ${summary.aiCreditsTotal}',
                   subtitle: summary.aiCreditsUnlimited
                       ? 'Unlimited'
-                      : '${summary.aiCreditsTotal == 0 ? 0 : (summary.aiCreditsUsed / summary.aiCreditsTotal * 100).round()}% used',
+                      : summary.aiCreditsTotal == 0
+                          ? 'None on this plan'
+                          : '${(summary.aiCreditsTotal - summary.aiCreditsUsed).clamp(0, summary.aiCreditsTotal)} left this cycle',
                 ),
               ),
             ],
