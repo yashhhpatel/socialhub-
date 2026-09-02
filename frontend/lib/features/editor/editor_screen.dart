@@ -123,6 +123,24 @@ class _EditorWorkspace extends ConsumerWidget {
             controller.duplicateSelectedLayer,
         const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
             controller.duplicateSelectedLayer,
+        // Arrow keys nudge the selection 1px; Shift+arrow nudges 10px. A
+        // focused text field consumes these first, so typing isn't affected.
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            controller.nudgeSelected(-1, 0),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            controller.nudgeSelected(1, 0),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            controller.nudgeSelected(0, -1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            controller.nudgeSelected(0, 1),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () =>
+            controller.nudgeSelected(-10, 0),
+        const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () =>
+            controller.nudgeSelected(10, 0),
+        const SingleActivator(LogicalKeyboardKey.arrowUp, shift: true): () =>
+            controller.nudgeSelected(0, -10),
+        const SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): () =>
+            controller.nudgeSelected(0, 10),
       },
       child: Focus(
         autofocus: true,

@@ -301,5 +301,111 @@ void main() {
       controller.undo();
       expect(controller.state.document.layers.length, 2);
     });
+
+    test('setBackgroundColor changes the artboard background (undoable)', () {
+      final controller = CanvasController(document);
+      controller.setBackgroundColor(const Color(0xFF0D0F14));
+      expect(controller.state.document.backgroundColor, const Color(0xFF0D0F14));
+      controller.undo();
+      expect(controller.state.document.backgroundColor, const Color(0xFFFFFFFF));
+    });
+
+    test('resizeArtboard changes size but keeps layers; ignores non-positive', () {
+      final controller = CanvasController(document);
+      controller.resizeArtboard(1080, 1920);
+      expect(controller.state.document.width, 1080);
+      expect(controller.state.document.height, 1920);
+      expect(controller.state.document.layers.length, 2);
+      controller.resizeArtboard(0, 500); // ignored
+      expect(controller.state.document.width, 1080);
+    });
+
+    test('alignSelectedToArtboard centres and edges the selected layer', () {
+      final controller = CanvasController(document); // 1080x1080, layer_a 100x100
+      controller.selectLayerById('layer_a');
+
+      controller.alignSelectedToArtboard(LayerAlignment.hCenter);
+      var a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.x, (1080 - 100) / 2);
+
+      controller.alignSelectedToArtboard(LayerAlignment.right);
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.x, 1080 - 100);
+
+      controller.alignSelectedToArtboard(LayerAlignment.bottom);
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.y, 1080 - 100);
+    });
+
+    test('lock/hide toggle by id; a locked layer will not move or nudge', () {
+      final controller = CanvasController(document);
+      controller.setLayerLocked('layer_a', true);
+      controller.setLayerHidden('layer_b', true);
+      final a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      final b = controller.state.document.layers.firstWhere((l) => l.id == 'layer_b');
+      expect(a.locked, isTrue);
+      expect(b.hidden, isTrue);
+
+      controller.selectLayerById('layer_a');
+      controller.nudgeSelected(10, 10); // locked → no-op
+      final aAfter = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(aAfter.x, 0);
+    });
+
+    test('nudgeSelected moves an unlocked selection', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_b'); // at (500,500)
+      controller.nudgeSelected(-10, 5);
+      final b = controller.state.document.layers.firstWhere((l) => l.id == 'layer_b');
+      expect(b.x, 490);
+      expect(b.y, 505);
+    });
+
+    test('text format + font family edits apply to the selected text layer', () {
+      final controller = CanvasController(
+        const CanvasDocument(
+          width: 1080,
+          height: 1080,
+          layers: [
+            TextCanvasLayer(id: 'txt', x: 0, y: 0, width: 200, height: 40, text: 'hi'),
+          ],
+        ),
+      );
+      controller.selectLayerById('txt');
+      controller.updateSelectedTextFormat(
+        bold: true,
+        italic: true,
+        align: TextAlign.center,
+        lineHeight: 1.5,
+      );
+      controller.updateSelectedTextFontFamily('Roboto');
+
+      final t = controller.state.document.layers.single as TextCanvasLayer;
+      expect(t.bold, isTrue);
+      expect(t.italic, isTrue);
+      expect(t.align, TextAlign.center);
+      expect(t.lineHeight, 1.5);
+      expect(t.fontFamily, 'Roboto');
+    });
+
+    test('shape style edits set border and corner radius; clearStroke removes it', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.updateSelectedShapeStyle(
+        strokeColor: const Color(0xFFFF0000),
+        strokeWidth: 4,
+        cornerRadius: 12,
+      );
+      var a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a')
+          as ShapeCanvasLayer;
+      expect(a.strokeColor, const Color(0xFFFF0000));
+      expect(a.strokeWidth, 4);
+      expect(a.cornerRadius, 12);
+
+      controller.updateSelectedShapeStyle(clearStroke: true);
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a')
+          as ShapeCanvasLayer;
+      expect(a.strokeColor, isNull);
+    });
   });
 }

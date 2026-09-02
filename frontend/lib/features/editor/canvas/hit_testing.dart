@@ -44,8 +44,13 @@ bool _withinBounds(CanvasLayer layer, Offset point) {
 /// Iterates in reverse — the last layer in the list is the top of the
 /// visual stack (see CanvasDocument's doc comment) and should win a hit
 /// test over anything beneath it.
+///
+/// Hidden and locked layers are skipped: a hidden layer isn't visible to
+/// click, and a locked one is deliberately not grabbable on the canvas (it's
+/// still selectable from the Layers panel to unlock it).
 CanvasLayer? hitTestLayers(List<CanvasLayer> layers, Offset point) {
   for (final layer in layers.reversed) {
+    if (layer.hidden || layer.locked) continue;
     if (layerContainsPoint(layer, point)) return layer;
   }
   return null;

@@ -1,4 +1,4 @@
-import { IsArray, IsNumber, Min } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, Min } from 'class-validator';
 
 /**
  * Deliberately minimal — per docs/api/SocialHub_REST_API_Design.md,
@@ -18,4 +18,13 @@ export class CanvasJsonDto {
 
   @IsArray()
   layers: unknown[];
+
+  /**
+   * Optional artboard background colour, as a packed ARGB int (the editor's
+   * `Color.value`). Whitelisted here so the editor can persist it — with
+   * `forbidNonWhitelisted` on, an undeclared key would 400 every save.
+   */
+  @IsOptional()
+  @IsNumber()
+  backgroundColor?: number;
 }
