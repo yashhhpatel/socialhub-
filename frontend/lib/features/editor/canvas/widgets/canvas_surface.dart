@@ -51,52 +51,47 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
   Offset? _marqueeStart;
   Rect? _marquee;
 
+  /// The text layer being edited inline, and the field's controller.
+  String? _editingLayerId;
+  final TextEditingController _editController = TextEditingController();
+
   @override
   void dispose() {
     _imageCache.dispose();
+    _editController.dispose();
     super.dispose();
   }
 
   void _setZoom(double zoom) =>
       setState(() => _zoom = zoom.clamp(_minZoom, _maxZoom));
 
-  /// Double-clicking a text layer edits its content. Hit-tests the point;
-  /// only text layers open the editor (other types just stay selected).
-  Future<void> _editTextAt(Offset artboardPoint) async {
+  /// Double-clicking a text layer edits its content INLINE — an overlay
+  /// TextField appears over the layer (see [build]); only text layers open it.
+  void _editTextAt(Offset artboardPoint) {
     final provider = canvasControllerProvider(widget.document);
     final controller = ref.read(provider.notifier);
     final hit = hitTestLayers(ref.read(provider).document.layers, artboardPoint);
     if (hit is! TextCanvasLayer) return;
     controller.selectLayerById(hit.id);
+    _editController.text = hit.text;
+    setState(() => _editingLayerId = hit.id);
+  }
 
-    final controllerText = TextEditingController(text: hit.text);
-    final edited = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit text'),
-        content: TextField(
-          controller: controllerText,
-          autofocus: true,
-          maxLines: null,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Type your text…',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controllerText.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    ).whenComplete(controllerText.dispose);
+  /// Commits the inline edit back to the layer and closes the overlay.
+  void _commitEdit(CanvasController controller) {
+    if (_editingLayerId == null) return;
+    controller.updateSelectedLayerText(_editController.text);
+    setState(() => _editingLayerId = null);
+  }
 
-    if (edited != null) controller.updateSelectedLayerText(edited);
+  /// The layer currently being edited, looked up fresh from state.
+  TextCanvasLayer? _editingLayer(CanvasEditorState state) {
+    final id = _editingLayerId;
+    if (id == null) return null;
+    for (final l in state.document.layers) {
+      if (l.id == id && l is TextCanvasLayer) return l;
+    }
+    return null;
   }
 
   /// Decides at drag-start whether this gesture resizes (a handle), rotates
@@ -281,29 +276,62 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
 
         Offset toArtboardSpace(Offset local) => local / effScale;
 
+        final editing = _editingLayer(state);
         final content = SizedBox(
           width: artW,
           height: artH,
-          child: GestureDetector(
-            onDoubleTapDown: (d) => _editTextAt(toArtboardSpace(d.localPosition)),
-            onPanStart: (d) =>
-                _onPanStart(d, controller, state, effScale),
-            onPanEnd: (_) => _endDrag(controller),
-            onPanCancel: () => _endDrag(controller),
-            onPanUpdate: (d) =>
-                _onPanUpdate(d, controller, state, doc, effScale),
-            child: CustomPaint(
-              size: Size(artW, artH),
-              painter: CanvasPainter(
-                document: doc,
-                selectedLayerIds: state.selectedLayerIds,
-                scale: effScale,
-                offset: Offset.zero,
-                imageCache: _imageCache,
-                guides: _guides,
-                marquee: _marquee,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  onDoubleTapDown: (d) =>
+                      _editTextAt(toArtboardSpace(d.localPosition)),
+                  onPanStart: (d) =>
+                      _onPanStart(d, controller, state, effScale),
+                  onPanEnd: (_) => _endDrag(controller),
+                  onPanCancel: () => _endDrag(controller),
+                  onPanUpdate: (d) =>
+                      _onPanUpdate(d, controller, state, doc, effScale),
+                  child: CustomPaint(
+                    size: Size(artW, artH),
+                    painter: CanvasPainter(
+                      document: doc,
+                      selectedLayerIds: state.selectedLayerIds,
+                      scale: effScale,
+                      offset: Offset.zero,
+                      imageCache: _imageCache,
+                      guides: _guides,
+                      marquee: _marquee,
+                      editingLayerId: _editingLayerId,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              // Inline text editor, positioned over the layer being edited.
+              if (editing != null)
+                Positioned(
+                  left: editing.x * effScale,
+                  top: editing.y * effScale,
+                  width: editing.width * effScale,
+                  height: editing.height * effScale,
+                  child: _InlineTextField(
+                    controller: _editController,
+                    style: TextStyle(
+                      fontSize: editing.fontSize * effScale,
+                      color: editing.color,
+                      fontFamily: editing.fontFamily,
+                      fontWeight:
+                          editing.bold ? FontWeight.w700 : FontWeight.w400,
+                      fontStyle:
+                          editing.italic ? FontStyle.italic : FontStyle.normal,
+                      height: editing.lineHeight,
+                      letterSpacing: editing.letterSpacing * effScale,
+                    ),
+                    textAlign: editing.align,
+                    onCommit: () => _commitEdit(controller),
+                  ),
+                ),
+            ],
           ),
         );
 
@@ -346,6 +374,69 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
       if (layer.id == id) return layer;
     }
     return null;
+  }
+}
+
+/// The overlay editor for inline text editing — a borderless, autofocused
+/// field styled to match the layer, committing on blur or Cmd/Ctrl+Enter.
+class _InlineTextField extends StatefulWidget {
+  const _InlineTextField({
+    required this.controller,
+    required this.style,
+    required this.textAlign,
+    required this.onCommit,
+  });
+
+  final TextEditingController controller;
+  final TextStyle style;
+  final TextAlign textAlign;
+  final VoidCallback onCommit;
+
+  @override
+  State<_InlineTextField> createState() => _InlineTextFieldState();
+}
+
+class _InlineTextFieldState extends State<_InlineTextField> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueAccent, width: 1),
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
+      ),
+      child: TextField(
+        controller: widget.controller,
+        focusNode: _focus,
+        style: widget.style,
+        textAlign: widget.textAlign,
+        maxLines: null,
+        expands: true,
+        cursorColor: Colors.blueAccent,
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+        ),
+        // Commit when focus leaves (click elsewhere) — the standard
+        // edit-in-place gesture.
+        onTapOutside: (_) => widget.onCommit(),
+        onEditingComplete: widget.onCommit,
+      ),
+    );
   }
 }
 

@@ -75,6 +75,7 @@ class CanvasPainter extends CustomPainter {
     required this.imageCache,
     this.guides = const [],
     this.marquee,
+    this.editingLayerId,
   }) : super(repaint: imageCache);
 
   final CanvasDocument document;
@@ -86,6 +87,10 @@ class CanvasPainter extends CustomPainter {
 
   /// The in-progress marquee-selection rectangle, in artboard space, or null.
   final Rect? marquee;
+
+  /// The text layer currently being edited inline — its glyphs are skipped so
+  /// the overlay TextField isn't drawn over.
+  final String? editingLayerId;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -207,23 +212,52 @@ class CanvasPainter extends CustomPainter {
           :final italic,
           :final align,
           :final lineHeight,
+          :final letterSpacing,
+          :final highlightColor,
+          :final strokeColor,
+          :final strokeWidth,
         ):
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: text,
-            style: TextStyle(
+        if (highlightColor != null) {
+          canvas.drawRect(bounds, Paint()..color = highlightColor);
+        }
+        if (layer.id == editingLayerId) break; // glyphs drawn by the overlay
+        final weight = bold ? FontWeight.w700 : FontWeight.w400;
+        final fontStyle = italic ? FontStyle.italic : FontStyle.normal;
+        TextPainter painterFor(TextStyle style) => TextPainter(
+              text: TextSpan(text: text, style: style),
+              textAlign: align,
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: bounds.width);
+
+        // Outline first (a stroke-only pass), then the fill on top.
+        if (strokeColor != null && strokeWidth > 0) {
+          painterFor(
+            TextStyle(
               fontSize: fontSize * scale,
-              color: color,
               fontFamily: fontFamily,
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-              fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+              fontWeight: weight,
+              fontStyle: fontStyle,
               height: lineHeight,
+              letterSpacing: letterSpacing * scale,
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = strokeWidth * scale
+                ..strokeJoin = StrokeJoin.round
+                ..color = strokeColor,
             ),
+          ).paint(canvas, Offset.zero);
+        }
+        painterFor(
+          TextStyle(
+            fontSize: fontSize * scale,
+            color: color,
+            fontFamily: fontFamily,
+            fontWeight: weight,
+            fontStyle: fontStyle,
+            height: lineHeight,
+            letterSpacing: letterSpacing * scale,
           ),
-          textAlign: align,
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: bounds.width);
-        textPainter.paint(canvas, Offset.zero);
+        ).paint(canvas, Offset.zero);
 
       case ShapeCanvasLayer(
           :final shapeKind,
@@ -396,6 +430,7 @@ class CanvasPainter extends CustomPainter {
         oldDelegate.scale != scale ||
         oldDelegate.offset != offset ||
         oldDelegate.marquee != marquee ||
+        oldDelegate.editingLayerId != editingLayerId ||
         !listEquals(oldDelegate.guides, guides);
   }
 }

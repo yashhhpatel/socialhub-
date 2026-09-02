@@ -150,6 +150,13 @@ sealed class CanvasLayer {
           italic: json['italic'] == true,
           align: _align(json['align']),
           lineHeight: _double(json['lineHeight'], fallback: 1.2),
+          letterSpacing: _double(json['letterSpacing']),
+          highlightColor: json['highlightColor'] is int
+              ? Color(json['highlightColor'] as int)
+              : null,
+          strokeColor:
+              json['strokeColor'] is int ? Color(json['strokeColor'] as int) : null,
+          strokeWidth: _double(json['strokeWidth']),
         ),
       'shape' => ShapeCanvasLayer(
           id: json['id'] as String,
@@ -317,6 +324,10 @@ class TextCanvasLayer extends CanvasLayer {
     this.italic = false,
     this.align = TextAlign.left,
     this.lineHeight = 1.2,
+    this.letterSpacing = 0,
+    this.highlightColor,
+    this.strokeColor,
+    this.strokeWidth = 0,
   });
 
   final String text;
@@ -327,6 +338,14 @@ class TextCanvasLayer extends CanvasLayer {
   final bool italic;
   final TextAlign align;
   final double lineHeight;
+  final double letterSpacing;
+
+  /// Optional highlight painted as a solid rectangle behind the text.
+  final Color? highlightColor;
+
+  /// Optional text outline. Null (or zero [strokeWidth]) means no outline.
+  final Color? strokeColor;
+  final double strokeWidth;
 
   @override
   TextCanvasLayer copyWithGeometry({
@@ -362,13 +381,14 @@ class TextCanvasLayer extends CanvasLayer {
       _copy(fontSize: newFontSize);
   TextCanvasLayer copyWithText(String newText) => _copy(text: newText);
 
-  /// Batched text-format edit (bold/italic/alignment/line-height/font).
+  /// Batched text-format edit (bold/italic/alignment/line-height/font/tracking).
   TextCanvasLayer copyWithTextFormat({
     bool? bold,
     bool? italic,
     TextAlign? align,
     double? lineHeight,
     String? fontFamily,
+    double? letterSpacing,
   }) =>
       _copy(
         bold: bold,
@@ -376,6 +396,23 @@ class TextCanvasLayer extends CanvasLayer {
         align: align,
         lineHeight: lineHeight,
         fontFamily: fontFamily,
+        letterSpacing: letterSpacing,
+      );
+
+  /// Highlight background and text outline. Pass the clear flags to remove.
+  TextCanvasLayer copyWithTextDecoration({
+    Color? highlightColor,
+    bool clearHighlight = false,
+    Color? strokeColor,
+    bool clearStroke = false,
+    double? strokeWidth,
+  }) =>
+      _copy(
+        highlightColor: highlightColor,
+        clearHighlight: clearHighlight,
+        strokeColor: strokeColor,
+        clearStroke: clearStroke,
+        strokeWidth: strokeWidth,
       );
 
   /// One private reconstruction so every copyWith* keeps ALL fields — a
@@ -400,6 +437,12 @@ class TextCanvasLayer extends CanvasLayer {
     bool? italic,
     TextAlign? align,
     double? lineHeight,
+    double? letterSpacing,
+    Color? highlightColor,
+    bool clearHighlight = false,
+    Color? strokeColor,
+    bool clearStroke = false,
+    double? strokeWidth,
   }) =>
       TextCanvasLayer(
         id: id,
@@ -421,6 +464,11 @@ class TextCanvasLayer extends CanvasLayer {
         italic: italic ?? this.italic,
         align: align ?? this.align,
         lineHeight: lineHeight ?? this.lineHeight,
+        letterSpacing: letterSpacing ?? this.letterSpacing,
+        highlightColor:
+            clearHighlight ? null : (highlightColor ?? this.highlightColor),
+        strokeColor: clearStroke ? null : (strokeColor ?? this.strokeColor),
+        strokeWidth: strokeWidth ?? this.strokeWidth,
       );
 
   @override
@@ -441,6 +489,12 @@ class TextCanvasLayer extends CanvasLayer {
         'italic': italic,
         'align': align.name,
         'lineHeight': lineHeight,
+        'letterSpacing': letterSpacing,
+        // ignore: deprecated_member_use
+        'highlightColor': highlightColor?.value,
+        // ignore: deprecated_member_use
+        'strokeColor': strokeColor?.value,
+        'strokeWidth': strokeWidth,
       };
 }
 

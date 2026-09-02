@@ -20,6 +20,9 @@ enum ResizeHandle { nw, n, ne, e, se, s, sw, w }
 /// Axis for distributing three-or-more selected layers evenly.
 enum DistributeAxis { horizontal, vertical }
 
+/// Case transform applied to a text layer's content.
+enum TextCase { upper, lower, title }
+
 /// Selection + editing logic for one editor session. Selection is a SET of
 /// layer ids (multi-select); single-layer operations act on the sole selected
 /// layer via [CanvasEditorState.selectedLayerId] and no-op when several are
@@ -398,6 +401,7 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     bool? italic,
     TextAlign? align,
     double? lineHeight,
+    double? letterSpacing,
   }) {
     final id = state.selectedLayerId;
     if (id == null) return;
@@ -409,11 +413,67 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
             italic: italic,
             align: align,
             lineHeight: lineHeight,
+            letterSpacing: letterSpacing,
           )
         else
           layer,
     ];
     _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
+  /// Highlight background / text outline on the selected text layer.
+  void updateSelectedTextDecoration({
+    Color? highlightColor,
+    bool clearHighlight = false,
+    Color? strokeColor,
+    bool clearStroke = false,
+    double? strokeWidth,
+  }) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithTextDecoration(
+            highlightColor: highlightColor,
+            clearHighlight: clearHighlight,
+            strokeColor: strokeColor,
+            clearStroke: clearStroke,
+            strokeWidth: strokeWidth,
+          )
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
+  /// Rewrites the selected text layer's content to UPPER / lower / Title case.
+  void transformSelectedTextCase(TextCase mode) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithText(_applyCase(layer.text, mode))
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
+  String _applyCase(String text, TextCase mode) {
+    switch (mode) {
+      case TextCase.upper:
+        return text.toUpperCase();
+      case TextCase.lower:
+        return text.toLowerCase();
+      case TextCase.title:
+        // Title-case each run of non-space chars, preserving all whitespace.
+        return text.replaceAllMapped(RegExp(r'\S+'), (m) {
+          final w = m[0]!;
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        });
+    }
   }
 
   void updateSelectedTextFontFamily(String? fontFamily) {
@@ -626,6 +686,10 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           italic: t.italic,
           align: t.align,
           lineHeight: t.lineHeight,
+          letterSpacing: t.letterSpacing,
+          highlightColor: t.highlightColor,
+          strokeColor: t.strokeColor,
+          strokeWidth: t.strokeWidth,
         ),
       ImageCanvasLayer i => ImageCanvasLayer(
           id: newId,
