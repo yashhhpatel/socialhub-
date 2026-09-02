@@ -139,25 +139,31 @@ class CanvasPainter extends CustomPainter {
           :final cornerRadius,
         ):
         final fill = Paint()..color = fillColor;
-        if (shapeKind == ShapeKind.ellipse) {
-          canvas.drawOval(bounds, fill);
-          if (strokeColor != null && strokeWidth > 0) {
-            canvas.drawOval(bounds, _strokePaint(strokeColor, strokeWidth));
-          }
-        } else if (cornerRadius > 0) {
-          final rrect = RRect.fromRectAndRadius(
-            bounds,
-            Radius.circular(cornerRadius * scale),
-          );
-          canvas.drawRRect(rrect, fill);
-          if (strokeColor != null && strokeWidth > 0) {
-            canvas.drawRRect(rrect, _strokePaint(strokeColor, strokeWidth));
-          }
-        } else {
-          canvas.drawRect(bounds, fill);
-          if (strokeColor != null && strokeWidth > 0) {
-            canvas.drawRect(bounds, _strokePaint(strokeColor, strokeWidth));
-          }
+        final stroke = (strokeColor != null && strokeWidth > 0)
+            ? _strokePaint(strokeColor, strokeWidth)
+            : null;
+        switch (shapeKind) {
+          case ShapeKind.ellipse:
+            canvas.drawOval(bounds, fill);
+            if (stroke != null) canvas.drawOval(bounds, stroke);
+          case ShapeKind.rectangle:
+            if (cornerRadius > 0) {
+              final rrect = RRect.fromRectAndRadius(
+                bounds,
+                Radius.circular(cornerRadius * scale),
+              );
+              canvas.drawRRect(rrect, fill);
+              if (stroke != null) canvas.drawRRect(rrect, stroke);
+            } else {
+              canvas.drawRect(bounds, fill);
+              if (stroke != null) canvas.drawRect(bounds, stroke);
+            }
+          case ShapeKind.triangle:
+          case ShapeKind.star:
+          case ShapeKind.diamond:
+            final path = _polygonPath(shapeKind, bounds);
+            canvas.drawPath(path, fill);
+            if (stroke != null) canvas.drawPath(path, stroke);
         }
 
       case VideoCanvasLayer(:final posterUrl):
@@ -189,6 +195,46 @@ class CanvasPainter extends CustomPainter {
     ..color = color
     ..style = PaintingStyle.stroke
     ..strokeWidth = width * scale;
+
+  /// Builds the outline for a polygon shape (triangle / diamond / 5-point
+  /// star) inscribed in [bounds]. Rect/ellipse use their own draw calls.
+  Path _polygonPath(ShapeKind kind, Rect bounds) {
+    final path = Path();
+    switch (kind) {
+      case ShapeKind.triangle:
+        path
+          ..moveTo(bounds.center.dx, bounds.top)
+          ..lineTo(bounds.right, bounds.bottom)
+          ..lineTo(bounds.left, bounds.bottom)
+          ..close();
+      case ShapeKind.diamond:
+        path
+          ..moveTo(bounds.center.dx, bounds.top)
+          ..lineTo(bounds.right, bounds.center.dy)
+          ..lineTo(bounds.center.dx, bounds.bottom)
+          ..lineTo(bounds.left, bounds.center.dy)
+          ..close();
+      case ShapeKind.star:
+        const points = 5;
+        final cx = bounds.center.dx;
+        final cy = bounds.center.dy;
+        final outer = math.min(bounds.width, bounds.height) / 2;
+        final inner = outer * 0.42;
+        for (var i = 0; i < points * 2; i++) {
+          final r = i.isEven ? outer : inner;
+          // Start at the top point (-90°) and step around.
+          final angle = -math.pi / 2 + i * math.pi / points;
+          final x = cx + r * math.cos(angle);
+          final y = cy + r * math.sin(angle);
+          i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+        }
+        path.close();
+      case ShapeKind.rectangle:
+      case ShapeKind.ellipse:
+        path.addRect(bounds); // not used (handled above), kept exhaustive
+    }
+    return path;
+  }
 
   /// Centered translucent circle + play triangle, sized to the layer, so a
   /// video layer is visually distinct from an image one on the canvas.

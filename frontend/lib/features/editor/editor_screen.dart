@@ -123,6 +123,20 @@ class _EditorWorkspace extends ConsumerWidget {
             controller.duplicateSelectedLayer,
         const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
             controller.duplicateSelectedLayer,
+        // Copy / cut / paste the selected layer (Ctrl/⌘). A focused text
+        // field consumes these first, so editing captions still copies text.
+        const SingleActivator(LogicalKeyboardKey.keyC, control: true):
+            controller.copySelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+            controller.copySelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.keyX, control: true):
+            controller.cutSelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.keyX, meta: true):
+            controller.cutSelectedLayer,
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+            controller.pasteLayer,
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+            controller.pasteLayer,
         // Arrow keys nudge the selection 1px; Shift+arrow nudges 10px. A
         // focused text field consumes these first, so typing isn't affected.
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>

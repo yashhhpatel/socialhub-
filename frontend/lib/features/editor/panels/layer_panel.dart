@@ -75,6 +75,8 @@ class LayerPanel extends ConsumerWidget {
             canSendBackward: hasSelection && selectedIndex > 0,
             onBringForward: controller.bringSelectedForward,
             onSendBackward: controller.sendSelectedBackward,
+            onBringToFront: controller.bringSelectedToFront,
+            onSendToBack: controller.sendSelectedToBack,
             onDuplicate: controller.duplicateSelectedLayer,
             onDelete: controller.deleteSelectedLayer,
           ),
@@ -94,6 +96,8 @@ class _LayerActions extends StatelessWidget {
     required this.canSendBackward,
     required this.onBringForward,
     required this.onSendBackward,
+    required this.onBringToFront,
+    required this.onSendToBack,
     required this.onDuplicate,
     required this.onDelete,
   });
@@ -103,6 +107,8 @@ class _LayerActions extends StatelessWidget {
   final bool canSendBackward;
   final VoidCallback onBringForward;
   final VoidCallback onSendBackward;
+  final VoidCallback onBringToFront;
+  final VoidCallback onSendToBack;
   final VoidCallback onDuplicate;
   final VoidCallback onDelete;
 
@@ -118,6 +124,12 @@ class _LayerActions extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
+            tooltip: 'Bring to front',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.vertical_align_top, size: 18),
+            onPressed: canBringForward ? onBringToFront : null,
+          ),
+          IconButton(
             tooltip: 'Bring forward',
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.arrow_upward, size: 18),
@@ -128,6 +140,12 @@ class _LayerActions extends StatelessWidget {
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.arrow_downward, size: 18),
             onPressed: canSendBackward ? onSendBackward : null,
+          ),
+          IconButton(
+            tooltip: 'Send to back',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.vertical_align_bottom, size: 18),
+            onPressed: canSendBackward ? onSendToBack : null,
           ),
           IconButton(
             tooltip: 'Duplicate (Ctrl+D)',
@@ -173,8 +191,13 @@ class _LayerRow extends StatelessWidget {
   String get _label => switch (layer) {
         ImageCanvasLayer() => 'Image',
         TextCanvasLayer(:final text) => text.isEmpty ? 'Text' : text,
-        ShapeCanvasLayer(:final shapeKind) =>
-          shapeKind == ShapeKind.ellipse ? 'Ellipse' : 'Rectangle',
+        ShapeCanvasLayer(:final shapeKind) => switch (shapeKind) {
+            ShapeKind.rectangle => 'Rectangle',
+            ShapeKind.ellipse => 'Ellipse',
+            ShapeKind.triangle => 'Triangle',
+            ShapeKind.star => 'Star',
+            ShapeKind.diamond => 'Diamond',
+          },
         VideoCanvasLayer() => 'Video',
       };
 
