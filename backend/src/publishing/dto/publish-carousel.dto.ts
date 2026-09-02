@@ -26,7 +26,7 @@ export class PublishCarouselDto {
 
   /** Ordered, publicly-reachable image URLs. Array order is the slide order. */
   @IsArray()
-  @ArrayMinSize(2)
+  @ArrayMinSize(1)
   @ArrayMaxSize(MAX_CAROUSEL_ITEMS)
   @IsString({ each: true })
   mediaUrls: string[];

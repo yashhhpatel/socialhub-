@@ -213,8 +213,11 @@ export class PublishingService {
 
   /**
    * Preconditions for a carousel: the account is the org's and connected, the
-   * platform supports carousels, and the item count is within 2..max. Runs
+   * platform supports carousels, and the item count is within 1..max. Runs
    * synchronously so a bad request is rejected before anything is persisted.
+   * A single-image carousel is allowed — it publishes as a normal single post
+   * (see executeCarouselPublish), since the platform carousel/album endpoints
+   * themselves require 2+ children.
    */
   private async loadAndValidateCarousel(
     orgId: string,
@@ -242,8 +245,8 @@ export class PublishingService {
       );
     }
 
-    if (mediaUrls.length < 2) {
-      throw new UnprocessableEntityException('A carousel needs at least 2 images.');
+    if (mediaUrls.length < 1) {
+      throw new UnprocessableEntityException('A carousel needs at least 1 image.');
     }
     if (mediaUrls.length > maxItems) {
       throw new UnprocessableEntityException(
@@ -275,7 +278,7 @@ export class PublishingService {
     });
     const adapter = account ? this.adapters[account.platform] : undefined;
 
-    if (!carousel || carousel.mediaUrls.length < 2 || !account || !adapter) {
+    if (!carousel || carousel.mediaUrls.length < 1 || !account || !adapter) {
       await this.prisma.publishJob.update({
         where: { id: job.id },
         data: {
@@ -318,12 +321,24 @@ export class PublishingService {
     }
 
     try {
-      const result = await adapter.publishCarousel({
-        mediaUrls: carousel.mediaUrls,
-        caption: data.caption ?? carousel.caption ?? '',
-        externalAccountId: account.externalAccountId,
-        accessToken,
-      });
+      const caption = data.caption ?? carousel.caption ?? '';
+      // A single-image carousel isn't a carousel to the platform — the album
+      // endpoints (Instagram/Threads/X) reject a 1-child container — so publish
+      // it as a normal single post instead.
+      const result =
+        carousel.mediaUrls.length === 1
+          ? await adapter.publish({
+              imageUrl: carousel.mediaUrls[0],
+              caption,
+              externalAccountId: account.externalAccountId,
+              accessToken,
+            })
+          : await adapter.publishCarousel({
+              mediaUrls: carousel.mediaUrls,
+              caption,
+              externalAccountId: account.externalAccountId,
+              accessToken,
+            });
 
       await this.prisma.publishJob.update({
         where: { id: job.id },

@@ -104,7 +104,7 @@ Future<void> _open(
 }
 
 void main() {
-  testWidgets('publish is disabled until an account + 2 images are chosen',
+  testWidgets('publish is disabled until an account + at least 1 image is chosen',
       (tester) async {
     final publish = _FakePublishRepo();
     await _open(tester, publish: publish);
@@ -118,18 +118,32 @@ void main() {
     // Nothing selected yet → disabled.
     expect(publishButton().onPressed, isNull);
 
-    // Pick the X account.
+    // Pick the X account — still no images, so still disabled.
     await tester.tap(find.widgetWithText(FilterChip, 'X'));
-    await tester.pumpAndSettle();
-    // One image only → still disabled.
-    await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
     await tester.pumpAndSettle();
     expect(publishButton().onPressed, isNull);
 
-    // Second image → enabled.
-    await tester.tap(find.byKey(const ValueKey('carousel-tile-b')));
+    // A single image is enough for a carousel now → enabled.
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
     await tester.pumpAndSettle();
     expect(publishButton().onPressed, isNotNull);
+  });
+
+  testWidgets('a single image can be published as a carousel', (tester) async {
+    final publish = _FakePublishRepo();
+    await _open(tester, publish: publish);
+
+    await tester.tap(find.widgetWithText(FilterChip, 'X'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('carousel-tile-a')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Publish'));
+    await tester.pumpAndSettle();
+
+    expect(publish.calls, 1);
+    expect(publish.socialAccountId, 'sa_x');
+    expect(publish.mediaUrls, ['https://cdn.test/a.png']);
   });
 
   testWidgets('publishing posts the ordered urls to the chosen account',

@@ -583,11 +583,50 @@ describe('PublishingService', () => {
       expect(job.status).toBe('queued');
     });
 
-    it('rejects fewer than 2 images', async () => {
+    it('rejects an empty image list', async () => {
       await expect(
-        service.publishCarouselNow('org_1', 'u1', 'sa_1', ['https://cdn.test/only.png']),
+        service.publishCarouselNow('org_1', 'u1', 'sa_1', []),
       ).rejects.toThrow(UnprocessableEntityException);
       expect(prisma.carouselPost.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts a single image (persists + enqueues)', async () => {
+      const job = await service.publishCarouselNow('org_1', 'u1', 'sa_1', [
+        'https://cdn.test/only.png',
+      ]);
+      expect(prisma.carouselPost.create).toHaveBeenCalled();
+      expect(xQueue.add).toHaveBeenCalledTimes(1);
+      expect(job.status).toBe('queued');
+    });
+
+    it('publishes a single-image carousel as a normal post, not via publishCarousel', async () => {
+      prisma.carouselPost.findUnique.mockResolvedValueOnce({
+        id: 'car_1',
+        createdById: 'u1',
+        mediaUrls: ['https://cdn.test/only.png'],
+        caption: 'solo',
+      });
+      prisma.publishJob.findUnique.mockResolvedValue({
+        id: 'job_c1',
+        variantId: null,
+        carouselPostId: 'car_1',
+        socialAccountId: 'sa_1',
+        status: 'queued',
+        attemptCount: 0,
+      });
+
+      await service.executePublish(
+        { publishJobId: 'job_c1' },
+        { attemptsMade: 0, maxAttempts: 3 },
+      );
+
+      expect(xAdapter.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageUrl: 'https://cdn.test/only.png',
+          externalAccountId: 'x_123',
+        }),
+      );
+      expect(xAdapter.publishCarousel).not.toHaveBeenCalled();
     });
 
     it('rejects more than the platform maximum (X = 4)', async () => {

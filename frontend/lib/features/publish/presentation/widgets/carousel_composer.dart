@@ -131,9 +131,8 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
   /// without saying what's missing.
   String? get _disabledReason {
     if (_accounts.isEmpty) return 'Choose at least one account to publish to.';
-    if (_selected.length < 2) {
-      return 'Tap at least 2 images above to include them'
-          '${_selected.length == 1 ? ' (1 selected)' : ''}.';
+    if (_selected.isEmpty) {
+      return 'Tap at least 1 image above to include it.';
     }
     if (_selected.length > _maxItems) {
       return '$_strictestLabel allows at most '
@@ -288,7 +287,7 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                         ),
                         const SizedBox(height: SpacingTokens.xs),
                         Text(
-                          'Pick 2 or more images and publish them as one carousel.',
+                          'Pick one or more images and publish them as a carousel.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
@@ -379,9 +378,9 @@ class _CarouselComposerState extends ConsumerState<_CarouselComposer> {
                       ),
                       data: (items) {
                         final images = items.where((m) => !m.isVideo).toList();
-                        if (images.length < 2) {
+                        if (images.isEmpty) {
                           return Text(
-                            'Upload at least 2 images to the media library first.',
+                            'Upload at least 1 image to the media library first.',
                             style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,),
                           );
