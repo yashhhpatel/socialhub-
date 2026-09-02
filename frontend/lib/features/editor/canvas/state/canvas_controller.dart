@@ -11,6 +11,10 @@ import 'canvas_editor_state.dart';
 /// Arrange section — see [CanvasController.alignSelectedToArtboard]).
 enum LayerAlignment { left, hCenter, right, top, vCenter, bottom }
 
+/// The eight resize handles around a selected layer (compass points), used by
+/// the on-canvas drag-to-resize — see [CanvasController.resizeSelectedByHandle].
+enum ResizeHandle { nw, n, ne, e, se, s, sw, w }
+
 /// Selection + editing logic for one editor session. Deliberately NOT a
 /// singleton provider (unlike e.g. authControllerProvider) — a
 /// StateNotifierProvider.family.autoDispose instance is created per
@@ -101,6 +105,77 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     final selected = _selectedLayer;
     if (selected == null || selected.locked) return;
     updateSelectedLayerGeometry(x: selected.x + dx, y: selected.y + dy);
+  }
+
+  /// Mirrors the selected layer horizontally or vertically.
+  void flipSelected({required bool horizontal}) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id)
+          layer.copyWithFlags(
+            flipH: horizontal ? !layer.flipH : null,
+            flipV: horizontal ? null : !layer.flipV,
+          )
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
+  }
+
+  /// Resizes the selected layer by dragging one of the eight handles, in
+  /// artboard-space [delta]. The edge/corner OPPOSITE the dragged handle stays
+  /// fixed. [lockAspect] (Shift on a corner) preserves the aspect ratio. Sizes
+  /// clamp to [minSize]. Called only for unrotated layers by the surface, so
+  /// the anchor maths is exact.
+  void resizeSelectedByHandle(
+    ResizeHandle handle,
+    Offset delta, {
+    bool lockAspect = false,
+    double minSize = 8,
+  }) {
+    final sel = _selectedLayer;
+    if (sel == null || sel.locked) return;
+
+    final left = handle == ResizeHandle.nw ||
+        handle == ResizeHandle.w ||
+        handle == ResizeHandle.sw;
+    final right = handle == ResizeHandle.ne ||
+        handle == ResizeHandle.e ||
+        handle == ResizeHandle.se;
+    final top = handle == ResizeHandle.nw ||
+        handle == ResizeHandle.n ||
+        handle == ResizeHandle.ne;
+    final bottom = handle == ResizeHandle.sw ||
+        handle == ResizeHandle.s ||
+        handle == ResizeHandle.se;
+    final isCorner = (left || right) && (top || bottom);
+
+    final rightEdge = sel.x + sel.width;
+    final bottomEdge = sel.y + sel.height;
+
+    var w = sel.width;
+    var h = sel.height;
+    if (left) w = sel.width - delta.dx;
+    if (right) w = sel.width + delta.dx;
+    if (top) h = sel.height - delta.dy;
+    if (bottom) h = sel.height + delta.dy;
+
+    if (lockAspect && isCorner && sel.height != 0) {
+      // Honour the width change and derive height to keep the ratio.
+      h = w / (sel.width / sel.height);
+    }
+
+    w = w < minSize ? minSize : w;
+    h = h < minSize ? minSize : h;
+
+    var x = sel.x;
+    var y = sel.y;
+    if (left) x = rightEdge - w; // right edge stays fixed
+    if (top) y = bottomEdge - h; // bottom edge stays fixed
+
+    updateSelectedLayerGeometry(x: x, y: y, width: w, height: h);
   }
 
   /// Aligns the selected layer against the artboard edges/centre.
@@ -446,6 +521,8 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           height: s.height,
           rotationDegrees: s.rotationDegrees,
           opacity: s.opacity,
+          flipH: s.flipH,
+          flipV: s.flipV,
           shapeKind: s.shapeKind,
           fillColor: s.fillColor,
           strokeColor: s.strokeColor,
@@ -460,6 +537,8 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           height: t.height,
           rotationDegrees: t.rotationDegrees,
           opacity: t.opacity,
+          flipH: t.flipH,
+          flipV: t.flipV,
           text: t.text,
           fontSize: t.fontSize,
           color: t.color,
@@ -477,6 +556,8 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           height: i.height,
           rotationDegrees: i.rotationDegrees,
           opacity: i.opacity,
+          flipH: i.flipH,
+          flipV: i.flipV,
           imageUrl: i.imageUrl,
         ),
       VideoCanvasLayer v => VideoCanvasLayer(
@@ -487,6 +568,8 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           height: v.height,
           rotationDegrees: v.rotationDegrees,
           opacity: v.opacity,
+          flipH: v.flipH,
+          flipV: v.flipV,
           videoUrl: v.videoUrl,
           posterUrl: v.posterUrl,
           trimStartSeconds: v.trimStartSeconds,

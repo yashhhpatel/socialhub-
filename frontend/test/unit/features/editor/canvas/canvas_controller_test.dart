@@ -388,6 +388,69 @@ void main() {
       expect(t.fontFamily, 'Roboto');
     });
 
+    test('flipSelected toggles the horizontal/vertical mirror flags', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.flipSelected(horizontal: true);
+      var a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.flipH, isTrue);
+      expect(a.flipV, isFalse);
+      controller.flipSelected(horizontal: true);
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.flipH, isFalse);
+      controller.flipSelected(horizontal: false);
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.flipV, isTrue);
+    });
+
+    test('resizeSelectedByHandle keeps the opposite edge fixed', () {
+      final controller = CanvasController(document); // layer_a at (0,0) 100x100
+      controller.selectLayerById('layer_a');
+
+      // East handle: grows width, left edge (x) stays put.
+      controller.resizeSelectedByHandle(ResizeHandle.e, const Offset(50, 0));
+      var a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.x, 0);
+      expect(a.width, 150);
+      expect(a.height, 100);
+
+      // NW handle on the (now 150x100) layer: right & bottom edges stay fixed.
+      controller.resizeSelectedByHandle(ResizeHandle.nw, const Offset(-10, -20));
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.width, 160); // 150 - (-10)
+      expect(a.height, 120); // 100 - (-20)
+      expect(a.x, -10); // rightEdge(150) - 160
+      expect(a.y, -20); // bottomEdge(100) - 120
+    });
+
+    test('resizeSelectedByHandle: aspect lock on a corner, and min-size clamp', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a'); // 100x100
+
+      controller.resizeSelectedByHandle(
+        ResizeHandle.se,
+        const Offset(50, 0),
+        lockAspect: true,
+      );
+      var a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.width, 150);
+      expect(a.height, 150); // derived from the 1:1 ratio
+
+      // Shrink far past zero → clamps to the 8px minimum.
+      controller.resizeSelectedByHandle(ResizeHandle.e, const Offset(-1000, 0));
+      a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      expect(a.width, 8);
+    });
+
+    test('duplicate preserves the flip flags', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.flipSelected(horizontal: true);
+      controller.duplicateSelectedLayer();
+      final copy = controller.state.document.layers[1];
+      expect(copy.flipH, isTrue);
+    });
+
     test('bringSelectedToFront / sendSelectedToBack jump to the stack ends', () {
       final controller = CanvasController(
         const CanvasDocument(

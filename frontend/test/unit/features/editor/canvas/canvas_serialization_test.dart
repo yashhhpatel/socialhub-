@@ -118,6 +118,8 @@ void main() {
             align: TextAlign.center,
             lineHeight: 1.5,
             hidden: true,
+            flipH: true,
+            flipV: true,
           ),
         ],
       );
@@ -140,6 +142,8 @@ void main() {
       expect(text.align, TextAlign.center);
       expect(text.lineHeight, 1.5);
       expect(text.hidden, isTrue);
+      expect(text.flipH, isTrue);
+      expect(text.flipV, isTrue);
     });
 
     test('preserves layer ORDER, which is z-order on the canvas', () {
