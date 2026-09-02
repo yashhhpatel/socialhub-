@@ -121,7 +121,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
                     showCarouselComposer(context);
                   },
                   icon: const Icon(Icons.collections_outlined),
-                  label: const Text('New carousel'),
+                  label: const Text('Create Post'),
                 ),
                 const SizedBox(width: SpacingTokens.sm),
                 FilledButton.icon(
