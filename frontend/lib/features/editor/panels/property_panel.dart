@@ -195,6 +195,26 @@ class _PropertyFields extends StatelessWidget {
         const _SectionLabel('Arrange on canvas'),
         _ArrangeRow(controller: controller),
         const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Flip'),
+        Row(
+          children: [
+            _ToggleIcon(
+              icon: Icons.flip,
+              tooltip: 'Flip horizontal',
+              active: layer.flipH,
+              onPressed: () => controller.flipSelected(horizontal: true),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            _ToggleIcon(
+              icon: Icons.flip,
+              quarterTurns: 1,
+              tooltip: 'Flip vertical',
+              active: layer.flipV,
+              onPressed: () => controller.flipSelected(horizontal: false),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
         const _SectionLabel('Rotation'),
         _NumberField(
           label: 'Degrees',
@@ -458,12 +478,16 @@ class _ToggleIcon extends StatelessWidget {
     required this.tooltip,
     required this.active,
     required this.onPressed,
+    this.quarterTurns = 0,
   });
 
   final IconData icon;
   final String tooltip;
   final bool active;
   final VoidCallback onPressed;
+
+  /// Rotates the icon glyph (e.g. the mirror icon turned 90° for vertical flip).
+  final int quarterTurns;
 
   @override
   Widget build(BuildContext context) {
@@ -475,7 +499,7 @@ class _ToggleIcon extends StatelessWidget {
         tooltip: tooltip,
         visualDensity: VisualDensity.compact,
         color: active ? scheme.primary : scheme.onSurface.withOpacity(0.7),
-        icon: Icon(icon, size: 18),
+        icon: RotatedBox(quarterTurns: quarterTurns, child: Icon(icon, size: 18)),
         onPressed: onPressed,
       ),
     );

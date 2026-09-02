@@ -19,6 +19,8 @@ sealed class CanvasLayer {
     this.opacity = 1.0,
     this.locked = false,
     this.hidden = false,
+    this.flipH = false,
+    this.flipV = false,
   });
 
   final String id;
@@ -35,6 +37,11 @@ sealed class CanvasLayer {
 
   /// Hidden layers aren't painted or hit-tested, but stay in the document.
   final bool hidden;
+
+  /// Mirror flags, applied in the painter as a negative scale about the
+  /// layer's centre.
+  final bool flipH;
+  final bool flipV;
 
   Offset get center => Offset(x + width / 2, y + height / 2);
 
@@ -58,8 +65,13 @@ sealed class CanvasLayer {
     double? opacity,
   });
 
-  /// Toggles the lock/hide flags, preserving everything else.
-  CanvasLayer copyWithFlags({bool? locked, bool? hidden});
+  /// Toggles the lock/hide/flip flags, preserving everything else.
+  CanvasLayer copyWithFlags({
+    bool? locked,
+    bool? hidden,
+    bool? flipH,
+    bool? flipV,
+  });
 
   /// Serializes to the persisted canvas-JSON shape sent to
   /// `PATCH /content/assets/:id` (Milestone 3.5 autosave).
@@ -86,6 +98,8 @@ sealed class CanvasLayer {
         'opacity': opacity,
         'locked': locked,
         'hidden': hidden,
+        'flipH': flipH,
+        'flipV': flipV,
       };
 
   /// Rebuilds a layer from persisted JSON, dispatching on the `type`
@@ -99,6 +113,8 @@ sealed class CanvasLayer {
     final type = json['type'];
     final locked = json['locked'] == true;
     final hidden = json['hidden'] == true;
+    final flipH = json['flipH'] == true;
+    final flipV = json['flipV'] == true;
     return switch (type) {
       'image' => ImageCanvasLayer(
           id: json['id'] as String,
@@ -110,6 +126,8 @@ sealed class CanvasLayer {
           opacity: _double(json['opacity'], fallback: 1),
           locked: locked,
           hidden: hidden,
+          flipH: flipH,
+          flipV: flipV,
           imageUrl: json['imageUrl'] as String,
         ),
       'text' => TextCanvasLayer(
@@ -122,6 +140,8 @@ sealed class CanvasLayer {
           opacity: _double(json['opacity'], fallback: 1),
           locked: locked,
           hidden: hidden,
+          flipH: flipH,
+          flipV: flipV,
           text: json['text'] as String,
           fontSize: _double(json['fontSize'], fallback: 24),
           color: Color(json['color'] as int),
@@ -141,6 +161,8 @@ sealed class CanvasLayer {
           opacity: _double(json['opacity'], fallback: 1),
           locked: locked,
           hidden: hidden,
+          flipH: flipH,
+          flipV: flipV,
           shapeKind: ShapeKind.values.byName(json['shapeKind'] as String),
           fillColor: Color(json['fillColor'] as int),
           strokeColor:
@@ -158,6 +180,8 @@ sealed class CanvasLayer {
           opacity: _double(json['opacity'], fallback: 1),
           locked: locked,
           hidden: hidden,
+          flipH: flipH,
+          flipV: flipV,
           videoUrl: json['videoUrl'] as String,
           posterUrl: json['posterUrl'] as String?,
           trimStartSeconds: _double(json['trimStartSeconds']),
@@ -197,6 +221,8 @@ class ImageCanvasLayer extends CanvasLayer {
     super.opacity,
     super.locked,
     super.hidden,
+    super.flipH,
+    super.flipV,
     required this.imageUrl,
   });
 
@@ -221,11 +247,18 @@ class ImageCanvasLayer extends CanvasLayer {
         opacity: opacity ?? this.opacity,
         locked: locked,
         hidden: hidden,
+        flipH: flipH,
+        flipV: flipV,
         imageUrl: imageUrl,
       );
 
   @override
-  ImageCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+  ImageCanvasLayer copyWithFlags({
+    bool? locked,
+    bool? hidden,
+    bool? flipH,
+    bool? flipV,
+  }) =>
       ImageCanvasLayer(
         id: id,
         x: x,
@@ -236,6 +269,8 @@ class ImageCanvasLayer extends CanvasLayer {
         opacity: opacity,
         locked: locked ?? this.locked,
         hidden: hidden ?? this.hidden,
+        flipH: flipH ?? this.flipH,
+        flipV: flipV ?? this.flipV,
         imageUrl: imageUrl,
       );
 
@@ -249,6 +284,8 @@ class ImageCanvasLayer extends CanvasLayer {
         opacity: opacity,
         locked: locked,
         hidden: hidden,
+        flipH: flipH,
+        flipV: flipV,
         imageUrl: newImageUrl,
       );
 
@@ -270,6 +307,8 @@ class TextCanvasLayer extends CanvasLayer {
     super.opacity,
     super.locked,
     super.hidden,
+    super.flipH,
+    super.flipV,
     required this.text,
     this.fontSize = 24,
     this.color = const Color(0xFF111827),
@@ -308,8 +347,13 @@ class TextCanvasLayer extends CanvasLayer {
       );
 
   @override
-  TextCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
-      _copy(locked: locked, hidden: hidden);
+  TextCanvasLayer copyWithFlags({
+    bool? locked,
+    bool? hidden,
+    bool? flipH,
+    bool? flipV,
+  }) =>
+      _copy(locked: locked, hidden: hidden, flipH: flipH, flipV: flipV);
 
   TextCanvasLayer copyWithColor(Color newColor) => _copy(color: newColor);
   TextCanvasLayer copyWithFontFamily(String? newFontFamily) =>
@@ -345,6 +389,8 @@ class TextCanvasLayer extends CanvasLayer {
     double? opacity,
     bool? locked,
     bool? hidden,
+    bool? flipH,
+    bool? flipV,
     String? text,
     double? fontSize,
     Color? color,
@@ -365,6 +411,8 @@ class TextCanvasLayer extends CanvasLayer {
         opacity: opacity ?? this.opacity,
         locked: locked ?? this.locked,
         hidden: hidden ?? this.hidden,
+        flipH: flipH ?? this.flipH,
+        flipV: flipV ?? this.flipV,
         text: text ?? this.text,
         fontSize: fontSize ?? this.fontSize,
         color: color ?? this.color,
@@ -409,6 +457,8 @@ class ShapeCanvasLayer extends CanvasLayer {
     super.opacity,
     super.locked,
     super.hidden,
+    super.flipH,
+    super.flipV,
     required this.shapeKind,
     this.fillColor = const Color(0xFF3B82F6),
     this.strokeColor,
@@ -445,8 +495,13 @@ class ShapeCanvasLayer extends CanvasLayer {
       );
 
   @override
-  ShapeCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
-      _copy(locked: locked, hidden: hidden);
+  ShapeCanvasLayer copyWithFlags({
+    bool? locked,
+    bool? hidden,
+    bool? flipH,
+    bool? flipV,
+  }) =>
+      _copy(locked: locked, hidden: hidden, flipH: flipH, flipV: flipV);
 
   ShapeCanvasLayer copyWithFillColor(Color newFillColor) =>
       _copy(fillColor: newFillColor);
@@ -474,6 +529,8 @@ class ShapeCanvasLayer extends CanvasLayer {
     double? opacity,
     bool? locked,
     bool? hidden,
+    bool? flipH,
+    bool? flipV,
     Color? fillColor,
     Color? strokeColor,
     bool clearStroke = false,
@@ -490,6 +547,8 @@ class ShapeCanvasLayer extends CanvasLayer {
         opacity: opacity ?? this.opacity,
         locked: locked ?? this.locked,
         hidden: hidden ?? this.hidden,
+        flipH: flipH ?? this.flipH,
+        flipV: flipV ?? this.flipV,
         shapeKind: shapeKind,
         fillColor: fillColor ?? this.fillColor,
         strokeColor: clearStroke ? null : (strokeColor ?? this.strokeColor),
@@ -531,6 +590,8 @@ class VideoCanvasLayer extends CanvasLayer {
     super.opacity,
     super.locked,
     super.hidden,
+    super.flipH,
+    super.flipV,
     required this.videoUrl,
     this.posterUrl,
     this.trimStartSeconds = 0,
@@ -567,6 +628,8 @@ class VideoCanvasLayer extends CanvasLayer {
         opacity: opacity ?? this.opacity,
         locked: locked,
         hidden: hidden,
+        flipH: flipH,
+        flipV: flipV,
         videoUrl: videoUrl,
         posterUrl: posterUrl,
         trimStartSeconds: trimStartSeconds,
@@ -574,7 +637,12 @@ class VideoCanvasLayer extends CanvasLayer {
       );
 
   @override
-  VideoCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+  VideoCanvasLayer copyWithFlags({
+    bool? locked,
+    bool? hidden,
+    bool? flipH,
+    bool? flipV,
+  }) =>
       VideoCanvasLayer(
         id: id,
         x: x,
@@ -585,6 +653,8 @@ class VideoCanvasLayer extends CanvasLayer {
         opacity: opacity,
         locked: locked ?? this.locked,
         hidden: hidden ?? this.hidden,
+        flipH: flipH ?? this.flipH,
+        flipV: flipV ?? this.flipV,
         videoUrl: videoUrl,
         posterUrl: posterUrl,
         trimStartSeconds: trimStartSeconds,
@@ -608,6 +678,8 @@ class VideoCanvasLayer extends CanvasLayer {
         opacity: opacity,
         locked: locked,
         hidden: hidden,
+        flipH: flipH,
+        flipV: flipV,
         videoUrl: videoUrl,
         posterUrl: posterUrl,
         trimStartSeconds: trimStartSeconds ?? this.trimStartSeconds,

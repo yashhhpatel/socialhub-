@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../hit_testing.dart';
@@ -40,6 +41,11 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
 
   /// Active snap guides for the in-flight drag; empty when not snapping.
   List<CanvasGuide> _guides = const [];
+
+  /// When a drag started on a resize handle / rotate knob, the active mode for
+  /// the rest of that drag (so a resize doesn't turn into a move mid-gesture).
+  ResizeHandle? _activeHandle;
+  bool _rotating = false;
 
   @override
   void dispose() {
@@ -89,9 +95,77 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
     if (edited != null) controller.updateSelectedLayerText(edited);
   }
 
+  /// Decides at drag-start whether this gesture resizes (a handle), rotates
+  /// (the knob), or selects+moves. A resize/rotate keeps the current
+  /// selection; a plain drag hit-tests and selects under the pointer.
+  void _onPanStart(
+    DragStartDetails details,
+    CanvasController controller,
+    CanvasEditorState state,
+    double effScale,
+  ) {
+    final local = details.localPosition;
+    final selected = _selectedLayer(state);
+    if (selected != null && !selected.hidden && !selected.locked) {
+      // Rotate knob (works at any rotation).
+      if ((local - rotateHandleCenter(selected, effScale)).distance <=
+          kHandleSize) {
+        _rotating = true;
+        controller.beginInteraction();
+        return;
+      }
+      // Resize handles (only offered for an unrotated layer).
+      if (selected.rotationDegrees == 0) {
+        for (final entry in resizeHandleCenters(selected, effScale).entries) {
+          if ((local - entry.value).distance <= kHandleSize) {
+            _activeHandle = entry.key;
+            controller.beginInteraction();
+            return;
+          }
+        }
+      }
+    }
+    controller.selectLayerAt(local / effScale);
+    controller.beginInteraction();
+  }
+
+  void _onPanUpdate(
+    DragUpdateDetails details,
+    CanvasController controller,
+    CanvasEditorState state,
+    CanvasDocument doc,
+    double effScale,
+  ) {
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    if (_activeHandle != null) {
+      controller.resizeSelectedByHandle(
+        _activeHandle!,
+        details.delta / effScale,
+        lockAspect: shift,
+      );
+      return;
+    }
+    if (_rotating) {
+      final sel = _selectedLayer(state);
+      if (sel == null) return;
+      final c = Offset(
+        (sel.x + sel.width / 2) * effScale,
+        (sel.y + sel.height / 2) * effScale,
+      );
+      final local = details.localPosition;
+      var deg = math.atan2(local.dy - c.dy, local.dx - c.dx) * 180 / math.pi + 90;
+      deg %= 360;
+      if (deg < 0) deg += 360;
+      if (shift) deg = (deg / 15).round() * 15; // snap to 15° with Shift
+      controller.updateSelectedLayerGeometry(rotationDegrees: deg.roundToDouble());
+      return;
+    }
+    _moveWithSnap(details, controller, doc, effScale, _selectedLayer(state));
+  }
+
   /// Applies drag delta with snap-to-artboard (centre + edges), streaming
   /// guides for the snaps that engaged this frame.
-  void _onPanUpdate(
+  void _moveWithSnap(
     DragUpdateDetails details,
     CanvasController controller,
     CanvasDocument doc,
@@ -144,6 +218,8 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
 
   void _endDrag(CanvasController controller) {
     controller.endInteraction();
+    _activeHandle = null;
+    _rotating = false;
     if (_guides.isNotEmpty) setState(() => _guides = const []);
   }
 
@@ -170,16 +246,12 @@ class _CanvasSurfaceState extends ConsumerState<CanvasSurface> {
           height: artH,
           child: GestureDetector(
             onDoubleTapDown: (d) => _editTextAt(toArtboardSpace(d.localPosition)),
-            onPanStart: (d) {
-              controller.selectLayerAt(toArtboardSpace(d.localPosition));
-              controller.beginInteraction();
-            },
+            onPanStart: (d) =>
+                _onPanStart(d, controller, state, effScale),
             onPanEnd: (_) => _endDrag(controller),
             onPanCancel: () => _endDrag(controller),
-            onPanUpdate: (d) {
-              final selected = _selectedLayer(state);
-              _onPanUpdate(d, controller, doc, effScale, selected);
-            },
+            onPanUpdate: (d) =>
+                _onPanUpdate(d, controller, state, doc, effScale),
             child: CustomPaint(
               size: Size(artW, artH),
               painter: CanvasPainter(

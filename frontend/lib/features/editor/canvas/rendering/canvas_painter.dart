@@ -5,7 +5,40 @@ import 'package:flutter/material.dart';
 
 import '../models/canvas_document.dart';
 import '../models/canvas_layer.dart';
+import '../state/canvas_controller.dart' show ResizeHandle;
 import 'canvas_image_cache.dart';
+
+/// Visual size (screen px) of a resize handle square.
+const double kHandleSize = 10;
+
+/// Gap (screen px) between the top edge and the rotate knob.
+const double kRotateHandleGap = 26;
+
+/// Screen-space centres of the eight resize handles for a layer's
+/// axis-aligned box, at [scale]. Shared by the painter (to draw them) and the
+/// surface (to hit-test them) so the two never drift apart.
+Map<ResizeHandle, Offset> resizeHandleCenters(CanvasLayer layer, double scale) {
+  final bx = layer.x * scale;
+  final by = layer.y * scale;
+  final bw = layer.width * scale;
+  final bh = layer.height * scale;
+  return {
+    ResizeHandle.nw: Offset(bx, by),
+    ResizeHandle.n: Offset(bx + bw / 2, by),
+    ResizeHandle.ne: Offset(bx + bw, by),
+    ResizeHandle.e: Offset(bx + bw, by + bh / 2),
+    ResizeHandle.se: Offset(bx + bw, by + bh),
+    ResizeHandle.s: Offset(bx + bw / 2, by + bh),
+    ResizeHandle.sw: Offset(bx, by + bh),
+    ResizeHandle.w: Offset(bx, by + bh / 2),
+  };
+}
+
+/// Screen-space centre of the rotate knob (above the top edge).
+Offset rotateHandleCenter(CanvasLayer layer, double scale) => Offset(
+      (layer.x + layer.width / 2) * scale,
+      layer.y * scale - kRotateHandleGap,
+    );
 
 /// A snap guide line to draw over the artboard while dragging — a vertical or
 /// horizontal line at an artboard-space [position].
@@ -68,12 +101,44 @@ class CanvasPainter extends CustomPainter {
 
       if (layer.id == selectedLayerId) {
         _paintSelectionOutline(canvas, layer);
+        _paintHandles(canvas, layer);
       }
     }
 
     _paintGuides(canvas);
 
     canvas.restore();
+  }
+
+  /// Draws the rotate knob (always) and the eight resize handles (only when
+  /// the layer is unrotated — resizing a rotated layer is done from the
+  /// property panel). Coordinates match [resizeHandleCenters] exactly so the
+  /// surface's hit-testing lines up with what's drawn.
+  void _paintHandles(Canvas canvas, CanvasLayer layer) {
+    final fill = Paint()..color = Colors.white;
+    final border = Paint()
+      ..color = Colors.blueAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // Rotate knob + its connector line to the top edge.
+    final knob = rotateHandleCenter(layer, scale);
+    final topEdge = Offset((layer.x + layer.width / 2) * scale, layer.y * scale);
+    canvas.drawLine(topEdge, knob, border);
+    canvas.drawCircle(knob, kHandleSize / 2, fill);
+    canvas.drawCircle(knob, kHandleSize / 2, border);
+
+    if (layer.rotationDegrees != 0) return; // resize handles: unrotated only
+
+    for (final center in resizeHandleCenters(layer, scale).values) {
+      final rect = Rect.fromCenter(
+        center: center,
+        width: kHandleSize,
+        height: kHandleSize,
+      );
+      canvas.drawRect(rect, fill);
+      canvas.drawRect(rect, border);
+    }
   }
 
   void _paintLayer(Canvas canvas, CanvasLayer layer) {
@@ -83,6 +148,9 @@ class CanvasPainter extends CustomPainter {
     final centerY = (layer.y + layer.height / 2) * scale;
     canvas.translate(centerX, centerY);
     canvas.rotate(layer.rotationDegrees * math.pi / 180);
+    if (layer.flipH || layer.flipV) {
+      canvas.scale(layer.flipH ? -1.0 : 1.0, layer.flipV ? -1.0 : 1.0);
+    }
     canvas.translate(-layer.width * scale / 2, -layer.height * scale / 2);
 
     final bounds = Rect.fromLTWH(0, 0, layer.width * scale, layer.height * scale);
