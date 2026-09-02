@@ -586,6 +586,63 @@ void main() {
       expect(controller.state.document.layers.length, 2);
     });
 
+    TextCanvasLayer textDoc(String text) => TextCanvasLayer(
+          id: 'txt',
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 40,
+          text: text,
+        );
+
+    test('letter spacing applies to the selected text layer', () {
+      final controller = CanvasController(
+        CanvasDocument(width: 1080, height: 1080, layers: [textDoc('hi')]),
+      );
+      controller.selectLayerById('txt');
+      controller.updateSelectedTextFormat(letterSpacing: 5);
+      final t = controller.state.document.layers.single as TextCanvasLayer;
+      expect(t.letterSpacing, 5);
+    });
+
+    test('text case transform rewrites the content', () {
+      final controller = CanvasController(
+        CanvasDocument(width: 1080, height: 1080, layers: [textDoc('hello world')]),
+      );
+      controller.selectLayerById('txt');
+      controller.transformSelectedTextCase(TextCase.upper);
+      expect((controller.state.document.layers.single as TextCanvasLayer).text,
+          'HELLO WORLD',);
+      controller.transformSelectedTextCase(TextCase.title);
+      expect((controller.state.document.layers.single as TextCanvasLayer).text,
+          'Hello World',);
+      controller.transformSelectedTextCase(TextCase.lower);
+      expect((controller.state.document.layers.single as TextCanvasLayer).text,
+          'hello world',);
+    });
+
+    test('text decoration sets/clears highlight and outline', () {
+      final controller = CanvasController(
+        CanvasDocument(width: 1080, height: 1080, layers: [textDoc('hi')]),
+      );
+      controller.selectLayerById('txt');
+      controller.updateSelectedTextDecoration(
+        highlightColor: const Color(0xFFFFFF00),
+        strokeColor: const Color(0xFF000000),
+        strokeWidth: 2,
+      );
+      var t = controller.state.document.layers.single as TextCanvasLayer;
+      expect(t.highlightColor, const Color(0xFFFFFF00));
+      expect(t.strokeColor, const Color(0xFF000000));
+      expect(t.strokeWidth, 2);
+
+      controller.updateSelectedTextDecoration(clearHighlight: true);
+      controller.updateSelectedTextDecoration(clearStroke: true, strokeWidth: 0);
+      t = controller.state.document.layers.single as TextCanvasLayer;
+      expect(t.highlightColor, isNull);
+      expect(t.strokeColor, isNull);
+    });
+
     test('shape style edits set border and corner radius; clearStroke removes it', () {
       final controller = CanvasController(document);
       controller.selectLayerById('layer_a');

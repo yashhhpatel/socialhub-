@@ -502,6 +502,85 @@ class _TextFormatControls extends StatelessWidget {
             lineHeight: v <= 0 ? 1.0 : v,
           ),
         ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Letter spacing'),
+        _NumberField(
+          label: 'Spacing',
+          value: layer.letterSpacing,
+          onChanged: (v) => controller.updateSelectedTextFormat(letterSpacing: v),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Case'),
+        Wrap(
+          spacing: SpacingTokens.xs,
+          children: [
+            OutlinedButton(
+              onPressed: () =>
+                  controller.transformSelectedTextCase(TextCase.upper),
+              child: const Text('AA'),
+            ),
+            OutlinedButton(
+              onPressed: () =>
+                  controller.transformSelectedTextCase(TextCase.lower),
+              child: const Text('aa'),
+            ),
+            OutlinedButton(
+              onPressed: () =>
+                  controller.transformSelectedTextCase(TextCase.title),
+              child: const Text('Aa'),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        Row(
+          children: [
+            const Expanded(child: _SectionLabel('Highlight')),
+            if (layer.highlightColor != null)
+              IconButton(
+                tooltip: 'Remove highlight',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.format_color_reset_outlined, size: 18),
+                onPressed: () =>
+                    controller.updateSelectedTextDecoration(clearHighlight: true),
+              ),
+          ],
+        ),
+        _ColorControl(
+          selectedColor: layer.highlightColor,
+          onColorSelected: (c) =>
+              controller.updateSelectedTextDecoration(highlightColor: c),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        Row(
+          children: [
+            const Expanded(child: _SectionLabel('Outline')),
+            if (layer.strokeColor != null)
+              IconButton(
+                tooltip: 'Remove outline',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.format_color_reset_outlined, size: 18),
+                onPressed: () => controller.updateSelectedTextDecoration(
+                  clearStroke: true,
+                  strokeWidth: 0,
+                ),
+              ),
+          ],
+        ),
+        _ColorControl(
+          selectedColor: layer.strokeColor,
+          onColorSelected: (c) => controller.updateSelectedTextDecoration(
+            strokeColor: c,
+            strokeWidth: layer.strokeWidth <= 0 ? 2 : null,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        _NumberField(
+          label: 'Outline width',
+          value: layer.strokeWidth,
+          onChanged: (v) => controller.updateSelectedTextDecoration(
+            strokeWidth: v < 0 ? 0 : v,
+          ),
+        ),
       ],
     );
   }

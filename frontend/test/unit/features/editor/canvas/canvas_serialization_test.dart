@@ -120,6 +120,10 @@ void main() {
             hidden: true,
             flipH: true,
             flipV: true,
+            letterSpacing: 3,
+            highlightColor: Color(0xFFFFFF00),
+            strokeColor: Color(0xFF000000),
+            strokeWidth: 2,
           ),
         ],
       );
@@ -144,6 +148,10 @@ void main() {
       expect(text.hidden, isTrue);
       expect(text.flipH, isTrue);
       expect(text.flipV, isTrue);
+      expect(text.letterSpacing, 3);
+      expect(text.highlightColor, const Color(0xFFFFFF00));
+      expect(text.strokeColor, const Color(0xFF000000));
+      expect(text.strokeWidth, 2);
     });
 
     test('preserves layer ORDER, which is z-order on the canvas', () {
