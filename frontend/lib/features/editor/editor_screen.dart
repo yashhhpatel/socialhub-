@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_error_message.dart';
 import '../brand_kit/data/repositories/api_brand_kit_repository.dart';
-import '../collaboration/presentation/widgets/approval_bar.dart';
 import '../collaboration/presentation/widgets/comments_drawer.dart';
 import '../publish/presentation/widgets/publish_modal.dart';
 import '../templates/data/repositories/api_templates_repository.dart';
@@ -198,8 +197,6 @@ class _EditorWorkspace extends ConsumerWidget {
           endDrawer: CommentsDrawer(assetId: assetId),
           body: Column(
             children: [
-              // Approval status + role-gated approve/reject/submit actions.
-              ApprovalBar(assetId: assetId),
               Expanded(
                 child: Row(
                   children: [
