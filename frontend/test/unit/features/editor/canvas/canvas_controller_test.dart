@@ -388,6 +388,56 @@ void main() {
       expect(t.fontFamily, 'Roboto');
     });
 
+    test('bringSelectedToFront / sendSelectedToBack jump to the stack ends', () {
+      final controller = CanvasController(
+        const CanvasDocument(
+          width: 100,
+          height: 100,
+          layers: [
+            ShapeCanvasLayer(id: 'a', x: 0, y: 0, width: 1, height: 1, shapeKind: ShapeKind.rectangle),
+            ShapeCanvasLayer(id: 'b', x: 0, y: 0, width: 1, height: 1, shapeKind: ShapeKind.rectangle),
+            ShapeCanvasLayer(id: 'c', x: 0, y: 0, width: 1, height: 1, shapeKind: ShapeKind.rectangle),
+          ],
+        ),
+      );
+      controller.selectLayerById('a'); // bottom
+      controller.bringSelectedToFront();
+      expect(controller.state.document.layers.map((l) => l.id), ['b', 'c', 'a']);
+      controller.sendSelectedToBack();
+      expect(controller.state.document.layers.map((l) => l.id), ['a', 'b', 'c']);
+    });
+
+    test('copy + paste inserts an offset copy on top and selects it', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a'); // (0,0)
+      controller.copySelectedLayer();
+      controller.pasteLayer();
+
+      final layers = controller.state.document.layers;
+      expect(layers.length, 3);
+      final pasted = layers.last;
+      expect(pasted.id, isNot('layer_a'));
+      expect(pasted.id, controller.state.selectedLayerId);
+      expect(pasted.x, 20); // offset from the copied (0,0)
+      expect(pasted.y, 20);
+    });
+
+    test('cut removes the layer but keeps it on the clipboard for paste', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.cutSelectedLayer();
+      expect(controller.state.document.layers.map((l) => l.id), ['layer_b']);
+      expect(controller.hasClipboard, isTrue);
+      controller.pasteLayer();
+      expect(controller.state.document.layers.length, 2);
+    });
+
+    test('paste is a no-op when the clipboard is empty', () {
+      final controller = CanvasController(document);
+      controller.pasteLayer();
+      expect(controller.state.document.layers.length, 2);
+    });
+
     test('shape style edits set border and corner radius; clearStroke removes it', () {
       final controller = CanvasController(document);
       controller.selectLayerById('layer_a');

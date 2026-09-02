@@ -396,7 +396,7 @@ class TextCanvasLayer extends CanvasLayer {
       };
 }
 
-enum ShapeKind { rectangle, ellipse }
+enum ShapeKind { rectangle, ellipse, triangle, star, diamond }
 
 class ShapeCanvasLayer extends CanvasLayer {
   const ShapeCanvasLayer({

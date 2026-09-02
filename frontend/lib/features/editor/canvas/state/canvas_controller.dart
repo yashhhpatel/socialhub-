@@ -369,6 +369,53 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
   /// back). No-op if it's already at the bottom or nothing is selected.
   void sendSelectedBackward() => _reorderSelected(-1);
 
+  /// Moves the selected layer to the very top / bottom of the stack.
+  void bringSelectedToFront() => _reorderSelectedTo(true);
+  void sendSelectedToBack() => _reorderSelectedTo(false);
+
+  void _reorderSelectedTo(bool front) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final layers = [...state.document.layers];
+    final i = layers.indexWhere((l) => l.id == id);
+    if (i < 0) return;
+    if (front && i == layers.length - 1) return; // already on top
+    if (!front && i == 0) return; // already at the bottom
+    final moved = layers.removeAt(i);
+    front ? layers.add(moved) : layers.insert(0, moved);
+    _applyDocument(state.document.copyWithLayers(layers), id);
+  }
+
+  /// Session clipboard for copy/paste — the last copied (or cut) layer.
+  CanvasLayer? _clipboard;
+  bool get hasClipboard => _clipboard != null;
+
+  /// Copies the selected layer to the clipboard. No document change.
+  void copySelectedLayer() {
+    final selected = _selectedLayer;
+    if (selected != null) _clipboard = selected;
+  }
+
+  /// Copies then deletes the selected layer.
+  void cutSelectedLayer() {
+    final selected = _selectedLayer;
+    if (selected == null) return;
+    _clipboard = selected;
+    deleteSelectedLayer();
+  }
+
+  /// Pastes the clipboard layer as an offset copy on top of the stack, and
+  /// selects it. No-op when the clipboard is empty.
+  void pasteLayer() {
+    final source = _clipboard;
+    if (source == null) return;
+    final copy = _cloneWithOffset(source, _nextId(), const Offset(20, 20));
+    _applyDocument(
+      state.document.copyWithLayers([...state.document.layers, copy]),
+      copy.id,
+    );
+  }
+
   void _reorderSelected(int direction) {
     final id = state.selectedLayerId;
     if (id == null) return;

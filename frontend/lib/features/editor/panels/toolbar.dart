@@ -231,6 +231,48 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
             _ToolbarButton(
+              icon: Icons.change_history,
+              tooltip: 'Add triangle',
+              onPressed: () => controller.addLayer(
+                ShapeCanvasLayer(
+                  id: _nextLayerId(),
+                  x: centerX - 75,
+                  y: centerY - 65,
+                  width: 150,
+                  height: 130,
+                  shapeKind: ShapeKind.triangle,
+                ),
+              ),
+            ),
+            _ToolbarButton(
+              icon: Icons.star_border,
+              tooltip: 'Add star',
+              onPressed: () => controller.addLayer(
+                ShapeCanvasLayer(
+                  id: _nextLayerId(),
+                  x: centerX - 75,
+                  y: centerY - 75,
+                  width: 150,
+                  height: 150,
+                  shapeKind: ShapeKind.star,
+                ),
+              ),
+            ),
+            _ToolbarButton(
+              icon: Icons.diamond_outlined,
+              tooltip: 'Add diamond',
+              onPressed: () => controller.addLayer(
+                ShapeCanvasLayer(
+                  id: _nextLayerId(),
+                  x: centerX - 75,
+                  y: centerY - 75,
+                  width: 150,
+                  height: 150,
+                  shapeKind: ShapeKind.diamond,
+                ),
+              ),
+            ),
+            _ToolbarButton(
               icon: Icons.text_fields,
               tooltip: 'Add text',
               onPressed: () => controller.addLayer(
