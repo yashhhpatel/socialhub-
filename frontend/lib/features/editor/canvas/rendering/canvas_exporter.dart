@@ -58,7 +58,7 @@ class CanvasExporter {
       document: document,
       // No selection outline in an exported design — that's editor
       // chrome, not part of the artwork.
-      selectedLayerId: null,
+      selectedLayerIds: const {},
       scale: 1,
       offset: Offset.zero,
       imageCache: imageCache,

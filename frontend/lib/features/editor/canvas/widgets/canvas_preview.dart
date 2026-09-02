@@ -49,7 +49,7 @@ class _CanvasPreviewState extends State<CanvasPreview> {
           size: Size(constraints.maxWidth, constraints.maxHeight),
           painter: CanvasPainter(
             document: widget.document,
-            selectedLayerId: null,
+            selectedLayerIds: const {},
             scale: scale,
             offset: offset,
             imageCache: _imageCache,

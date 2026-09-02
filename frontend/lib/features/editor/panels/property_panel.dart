@@ -47,7 +47,36 @@ class PropertyPanel extends ConsumerWidget {
     final controller = ref.read(provider.notifier);
     final colorScheme = Theme.of(context).colorScheme;
 
-    final selectedLayer = _findLayerById(state.document.layers, state.selectedLayerId);
+    final multi = state.selectedLayerIds.length > 1;
+    final selectedLayer =
+        multi ? null : _findLayerById(state.document.layers, state.selectedLayerId);
+
+    final Widget body;
+    if (multi) {
+      body = SingleChildScrollView(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        child: _MultiSelectProperties(
+          count: state.selectedLayerIds.length,
+          controller: controller,
+        ),
+      );
+    } else if (selectedLayer == null) {
+      body = SingleChildScrollView(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        child: _CanvasProperties(
+          document: state.document,
+          controller: controller,
+        ),
+      );
+    } else {
+      body = SingleChildScrollView(
+        // Keyed on layer id so switching the selection gives every field a
+        // fresh initial value instead of carrying over stale text.
+        key: ValueKey(selectedLayer.id),
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        child: _PropertyFields(layer: selectedLayer, controller: controller),
+      );
+    }
 
     return Container(
       width: 260,
@@ -58,29 +87,16 @@ class PropertyPanel extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(SpacingTokens.md),
             child: Text(
-              selectedLayer == null ? 'Canvas' : 'Properties',
+              multi
+                  ? '${state.selectedLayerIds.length} selected'
+                  : selectedLayer == null
+                      ? 'Canvas'
+                      : 'Properties',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ),
           const Divider(height: 1),
-          Expanded(
-            child: selectedLayer == null
-                ? SingleChildScrollView(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: _CanvasProperties(
-                      document: state.document,
-                      controller: controller,
-                    ),
-                  )
-                : SingleChildScrollView(
-                    // Keyed on layer id so switching the selection gives
-                    // every field a fresh initial value instead of
-                    // carrying over stale text from the previous layer.
-                    key: ValueKey(selectedLayer.id),
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: _PropertyFields(layer: selectedLayer, controller: controller),
-                  ),
-          ),
+          Expanded(child: body),
         ],
       ),
     );
@@ -134,6 +150,82 @@ class _CanvasProperties extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Shown when several layers are selected: align them to each other, space
+/// them evenly, or match their sizes.
+class _MultiSelectProperties extends StatelessWidget {
+  const _MultiSelectProperties({required this.count, required this.controller});
+
+  final int count;
+  final CanvasController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$count layers selected',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        const _SectionLabel('Align to each other'),
+        Wrap(
+          children: [
+            _alignBtn(Icons.align_horizontal_left, 'Left', LayerAlignment.left),
+            _alignBtn(Icons.align_horizontal_center, 'Center', LayerAlignment.hCenter),
+            _alignBtn(Icons.align_horizontal_right, 'Right', LayerAlignment.right),
+            _alignBtn(Icons.align_vertical_top, 'Top', LayerAlignment.top),
+            _alignBtn(Icons.align_vertical_center, 'Middle', LayerAlignment.vCenter),
+            _alignBtn(Icons.align_vertical_bottom, 'Bottom', LayerAlignment.bottom),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Distribute (3+)'),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () =>
+                  controller.distributeSelected(DistributeAxis.horizontal),
+              icon: const Icon(Icons.horizontal_distribute, size: 18),
+              label: const Text('Horizontal'),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  controller.distributeSelected(DistributeAxis.vertical),
+              icon: const Icon(Icons.vertical_distribute, size: 18),
+              label: const Text('Vertical'),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Match size'),
+        Row(
+          children: [
+            OutlinedButton(
+              onPressed: () => controller.matchSelectedSize(width: true),
+              child: const Text('Width'),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            OutlinedButton(
+              onPressed: () => controller.matchSelectedSize(width: false),
+              child: const Text('Height'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _alignBtn(IconData icon, String tip, LayerAlignment a) => IconButton(
+        tooltip: tip,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(icon, size: 18),
+        onPressed: () => controller.alignSelectedToSelection(a),
+      );
 }
 
 class _PropertyFields extends StatelessWidget {

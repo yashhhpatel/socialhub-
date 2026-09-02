@@ -388,6 +388,91 @@ void main() {
       expect(t.fontFamily, 'Roboto');
     });
 
+    test('toggleLayerSelection builds a multi-selection', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.toggleLayerSelection('layer_b');
+      expect(controller.state.selectedLayerIds, {'layer_a', 'layer_b'});
+      expect(controller.state.selectedLayerId, isNull); // ambiguous when >1
+      controller.toggleLayerSelection('layer_a');
+      expect(controller.state.selectedLayerIds, {'layer_b'});
+    });
+
+    test('selectLayersInRect selects the layers a marquee overlaps', () {
+      final controller = CanvasController(document);
+      controller.selectLayersInRect(const Rect.fromLTWH(0, 0, 600, 600));
+      expect(controller.state.selectedLayerIds, {'layer_a', 'layer_b'});
+      controller.selectLayersInRect(const Rect.fromLTWH(0, 0, 50, 50));
+      expect(controller.state.selectedLayerIds, {'layer_a'}); // only a overlaps
+    });
+
+    test('moveSelectedLayerBy moves EVERY selected layer', () {
+      final controller = CanvasController(document);
+      controller.selectLayerById('layer_a');
+      controller.toggleLayerSelection('layer_b');
+      controller.moveSelectedLayerBy(const Offset(10, 20));
+      final a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      final b = controller.state.document.layers.firstWhere((l) => l.id == 'layer_b');
+      expect(a.x, 10);
+      expect(a.y, 20);
+      expect(b.x, 510);
+      expect(b.y, 520);
+    });
+
+    test('alignSelectedToSelection aligns selected layers to their bbox', () {
+      final controller = CanvasController(document); // a@x0, b@x500
+      controller.selectLayerById('layer_a');
+      controller.toggleLayerSelection('layer_b');
+      controller.alignSelectedToSelection(LayerAlignment.left);
+      final a = controller.state.document.layers.firstWhere((l) => l.id == 'layer_a');
+      final b = controller.state.document.layers.firstWhere((l) => l.id == 'layer_b');
+      expect(a.x, 0);
+      expect(b.x, 0); // pulled to the selection's left edge
+    });
+
+    test('distributeSelected evenly spaces 3+ centres', () {
+      final controller = CanvasController(
+        const CanvasDocument(
+          width: 1000,
+          height: 100,
+          layers: [
+            ShapeCanvasLayer(id: 'l', x: 0, y: 0, width: 10, height: 10, shapeKind: ShapeKind.rectangle),
+            ShapeCanvasLayer(id: 'm', x: 100, y: 0, width: 10, height: 10, shapeKind: ShapeKind.rectangle),
+            ShapeCanvasLayer(id: 'r', x: 900, y: 0, width: 10, height: 10, shapeKind: ShapeKind.rectangle),
+          ],
+        ),
+      );
+      controller.selectLayersInRect(const Rect.fromLTWH(0, 0, 1000, 100));
+      controller.distributeSelected(DistributeAxis.horizontal);
+      // first centre 5, last centre 905 → middle centre should be 455 → x=450.
+      final m = controller.state.document.layers.firstWhere((l) => l.id == 'm');
+      expect(m.x, 450);
+    });
+
+    test('matchSelectedSize sets all selected to the largest dimension', () {
+      final controller = CanvasController(
+        const CanvasDocument(
+          width: 1000,
+          height: 1000,
+          layers: [
+            ShapeCanvasLayer(id: 's', x: 0, y: 0, width: 40, height: 40, shapeKind: ShapeKind.rectangle),
+            ShapeCanvasLayer(id: 'big', x: 0, y: 0, width: 200, height: 80, shapeKind: ShapeKind.rectangle),
+          ],
+        ),
+      );
+      controller.selectLayersInRect(const Rect.fromLTWH(0, 0, 1000, 1000));
+      controller.matchSelectedSize(width: true);
+      final s = controller.state.document.layers.firstWhere((l) => l.id == 's');
+      expect(s.width, 200); // matched to the largest width
+    });
+
+    test('multi delete removes every selected layer', () {
+      final controller = CanvasController(document);
+      controller.selectLayersInRect(const Rect.fromLTWH(0, 0, 600, 600));
+      controller.deleteSelectedLayer();
+      expect(controller.state.document.layers, isEmpty);
+    });
+
     test('flipSelected toggles the horizontal/vertical mirror flags', () {
       final controller = CanvasController(document);
       controller.selectLayerById('layer_a');

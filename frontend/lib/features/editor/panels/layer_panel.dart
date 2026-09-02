@@ -25,9 +25,12 @@ class LayerPanel extends ConsumerWidget {
 
     final reversedLayers = state.document.layers.reversed.toList();
 
+    // Reorder acts on a single selection; duplicate/delete work on any
+    // selection (including multi-select).
     final selectedIndex =
         state.document.layers.indexWhere((l) => l.id == state.selectedLayerId);
-    final hasSelection = selectedIndex >= 0;
+    final singleSelection = selectedIndex >= 0;
+    final anySelection = state.selectedLayerIds.isNotEmpty;
 
     return Container(
       width: 220,
@@ -53,7 +56,7 @@ class LayerPanel extends ConsumerWidget {
                     itemCount: reversedLayers.length,
                     itemBuilder: (context, index) {
                       final layer = reversedLayers[index];
-                      final selected = layer.id == state.selectedLayerId;
+                      final selected = state.isSelected(layer.id);
 
                       return _LayerRow(
                         layer: layer,
@@ -69,10 +72,10 @@ class LayerPanel extends ConsumerWidget {
           ),
           const Divider(height: 1),
           _LayerActions(
-            enabled: hasSelection,
+            enabled: anySelection,
             canBringForward:
-                hasSelection && selectedIndex < state.document.layers.length - 1,
-            canSendBackward: hasSelection && selectedIndex > 0,
+                singleSelection && selectedIndex < state.document.layers.length - 1,
+            canSendBackward: singleSelection && selectedIndex > 0,
             onBringForward: controller.bringSelectedForward,
             onSendBackward: controller.sendSelectedBackward,
             onBringToFront: controller.bringSelectedToFront,

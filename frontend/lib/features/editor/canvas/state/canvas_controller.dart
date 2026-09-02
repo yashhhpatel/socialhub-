@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,53 +9,37 @@ import '../models/canvas_document.dart';
 import '../models/canvas_layer.dart';
 import 'canvas_editor_state.dart';
 
-/// Where to align a layer against the artboard (used by the property panel's
-/// Arrange section — see [CanvasController.alignSelectedToArtboard]).
+/// Where to align a layer against the artboard, or selected layers against
+/// their common bounding box (property panel's Arrange / multi-select).
 enum LayerAlignment { left, hCenter, right, top, vCenter, bottom }
 
 /// The eight resize handles around a selected layer (compass points), used by
 /// the on-canvas drag-to-resize — see [CanvasController.resizeSelectedByHandle].
 enum ResizeHandle { nw, n, ne, e, se, s, sw, w }
 
-/// Selection + editing logic for one editor session. Deliberately NOT a
-/// singleton provider (unlike e.g. authControllerProvider) — a
-/// StateNotifierProvider.family.autoDispose instance is created per
-/// initial CanvasDocument, matching how a future EditorScreen(assetId)
-/// will use it: `ref.watch(canvasControllerProvider(loadedDocument))`.
-/// autoDispose so state is cleaned up once nothing is watching it
-/// (i.e., once the editor screen is left).
+/// Axis for distributing three-or-more selected layers evenly.
+enum DistributeAxis { horizontal, vertical }
+
+/// Selection + editing logic for one editor session. Selection is a SET of
+/// layer ids (multi-select); single-layer operations act on the sole selected
+/// layer via [CanvasEditorState.selectedLayerId] and no-op when several are
+/// selected.
 ///
-/// UNDO/REDO (Milestone 3.5): every method that changes the document
-/// records the pre-edit document into [EditorHistory] first, via the
-/// single [_applyDocument] chokepoint. Selection changes are deliberately
-/// NOT recorded — clicking around a design isn't an edit, and having
-/// Ctrl+Z step back through selections instead of actual changes is a
-/// well-known way to make undo feel broken.
+/// UNDO/REDO (Milestone 3.5): every method that changes the document records
+/// the pre-edit document into [EditorHistory] first, via the single
+/// [_applyDocument] chokepoint. Selection changes are deliberately NOT
+/// recorded.
 class CanvasController extends StateNotifier<CanvasEditorState> {
   CanvasController(CanvasDocument initialDocument)
       : super(CanvasEditorState(document: initialDocument));
 
   final EditorHistory<CanvasDocument> _history = EditorHistory<CanvasDocument>();
 
-  /// True while a continuous gesture (canvas drag, opacity slider) is in
-  /// flight. See [beginInteraction] for why this exists.
   bool _interactionActive = false;
-
-  /// Whether the in-flight gesture has already contributed its single
-  /// history entry. Reset per gesture — without that reset, only the very
-  /// first drag of a session would ever be undoable.
   bool _interactionRecorded = false;
 
-  /// Marks the start of a continuous gesture, so the whole gesture
-  /// collapses into ONE undo step.
-  ///
-  /// Without this, a single drag across the canvas fires
-  /// moveSelectedLayerBy on every pointer frame and would push ~60 history
-  /// entries per second — the user would then have to press Ctrl+Z
-  /// hundreds of times to walk back one drag. Callers that stream updates
-  /// (CanvasSurface's pan, the property panel's opacity slider) bracket
-  /// them with beginInteraction/[endInteraction]; discrete edits (adding a
-  /// layer, committing a number field) need neither.
+  /// Marks the start of a continuous gesture, so the whole gesture collapses
+  /// into ONE undo step (see the original note in earlier milestones).
   void beginInteraction() {
     _interactionActive = true;
     _interactionRecorded = false;
@@ -64,71 +50,115 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     _interactionRecorded = false;
   }
 
-  /// Hit-tests `artboardPoint` against the current layer stack and
-  /// selects whatever's on top there, or clears selection if nothing is.
-  /// Used by CanvasSurface's gesture handling (a tap/drag-start position
-  /// on the canvas itself).
-  void selectLayerAt(Offset artboardPoint) {
+  // ---- Selection ---------------------------------------------------------
+
+  /// Hit-tests `artboardPoint` and selects whatever's on top there. With
+  /// [additive] (Shift-click) the hit layer is toggled in/out of the current
+  /// selection instead of replacing it; a miss clears (unless additive).
+  void selectLayerAt(Offset artboardPoint, {bool additive = false}) {
     final hit = hitTestLayers(state.document.layers, artboardPoint);
-    selectLayerById(hit?.id);
+    if (hit == null) {
+      if (!additive) clearSelection();
+      return;
+    }
+    if (additive) {
+      toggleLayerSelection(hit.id);
+    } else if (!state.isSelected(hit.id)) {
+      // Clicking an already-selected layer keeps the whole (possibly multi)
+      // selection so it can be dragged as a group; clicking a new one selects
+      // just it.
+      _setSelection({hit.id});
+    }
   }
 
-  /// Selects by id directly — used by the layer panel (Milestone 3.4),
-  /// where the user clicks a list row rather than a canvas position.
-  /// Pass null to clear selection.
-  void selectLayerById(String? layerId) {
+  /// Selects a single layer by id (or clears with null) — the Layers panel.
+  void selectLayerById(String? layerId) =>
+      _setSelection(layerId == null ? const {} : {layerId});
+
+  /// Adds/removes a layer from the current selection (Shift-click).
+  void toggleLayerSelection(String id) {
+    final next = {...state.selectedLayerIds};
+    next.contains(id) ? next.remove(id) : next.add(id);
+    _setSelection(next);
+  }
+
+  /// Selects every (visible, unlocked) layer whose box intersects [rect] — the
+  /// marquee drag. An empty rect selection clears.
+  void selectLayersInRect(Rect rect) {
+    final ids = <String>{
+      for (final l in state.document.layers)
+        if (!l.hidden && !l.locked &&
+            rect.overlaps(Rect.fromLTWH(l.x, l.y, l.width, l.height)))
+          l.id,
+    };
+    _setSelection(ids);
+  }
+
+  void clearSelection() => _setSelection(const {});
+
+  void _setSelection(Set<String> ids) {
     state = CanvasEditorState(
       document: state.document,
-      selectedLayerId: layerId,
+      selectedLayerIds: ids,
       canUndo: _history.canUndo,
       canRedo: _history.canRedo,
     );
   }
 
-  void clearSelection() => selectLayerById(null);
+  // ---- Move / nudge (multi) ---------------------------------------------
 
-  /// Moves the currently-selected layer by `delta` (artboard-space
-  /// units, already converted from screen pixels by the caller — see
-  /// CanvasSurface). No-ops if nothing is selected, rather than throwing
-  /// — a drag gesture starting on empty canvas is a normal, expected
-  /// interaction, not an error condition.
+  /// Moves every selected (unlocked) layer by `delta` (artboard units). No-op
+  /// when nothing is selected.
   void moveSelectedLayerBy(Offset delta) {
-    final selected = _selectedLayer;
-    if (selected == null || selected.locked) return;
-    updateSelectedLayerGeometry(x: selected.x + delta.dx, y: selected.y + delta.dy);
-  }
-
-  /// Nudges the selected layer by a fixed artboard-space delta — the editor's
-  /// arrow-key handling. One discrete undo step per call. No-op when nothing
-  /// is selected or the layer is locked.
-  void nudgeSelected(double dx, double dy) {
-    final selected = _selectedLayer;
-    if (selected == null || selected.locked) return;
-    updateSelectedLayerGeometry(x: selected.x + dx, y: selected.y + dy);
-  }
-
-  /// Mirrors the selected layer horizontally or vertically.
-  void flipSelected({required bool horizontal}) {
-    final id = state.selectedLayerId;
-    if (id == null) return;
+    final ids = state.selectedLayerIds;
+    if (ids.isEmpty) return;
     final updated = [
       for (final layer in state.document.layers)
-        if (layer.id == id)
-          layer.copyWithFlags(
-            flipH: horizontal ? !layer.flipH : null,
-            flipV: horizontal ? null : !layer.flipV,
+        if (ids.contains(layer.id) && !layer.locked)
+          layer.copyWithGeometry(x: layer.x + delta.dx, y: layer.y + delta.dy)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), ids);
+  }
+
+  /// Nudges the selection by a fixed delta — the editor's arrow keys.
+  void nudgeSelected(double dx, double dy) => moveSelectedLayerBy(Offset(dx, dy));
+
+  // ---- Single-layer geometry / style ------------------------------------
+
+  /// General geometry update for the SINGLE selected layer (property panel).
+  void updateSelectedLayerGeometry({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+  }) {
+    final selectedId = state.selectedLayerId;
+    if (selectedId == null) return;
+    final updatedLayers = [
+      for (final layer in state.document.layers)
+        if (layer.id == selectedId)
+          layer.copyWithGeometry(
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            rotationDegrees: rotationDegrees,
+            opacity: opacity,
           )
         else
           layer,
     ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
+    _applyDocument(state.document.copyWithLayers(updatedLayers), state.selectedLayerIds);
   }
 
-  /// Resizes the selected layer by dragging one of the eight handles, in
-  /// artboard-space [delta]. The edge/corner OPPOSITE the dragged handle stays
-  /// fixed. [lockAspect] (Shift on a corner) preserves the aspect ratio. Sizes
-  /// clamp to [minSize]. Called only for unrotated layers by the surface, so
-  /// the anchor maths is exact.
+  /// Resizes the single selected layer by dragging one of the eight handles,
+  /// in artboard-space [delta]. The edge/corner OPPOSITE the dragged handle
+  /// stays fixed. [lockAspect] (Shift on a corner) preserves the aspect ratio.
+  /// Only called for unrotated single selections, so the anchor maths is exact.
   void resizeSelectedByHandle(
     ResizeHandle handle,
     Offset delta, {
@@ -163,7 +193,6 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     if (bottom) h = sel.height + delta.dy;
 
     if (lockAspect && isCorner && sel.height != 0) {
-      // Honour the width change and derive height to keep the ratio.
       h = w / (sel.width / sel.height);
     }
 
@@ -172,13 +201,32 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
 
     var x = sel.x;
     var y = sel.y;
-    if (left) x = rightEdge - w; // right edge stays fixed
-    if (top) y = bottomEdge - h; // bottom edge stays fixed
+    if (left) x = rightEdge - w;
+    if (top) y = bottomEdge - h;
 
     updateSelectedLayerGeometry(x: x, y: y, width: w, height: h);
   }
 
-  /// Aligns the selected layer against the artboard edges/centre.
+  /// Mirrors every selected layer horizontally or vertically.
+  void flipSelected({required bool horizontal}) {
+    final ids = state.selectedLayerIds;
+    if (ids.isEmpty) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (ids.contains(layer.id))
+          layer.copyWithFlags(
+            flipH: horizontal ? !layer.flipH : null,
+            flipV: horizontal ? null : !layer.flipV,
+          )
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), ids);
+  }
+
+  // ---- Alignment / distribute / match size ------------------------------
+
+  /// Aligns the single selected layer against the ARTBOARD edges/centre.
   void alignSelectedToArtboard(LayerAlignment alignment) {
     final selected = _selectedLayer;
     if (selected == null || selected.locked) return;
@@ -199,44 +247,152 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     }
   }
 
-  /// Sets the artboard's background fill. Undoable like any edit.
-  void setBackgroundColor(Color color) {
-    _applyDocument(
-      state.document.copyWith(backgroundColor: color),
-      state.selectedLayerId,
-    );
-  }
-
-  /// Resizes the artboard (a "Resize" preset). Layers keep their positions.
-  void resizeArtboard(double width, double height) {
-    if (width <= 0 || height <= 0) return;
-    _applyDocument(
-      state.document.copyWith(width: width, height: height),
-      state.selectedLayerId,
-    );
-  }
-
-  /// Locks/unlocks a layer by id (from the Layers panel, not necessarily the
-  /// selection). A locked layer can't be moved or selected on the canvas.
-  void setLayerLocked(String id, bool locked) =>
-      _setFlags(id, locked: locked);
-
-  /// Shows/hides a layer by id. A hidden layer isn't painted or hit-tested.
-  void setLayerHidden(String id, bool hidden) =>
-      _setFlags(id, hidden: hidden);
-
-  void _setFlags(String id, {bool? locked, bool? hidden}) {
+  /// Aligns all selected layers against their common bounding box (needs 2+).
+  void alignSelectedToSelection(LayerAlignment alignment) {
+    final sels = _selectedLayers;
+    if (sels.length < 2) return;
+    final b = _boundsOf(sels);
+    final ids = state.selectedLayerIds;
     final updated = [
       for (final layer in state.document.layers)
-        if (layer.id == id)
-          layer.copyWithFlags(locked: locked, hidden: hidden)
+        if (ids.contains(layer.id) && !layer.locked)
+          _alignedInBounds(layer, b, alignment)
         else
           layer,
     ];
-    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerId);
+    _applyDocument(state.document.copyWithLayers(updated), ids);
   }
 
-  /// Bold / italic / alignment / line-height on the selected text layer.
+  CanvasLayer _alignedInBounds(CanvasLayer l, Rect b, LayerAlignment a) =>
+      switch (a) {
+        LayerAlignment.left => l.copyWithGeometry(x: b.left),
+        LayerAlignment.hCenter => l.copyWithGeometry(x: b.center.dx - l.width / 2),
+        LayerAlignment.right => l.copyWithGeometry(x: b.right - l.width),
+        LayerAlignment.top => l.copyWithGeometry(y: b.top),
+        LayerAlignment.vCenter => l.copyWithGeometry(y: b.center.dy - l.height / 2),
+        LayerAlignment.bottom => l.copyWithGeometry(y: b.bottom - l.height),
+      };
+
+  /// Distributes 3+ selected layers so their CENTRES are evenly spaced between
+  /// the first and last along [axis].
+  void distributeSelected(DistributeAxis axis) {
+    final sels = _selectedLayers;
+    if (sels.length < 3) return;
+    final horizontal = axis == DistributeAxis.horizontal;
+    final sorted = [...sels]..sort((a, b) => horizontal
+        ? a.center.dx.compareTo(b.center.dx)
+        : a.center.dy.compareTo(b.center.dy),);
+    final firstC = horizontal ? sorted.first.center.dx : sorted.first.center.dy;
+    final lastC = horizontal ? sorted.last.center.dx : sorted.last.center.dy;
+    final step = (lastC - firstC) / (sorted.length - 1);
+
+    final moves = <String, CanvasLayer>{};
+    for (var i = 1; i < sorted.length - 1; i++) {
+      final l = sorted[i];
+      if (l.locked) continue;
+      final targetCenter = firstC + step * i;
+      moves[l.id] = horizontal
+          ? l.copyWithGeometry(x: targetCenter - l.width / 2)
+          : l.copyWithGeometry(y: targetCenter - l.height / 2);
+    }
+    if (moves.isEmpty) return;
+    final updated = [
+      for (final layer in state.document.layers) moves[layer.id] ?? layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
+  /// Matches the width (or height) of all selected layers to the largest among
+  /// them (needs 2+).
+  void matchSelectedSize({required bool width}) {
+    final sels = _selectedLayers;
+    if (sels.length < 2) return;
+    final target = width
+        ? sels.map((l) => l.width).reduce(math.max)
+        : sels.map((l) => l.height).reduce(math.max);
+    final ids = state.selectedLayerIds;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (ids.contains(layer.id) && !layer.locked)
+          (width
+              ? layer.copyWithGeometry(width: target)
+              : layer.copyWithGeometry(height: target))
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), ids);
+  }
+
+  Rect _boundsOf(List<CanvasLayer> layers) {
+    var l = double.infinity, t = double.infinity, r = -double.infinity, b = -double.infinity;
+    for (final layer in layers) {
+      l = math.min(l, layer.x);
+      t = math.min(t, layer.y);
+      r = math.max(r, layer.x + layer.width);
+      b = math.max(b, layer.y + layer.height);
+    }
+    return Rect.fromLTRB(l, t, r, b);
+  }
+
+  // ---- Colour / text / shape / video (single) ---------------------------
+
+  void updateSelectedLayerColor(Color color) {
+    final selectedId = state.selectedLayerId;
+    if (selectedId == null) return;
+    final updatedLayers = [
+      for (final layer in state.document.layers)
+        if (layer.id == selectedId)
+          switch (layer) {
+            ShapeCanvasLayer s => s.copyWithFillColor(color),
+            TextCanvasLayer t => t.copyWithColor(color),
+            ImageCanvasLayer img => img,
+            VideoCanvasLayer v => v,
+          }
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updatedLayers), state.selectedLayerIds);
+  }
+
+  void updateSelectedVideoTrim({double? start, double? end}) {
+    final selectedId = state.selectedLayerId;
+    if (selectedId == null) return;
+    final updatedLayers = [
+      for (final layer in state.document.layers)
+        if (layer.id == selectedId && layer is VideoCanvasLayer)
+          layer.copyWithTrim(trimStartSeconds: start, trimEndSeconds: end)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updatedLayers), state.selectedLayerIds);
+  }
+
+  void updateSelectedLayerText(String text) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithText(text)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
+  void updateSelectedTextFontSize(double fontSize) {
+    final id = state.selectedLayerId;
+    if (id == null || fontSize <= 0) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithFontSize(fontSize)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
+  }
+
   void updateSelectedTextFormat({
     bool? bold,
     bool? italic,
@@ -257,10 +413,9 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
         else
           layer,
     ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
   }
 
-  /// Sets (or clears, with null) the font family of the selected text layer.
   void updateSelectedTextFontFamily(String? fontFamily) {
     final id = state.selectedLayerId;
     if (id == null) return;
@@ -271,10 +426,9 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
         else
           layer,
     ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
   }
 
-  /// Border colour/width and corner radius on the selected shape layer.
   void updateSelectedShapeStyle({
     Color? strokeColor,
     double? strokeWidth,
@@ -295,201 +449,86 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
         else
           layer,
     ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
   }
 
-  /// General geometry update — the property panel's position/size/
-  /// rotation/opacity fields all funnel through this one method. Only
-  /// the fields actually passed are changed; everything else (including
-  /// subtype-specific fields like color) is preserved untouched.
-  void updateSelectedLayerGeometry({
-    double? x,
-    double? y,
-    double? width,
-    double? height,
-    double? rotationDegrees,
-    double? opacity,
-  }) {
-    final selectedId = state.selectedLayerId;
-    if (selectedId == null) return;
+  // ---- Canvas-level ------------------------------------------------------
 
-    final updatedLayers = [
+  void setBackgroundColor(Color color) {
+    _applyDocument(
+      state.document.copyWith(backgroundColor: color),
+      state.selectedLayerIds,
+    );
+  }
+
+  void resizeArtboard(double width, double height) {
+    if (width <= 0 || height <= 0) return;
+    _applyDocument(
+      state.document.copyWith(width: width, height: height),
+      state.selectedLayerIds,
+    );
+  }
+
+  void setLayerLocked(String id, bool locked) => _setFlags(id, locked: locked);
+  void setLayerHidden(String id, bool hidden) => _setFlags(id, hidden: hidden);
+
+  void _setFlags(String id, {bool? locked, bool? hidden}) {
+    final updated = [
       for (final layer in state.document.layers)
-        if (layer.id == selectedId)
-          layer.copyWithGeometry(
-            x: x,
-            y: y,
-            width: width,
-            height: height,
-            rotationDegrees: rotationDegrees,
-            opacity: opacity,
-          )
+        if (layer.id == id)
+          layer.copyWithFlags(locked: locked, hidden: hidden)
         else
           layer,
     ];
-
-    _applyDocument(state.document.copyWithLayers(updatedLayers), selectedId);
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerIds);
   }
 
-  /// Sets fill color (ShapeCanvasLayer) or text color (TextCanvasLayer)
-  /// on the selected layer. No-ops for an ImageCanvasLayer selection —
-  /// color doesn't apply to images, and the property panel doesn't show
-  /// a color field for one in the first place (see property_panel.dart),
-  /// but this stays a safe no-op rather than throwing in case it's ever
-  /// called from somewhere that hasn't checked the layer type first.
-  void updateSelectedLayerColor(Color color) {
-    final selectedId = state.selectedLayerId;
-    if (selectedId == null) return;
+  // ---- Add / delete / duplicate / clipboard -----------------------------
 
-    final updatedLayers = [
-      for (final layer in state.document.layers)
-        if (layer.id == selectedId)
-          switch (layer) {
-            ShapeCanvasLayer s => s.copyWithFillColor(color),
-            TextCanvasLayer t => t.copyWithColor(color),
-            ImageCanvasLayer img => img,
-            VideoCanvasLayer v => v,
-          }
-        else
-          layer,
-    ];
-
-    _applyDocument(state.document.copyWithLayers(updatedLayers), selectedId);
-  }
-
-  /// Sets the trim window on the selected video layer (Milestone 9.1).
-  /// No-ops for any other layer type — trim only applies to video, and the
-  /// property panel only shows the control for a video selection.
-  void updateSelectedVideoTrim({double? start, double? end}) {
-    final selectedId = state.selectedLayerId;
-    if (selectedId == null) return;
-
-    final updatedLayers = [
-      for (final layer in state.document.layers)
-        if (layer.id == selectedId && layer is VideoCanvasLayer)
-          layer.copyWithTrim(trimStartSeconds: start, trimEndSeconds: end)
-        else
-          layer,
-    ];
-
-    _applyDocument(state.document.copyWithLayers(updatedLayers), selectedId);
-  }
-
-  /// Adds a new layer to the top of the stack and selects it — used by
-  /// the toolbar's "add shape/text" actions (Milestone 3.4).
   void addLayer(CanvasLayer layer) {
     _applyDocument(
       state.document.copyWithLayers([...state.document.layers, layer]),
-      layer.id,
+      {layer.id},
     );
   }
 
-  /// Sets the text of the selected [TextCanvasLayer] (double-click on the
-  /// canvas, or the property panel's text field). No-op for other types.
-  void updateSelectedLayerText(String text) {
-    final id = state.selectedLayerId;
-    if (id == null) return;
-    final updated = [
-      for (final layer in state.document.layers)
-        if (layer.id == id && layer is TextCanvasLayer)
-          layer.copyWithText(text)
-        else
-          layer,
-    ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
-  }
-
-  /// Sets the font size of the selected [TextCanvasLayer]. No-op otherwise.
-  void updateSelectedTextFontSize(double fontSize) {
-    final id = state.selectedLayerId;
-    if (id == null || fontSize <= 0) return;
-    final updated = [
-      for (final layer in state.document.layers)
-        if (layer.id == id && layer is TextCanvasLayer)
-          layer.copyWithFontSize(fontSize)
-        else
-          layer,
-    ];
-    _applyDocument(state.document.copyWithLayers(updated), id);
-  }
-
-  /// Deletes the selected layer and clears selection. No-op if nothing is
-  /// selected (or the id no longer resolves to a layer).
+  /// Deletes every selected layer and clears selection. No-op when nothing is
+  /// selected.
   void deleteSelectedLayer() {
-    final id = state.selectedLayerId;
-    if (id == null) return;
+    final ids = state.selectedLayerIds;
+    if (ids.isEmpty) return;
     final remaining =
-        state.document.layers.where((l) => l.id != id).toList();
+        state.document.layers.where((l) => !ids.contains(l.id)).toList();
     if (remaining.length == state.document.layers.length) return;
-    _applyDocument(state.document.copyWithLayers(remaining), null);
+    _applyDocument(state.document.copyWithLayers(remaining), const {});
   }
 
-  /// Duplicates the selected layer — a copy offset by (20, 20), inserted
-  /// directly above the original in paint order, and selected.
+  /// Duplicates the selected layer(s) — each an offset copy — and selects the
+  /// copies. A single selection inserts its copy directly above the original
+  /// (the classic behaviour); a multi selection appends the copies on top.
   void duplicateSelectedLayer() {
-    final selected = _selectedLayer;
-    if (selected == null) return;
-    final copy = _cloneWithOffset(selected, _nextId(), const Offset(20, 20));
+    final sels = _selectedLayers;
+    if (sels.isEmpty) return;
     final layers = [...state.document.layers];
-    final index = layers.indexWhere((l) => l.id == selected.id);
-    layers.insert(index + 1, copy);
-    _applyDocument(state.document.copyWithLayers(layers), copy.id);
+    final newIds = <String>{};
+    if (sels.length == 1) {
+      final original = sels.first;
+      final copy = _cloneWithOffset(original, _nextId(), const Offset(20, 20));
+      final index = layers.indexWhere((l) => l.id == original.id);
+      layers.insert(index + 1, copy);
+      newIds.add(copy.id);
+    } else {
+      for (final l in sels) {
+        final copy = _cloneWithOffset(l, _nextId(), const Offset(20, 20));
+        layers.add(copy);
+        newIds.add(copy.id);
+      }
+    }
+    _applyDocument(state.document.copyWithLayers(layers), newIds);
   }
 
-  /// Moves the selected layer one step up the paint stack (towards the
-  /// front). No-op if it's already on top or nothing is selected.
   void bringSelectedForward() => _reorderSelected(1);
-
-  /// Moves the selected layer one step down the paint stack (towards the
-  /// back). No-op if it's already at the bottom or nothing is selected.
   void sendSelectedBackward() => _reorderSelected(-1);
-
-  /// Moves the selected layer to the very top / bottom of the stack.
-  void bringSelectedToFront() => _reorderSelectedTo(true);
-  void sendSelectedToBack() => _reorderSelectedTo(false);
-
-  void _reorderSelectedTo(bool front) {
-    final id = state.selectedLayerId;
-    if (id == null) return;
-    final layers = [...state.document.layers];
-    final i = layers.indexWhere((l) => l.id == id);
-    if (i < 0) return;
-    if (front && i == layers.length - 1) return; // already on top
-    if (!front && i == 0) return; // already at the bottom
-    final moved = layers.removeAt(i);
-    front ? layers.add(moved) : layers.insert(0, moved);
-    _applyDocument(state.document.copyWithLayers(layers), id);
-  }
-
-  /// Session clipboard for copy/paste — the last copied (or cut) layer.
-  CanvasLayer? _clipboard;
-  bool get hasClipboard => _clipboard != null;
-
-  /// Copies the selected layer to the clipboard. No document change.
-  void copySelectedLayer() {
-    final selected = _selectedLayer;
-    if (selected != null) _clipboard = selected;
-  }
-
-  /// Copies then deletes the selected layer.
-  void cutSelectedLayer() {
-    final selected = _selectedLayer;
-    if (selected == null) return;
-    _clipboard = selected;
-    deleteSelectedLayer();
-  }
-
-  /// Pastes the clipboard layer as an offset copy on top of the stack, and
-  /// selects it. No-op when the clipboard is empty.
-  void pasteLayer() {
-    final source = _clipboard;
-    if (source == null) return;
-    final copy = _cloneWithOffset(source, _nextId(), const Offset(20, 20));
-    _applyDocument(
-      state.document.copyWithLayers([...state.document.layers, copy]),
-      copy.id,
-    );
-  }
 
   void _reorderSelected(int direction) {
     final id = state.selectedLayerId;
@@ -501,17 +540,57 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     if (j < 0 || j >= layers.length) return;
     final moved = layers.removeAt(i);
     layers.insert(j, moved);
-    _applyDocument(state.document.copyWithLayers(layers), id);
+    _applyDocument(state.document.copyWithLayers(layers), {id});
   }
 
-  /// Clones any layer type with a new id, offset by [delta]. Kept here (a
-  /// switch over the sealed type) rather than on the model so the sealed
-  /// exhaustiveness check flags a missing case if a 5th layer type is added.
+  void bringSelectedToFront() => _reorderSelectedTo(true);
+  void sendSelectedToBack() => _reorderSelectedTo(false);
+
+  void _reorderSelectedTo(bool front) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final layers = [...state.document.layers];
+    final i = layers.indexWhere((l) => l.id == id);
+    if (i < 0) return;
+    if (front && i == layers.length - 1) return;
+    if (!front && i == 0) return;
+    final moved = layers.removeAt(i);
+    front ? layers.add(moved) : layers.insert(0, moved);
+    _applyDocument(state.document.copyWithLayers(layers), {id});
+  }
+
+  /// Session clipboard — the last copied (or cut) layers.
+  List<CanvasLayer> _clipboard = const [];
+  bool get hasClipboard => _clipboard.isNotEmpty;
+
+  void copySelectedLayer() {
+    final sels = _selectedLayers;
+    if (sels.isNotEmpty) _clipboard = sels;
+  }
+
+  void cutSelectedLayer() {
+    final sels = _selectedLayers;
+    if (sels.isEmpty) return;
+    _clipboard = sels;
+    deleteSelectedLayer();
+  }
+
+  /// Pastes the clipboard layer(s) as offset copies on top, and selects them.
+  void pasteLayer() {
+    if (_clipboard.isEmpty) return;
+    final layers = [...state.document.layers];
+    final newIds = <String>{};
+    for (final source in _clipboard) {
+      final copy = _cloneWithOffset(source, _nextId(), const Offset(20, 20));
+      layers.add(copy);
+      newIds.add(copy.id);
+    }
+    _applyDocument(state.document.copyWithLayers(layers), newIds);
+  }
+
   CanvasLayer _cloneWithOffset(CanvasLayer layer, String newId, Offset delta) {
     final nx = layer.x + delta.dx;
     final ny = layer.y + delta.dy;
-    // A duplicate is always unlocked and visible so it can be worked on
-    // immediately, even if the original was locked/hidden.
     return switch (layer) {
       ShapeCanvasLayer s => ShapeCanvasLayer(
           id: newId,
@@ -582,57 +661,39 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
   String _nextId() =>
       'layer_${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
 
-  /// Replaces the entire document in one undoable edit — used by
-  /// whole-canvas transforms like "apply brand kit" (Milestone 9.3), where
-  /// many layers change at once and there is no single selected layer the
-  /// change belongs to. Selection is cleared for the same reason undo does
-  /// it: the previously-selected layer may have been restyled out from
-  /// under the property panel.
-  void replaceDocument(CanvasDocument document) {
-    _applyDocument(document, null);
-  }
+  /// Replaces the whole document in one undoable edit (e.g. apply brand kit),
+  /// clearing selection since layers may have been restyled out from under it.
+  void replaceDocument(CanvasDocument document) =>
+      _applyDocument(document, const {});
 
-  /// Steps back one edit (Ctrl+Z). No-ops when there's nothing to undo.
-  ///
-  /// Selection is intentionally cleared on undo: the restored document
-  /// may not contain the currently-selected layer at all (undoing an
-  /// "add layer"), and a selectedLayerId pointing at a layer that no
-  /// longer exists would leave the property panel rendering stale
-  /// controls for a phantom layer.
   void undo() {
     final restored = _history.undo(state.document);
     if (restored == null) return;
-    _emit(restored, null);
+    _emit(restored, const {});
   }
 
-  /// Steps forward one undone edit (Ctrl+Y / Ctrl+Shift+Z).
   void redo() {
     final restored = _history.redo(state.document);
     if (restored == null) return;
-    _emit(restored, null);
+    _emit(restored, const {});
   }
 
-  /// The single write path for document *edits*. Records history (once
-  /// per discrete edit, or once per continuous gesture — see
-  /// [beginInteraction]) and then emits.
-  void _applyDocument(CanvasDocument document, String? selectedLayerId) {
+  /// The single write path for document *edits*. Records history (once per
+  /// discrete edit, or once per continuous gesture) then emits.
+  void _applyDocument(CanvasDocument document, Set<String> selectedLayerIds) {
     if (!_interactionActive) {
       _history.record(state.document);
     } else if (!_interactionRecorded) {
-      // First frame of a continuous gesture: record the pre-gesture
-      // document once, then suppress until the gesture ends.
       _history.record(state.document);
       _interactionRecorded = true;
     }
-    _emit(document, selectedLayerId);
+    _emit(document, selectedLayerIds);
   }
 
-  /// Emits without touching history — used by undo/redo, which move
-  /// through the stack rather than adding to it.
-  void _emit(CanvasDocument document, String? selectedLayerId) {
+  void _emit(CanvasDocument document, Set<String> selectedLayerIds) {
     state = CanvasEditorState(
       document: document,
-      selectedLayerId: selectedLayerId,
+      selectedLayerIds: selectedLayerIds,
       canUndo: _history.canUndo,
       canRedo: _history.canRedo,
     );
@@ -646,6 +707,11 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
     }
     return null;
   }
+
+  List<CanvasLayer> get _selectedLayers => [
+        for (final layer in state.document.layers)
+          if (state.selectedLayerIds.contains(layer.id)) layer,
+      ];
 }
 
 final canvasControllerProvider = StateNotifierProvider.autoDispose
