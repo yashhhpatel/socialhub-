@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Base type for anything paintable on the canvas. `sealed` so every
 /// switch over a CanvasLayer (see canvas_painter.dart) is exhaustive at
-/// compile time — adding a 4th layer type later is a compile error
+/// compile time — adding a 5th layer type later is a compile error
 /// everywhere it isn't handled, not a silent runtime gap.
 ///
 /// All coordinates (x/y/width/height) are in ARTBOARD space, not widget/
@@ -17,6 +17,8 @@ sealed class CanvasLayer {
     required this.height,
     this.rotationDegrees = 0,
     this.opacity = 1.0,
+    this.locked = false,
+    this.hidden = false,
   });
 
   final String id;
@@ -26,6 +28,13 @@ sealed class CanvasLayer {
   final double height;
   final double rotationDegrees;
   final double opacity;
+
+  /// Locked layers can't be selected or moved on the canvas (only toggled
+  /// back from the Layers panel), so a finished background stays put.
+  final bool locked;
+
+  /// Hidden layers aren't painted or hit-tested, but stay in the document.
+  final bool hidden;
 
   Offset get center => Offset(x + width / 2, y + height / 2);
 
@@ -48,6 +57,9 @@ sealed class CanvasLayer {
     double? rotationDegrees,
     double? opacity,
   });
+
+  /// Toggles the lock/hide flags, preserving everything else.
+  CanvasLayer copyWithFlags({bool? locked, bool? hidden});
 
   /// Serializes to the persisted canvas-JSON shape sent to
   /// `PATCH /content/assets/:id` (Milestone 3.5 autosave).
@@ -72,6 +84,8 @@ sealed class CanvasLayer {
         'height': height,
         'rotationDegrees': rotationDegrees,
         'opacity': opacity,
+        'locked': locked,
+        'hidden': hidden,
       };
 
   /// Rebuilds a layer from persisted JSON, dispatching on the `type`
@@ -83,6 +97,8 @@ sealed class CanvasLayer {
   /// indicating why. A loud failure is recoverable; a silent one isn't.
   static CanvasLayer fromJson(Map<String, dynamic> json) {
     final type = json['type'];
+    final locked = json['locked'] == true;
+    final hidden = json['hidden'] == true;
     return switch (type) {
       'image' => ImageCanvasLayer(
           id: json['id'] as String,
@@ -92,6 +108,8 @@ sealed class CanvasLayer {
           height: _double(json['height']),
           rotationDegrees: _double(json['rotationDegrees']),
           opacity: _double(json['opacity'], fallback: 1),
+          locked: locked,
+          hidden: hidden,
           imageUrl: json['imageUrl'] as String,
         ),
       'text' => TextCanvasLayer(
@@ -102,10 +120,16 @@ sealed class CanvasLayer {
           height: _double(json['height']),
           rotationDegrees: _double(json['rotationDegrees']),
           opacity: _double(json['opacity'], fallback: 1),
+          locked: locked,
+          hidden: hidden,
           text: json['text'] as String,
           fontSize: _double(json['fontSize'], fallback: 24),
           color: Color(json['color'] as int),
           fontFamily: json['fontFamily'] as String?,
+          bold: json['bold'] == true,
+          italic: json['italic'] == true,
+          align: _align(json['align']),
+          lineHeight: _double(json['lineHeight'], fallback: 1.2),
         ),
       'shape' => ShapeCanvasLayer(
           id: json['id'] as String,
@@ -115,8 +139,14 @@ sealed class CanvasLayer {
           height: _double(json['height']),
           rotationDegrees: _double(json['rotationDegrees']),
           opacity: _double(json['opacity'], fallback: 1),
+          locked: locked,
+          hidden: hidden,
           shapeKind: ShapeKind.values.byName(json['shapeKind'] as String),
           fillColor: Color(json['fillColor'] as int),
+          strokeColor:
+              json['strokeColor'] is int ? Color(json['strokeColor'] as int) : null,
+          strokeWidth: _double(json['strokeWidth']),
+          cornerRadius: _double(json['cornerRadius']),
         ),
       'video' => VideoCanvasLayer(
           id: json['id'] as String,
@@ -126,6 +156,8 @@ sealed class CanvasLayer {
           height: _double(json['height']),
           rotationDegrees: _double(json['rotationDegrees']),
           opacity: _double(json['opacity'], fallback: 1),
+          locked: locked,
+          hidden: hidden,
           videoUrl: json['videoUrl'] as String,
           posterUrl: json['posterUrl'] as String?,
           trimStartSeconds: _double(json['trimStartSeconds']),
@@ -143,6 +175,15 @@ sealed class CanvasLayer {
     if (value is num) return value.toDouble();
     return fallback;
   }
+
+  static TextAlign _align(Object? value) {
+    if (value is String) {
+      for (final a in TextAlign.values) {
+        if (a.name == value) return a;
+      }
+    }
+    return TextAlign.left;
+  }
 }
 
 class ImageCanvasLayer extends CanvasLayer {
@@ -154,6 +195,8 @@ class ImageCanvasLayer extends CanvasLayer {
     required super.height,
     super.rotationDegrees,
     super.opacity,
+    super.locked,
+    super.hidden,
     required this.imageUrl,
   });
 
@@ -176,6 +219,23 @@ class ImageCanvasLayer extends CanvasLayer {
         height: height ?? this.height,
         rotationDegrees: rotationDegrees ?? this.rotationDegrees,
         opacity: opacity ?? this.opacity,
+        locked: locked,
+        hidden: hidden,
+        imageUrl: imageUrl,
+      );
+
+  @override
+  ImageCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+      ImageCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+        locked: locked ?? this.locked,
+        hidden: hidden ?? this.hidden,
         imageUrl: imageUrl,
       );
 
@@ -187,6 +247,8 @@ class ImageCanvasLayer extends CanvasLayer {
         height: height,
         rotationDegrees: rotationDegrees,
         opacity: opacity,
+        locked: locked,
+        hidden: hidden,
         imageUrl: newImageUrl,
       );
 
@@ -206,16 +268,26 @@ class TextCanvasLayer extends CanvasLayer {
     required super.height,
     super.rotationDegrees,
     super.opacity,
+    super.locked,
+    super.hidden,
     required this.text,
     this.fontSize = 24,
     this.color = const Color(0xFF111827),
     this.fontFamily,
+    this.bold = false,
+    this.italic = false,
+    this.align = TextAlign.left,
+    this.lineHeight = 1.2,
   });
 
   final String text;
   final double fontSize;
   final Color color;
   final String? fontFamily;
+  final bool bold;
+  final bool italic;
+  final TextAlign align;
+  final double lineHeight;
 
   @override
   TextCanvasLayer copyWithGeometry({
@@ -226,6 +298,63 @@ class TextCanvasLayer extends CanvasLayer {
     double? rotationDegrees,
     double? opacity,
   }) =>
+      _copy(
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+      );
+
+  @override
+  TextCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+      _copy(locked: locked, hidden: hidden);
+
+  TextCanvasLayer copyWithColor(Color newColor) => _copy(color: newColor);
+  TextCanvasLayer copyWithFontFamily(String? newFontFamily) =>
+      _copy(fontFamily: newFontFamily, clearFontFamily: newFontFamily == null);
+  TextCanvasLayer copyWithFontSize(double newFontSize) =>
+      _copy(fontSize: newFontSize);
+  TextCanvasLayer copyWithText(String newText) => _copy(text: newText);
+
+  /// Batched text-format edit (bold/italic/alignment/line-height/font).
+  TextCanvasLayer copyWithTextFormat({
+    bool? bold,
+    bool? italic,
+    TextAlign? align,
+    double? lineHeight,
+    String? fontFamily,
+  }) =>
+      _copy(
+        bold: bold,
+        italic: italic,
+        align: align,
+        lineHeight: lineHeight,
+        fontFamily: fontFamily,
+      );
+
+  /// One private reconstruction so every copyWith* keeps ALL fields — a
+  /// missed field here would silently reset a layer's styling on an edit.
+  TextCanvasLayer _copy({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+    bool? locked,
+    bool? hidden,
+    String? text,
+    double? fontSize,
+    Color? color,
+    String? fontFamily,
+    bool clearFontFamily = false,
+    bool? bold,
+    bool? italic,
+    TextAlign? align,
+    double? lineHeight,
+  }) =>
       TextCanvasLayer(
         id: id,
         x: x ?? this.x,
@@ -234,66 +363,16 @@ class TextCanvasLayer extends CanvasLayer {
         height: height ?? this.height,
         rotationDegrees: rotationDegrees ?? this.rotationDegrees,
         opacity: opacity ?? this.opacity,
-        text: text,
-        fontSize: fontSize,
-        color: color,
-        fontFamily: fontFamily,
-      );
-
-  TextCanvasLayer copyWithColor(Color newColor) => TextCanvasLayer(
-        id: id,
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        rotationDegrees: rotationDegrees,
-        opacity: opacity,
-        text: text,
-        fontSize: fontSize,
-        color: newColor,
-        fontFamily: fontFamily,
-      );
-
-  TextCanvasLayer copyWithFontFamily(String? newFontFamily) => TextCanvasLayer(
-        id: id,
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        rotationDegrees: rotationDegrees,
-        opacity: opacity,
-        text: text,
-        fontSize: fontSize,
-        color: color,
-        fontFamily: newFontFamily,
-      );
-
-  TextCanvasLayer copyWithFontSize(double newFontSize) => TextCanvasLayer(
-        id: id,
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        rotationDegrees: rotationDegrees,
-        opacity: opacity,
-        text: text,
-        fontSize: newFontSize,
-        color: color,
-        fontFamily: fontFamily,
-      );
-
-  TextCanvasLayer copyWithText(String newText) => TextCanvasLayer(
-        id: id,
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        rotationDegrees: rotationDegrees,
-        opacity: opacity,
-        text: newText,
-        fontSize: fontSize,
-        color: color,
-        fontFamily: fontFamily,
+        locked: locked ?? this.locked,
+        hidden: hidden ?? this.hidden,
+        text: text ?? this.text,
+        fontSize: fontSize ?? this.fontSize,
+        color: color ?? this.color,
+        fontFamily: clearFontFamily ? null : (fontFamily ?? this.fontFamily),
+        bold: bold ?? this.bold,
+        italic: italic ?? this.italic,
+        align: align ?? this.align,
+        lineHeight: lineHeight ?? this.lineHeight,
       );
 
   @override
@@ -310,6 +389,10 @@ class TextCanvasLayer extends CanvasLayer {
         // ignore: deprecated_member_use
         'color': color.value,
         'fontFamily': fontFamily,
+        'bold': bold,
+        'italic': italic,
+        'align': align.name,
+        'lineHeight': lineHeight,
       };
 }
 
@@ -324,12 +407,24 @@ class ShapeCanvasLayer extends CanvasLayer {
     required super.height,
     super.rotationDegrees,
     super.opacity,
+    super.locked,
+    super.hidden,
     required this.shapeKind,
     this.fillColor = const Color(0xFF3B82F6),
+    this.strokeColor,
+    this.strokeWidth = 0,
+    this.cornerRadius = 0,
   });
 
   final ShapeKind shapeKind;
   final Color fillColor;
+
+  /// Optional border. Null (or a zero [strokeWidth]) means no border drawn.
+  final Color? strokeColor;
+  final double strokeWidth;
+
+  /// Rounded-corner radius, for rectangles (ignored by ellipses).
+  final double cornerRadius;
 
   @override
   ShapeCanvasLayer copyWithGeometry({
@@ -340,6 +435,51 @@ class ShapeCanvasLayer extends CanvasLayer {
     double? rotationDegrees,
     double? opacity,
   }) =>
+      _copy(
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+      );
+
+  @override
+  ShapeCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+      _copy(locked: locked, hidden: hidden);
+
+  ShapeCanvasLayer copyWithFillColor(Color newFillColor) =>
+      _copy(fillColor: newFillColor);
+
+  /// Batched border/corner edit. Pass [clearStroke] to remove the border.
+  ShapeCanvasLayer copyWithShapeStyle({
+    Color? strokeColor,
+    double? strokeWidth,
+    double? cornerRadius,
+    bool clearStroke = false,
+  }) =>
+      _copy(
+        strokeColor: strokeColor,
+        clearStroke: clearStroke,
+        strokeWidth: strokeWidth,
+        cornerRadius: cornerRadius,
+      );
+
+  ShapeCanvasLayer _copy({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? rotationDegrees,
+    double? opacity,
+    bool? locked,
+    bool? hidden,
+    Color? fillColor,
+    Color? strokeColor,
+    bool clearStroke = false,
+    double? strokeWidth,
+    double? cornerRadius,
+  }) =>
       ShapeCanvasLayer(
         id: id,
         x: x ?? this.x,
@@ -348,20 +488,13 @@ class ShapeCanvasLayer extends CanvasLayer {
         height: height ?? this.height,
         rotationDegrees: rotationDegrees ?? this.rotationDegrees,
         opacity: opacity ?? this.opacity,
+        locked: locked ?? this.locked,
+        hidden: hidden ?? this.hidden,
         shapeKind: shapeKind,
-        fillColor: fillColor,
-      );
-
-  ShapeCanvasLayer copyWithFillColor(Color newFillColor) => ShapeCanvasLayer(
-        id: id,
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        rotationDegrees: rotationDegrees,
-        opacity: opacity,
-        shapeKind: shapeKind,
-        fillColor: newFillColor,
+        fillColor: fillColor ?? this.fillColor,
+        strokeColor: clearStroke ? null : (strokeColor ?? this.strokeColor),
+        strokeWidth: strokeWidth ?? this.strokeWidth,
+        cornerRadius: cornerRadius ?? this.cornerRadius,
       );
 
   @override
@@ -372,6 +505,10 @@ class ShapeCanvasLayer extends CanvasLayer {
         // compatibility.
         // ignore: deprecated_member_use
         'fillColor': fillColor.value,
+        // ignore: deprecated_member_use
+        'strokeColor': strokeColor?.value,
+        'strokeWidth': strokeWidth,
+        'cornerRadius': cornerRadius,
       };
 }
 
@@ -392,6 +529,8 @@ class VideoCanvasLayer extends CanvasLayer {
     required super.height,
     super.rotationDegrees,
     super.opacity,
+    super.locked,
+    super.hidden,
     required this.videoUrl,
     this.posterUrl,
     this.trimStartSeconds = 0,
@@ -426,6 +565,26 @@ class VideoCanvasLayer extends CanvasLayer {
         height: height ?? this.height,
         rotationDegrees: rotationDegrees ?? this.rotationDegrees,
         opacity: opacity ?? this.opacity,
+        locked: locked,
+        hidden: hidden,
+        videoUrl: videoUrl,
+        posterUrl: posterUrl,
+        trimStartSeconds: trimStartSeconds,
+        trimEndSeconds: trimEndSeconds,
+      );
+
+  @override
+  VideoCanvasLayer copyWithFlags({bool? locked, bool? hidden}) =>
+      VideoCanvasLayer(
+        id: id,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        rotationDegrees: rotationDegrees,
+        opacity: opacity,
+        locked: locked ?? this.locked,
+        hidden: hidden ?? this.hidden,
         videoUrl: videoUrl,
         posterUrl: posterUrl,
         trimStartSeconds: trimStartSeconds,
@@ -447,6 +606,8 @@ class VideoCanvasLayer extends CanvasLayer {
         height: height,
         rotationDegrees: rotationDegrees,
         opacity: opacity,
+        locked: locked,
+        hidden: hidden,
         videoUrl: videoUrl,
         posterUrl: posterUrl,
         trimStartSeconds: trimStartSeconds ?? this.trimStartSeconds,

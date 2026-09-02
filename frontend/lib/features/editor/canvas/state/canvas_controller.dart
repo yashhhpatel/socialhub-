@@ -7,6 +7,10 @@ import '../models/canvas_document.dart';
 import '../models/canvas_layer.dart';
 import 'canvas_editor_state.dart';
 
+/// Where to align a layer against the artboard (used by the property panel's
+/// Arrange section — see [CanvasController.alignSelectedToArtboard]).
+enum LayerAlignment { left, hCenter, right, top, vCenter, bottom }
+
 /// Selection + editing logic for one editor session. Deliberately NOT a
 /// singleton provider (unlike e.g. authControllerProvider) — a
 /// StateNotifierProvider.family.autoDispose instance is created per
@@ -86,8 +90,137 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
   /// interaction, not an error condition.
   void moveSelectedLayerBy(Offset delta) {
     final selected = _selectedLayer;
-    if (selected == null) return;
+    if (selected == null || selected.locked) return;
     updateSelectedLayerGeometry(x: selected.x + delta.dx, y: selected.y + delta.dy);
+  }
+
+  /// Nudges the selected layer by a fixed artboard-space delta — the editor's
+  /// arrow-key handling. One discrete undo step per call. No-op when nothing
+  /// is selected or the layer is locked.
+  void nudgeSelected(double dx, double dy) {
+    final selected = _selectedLayer;
+    if (selected == null || selected.locked) return;
+    updateSelectedLayerGeometry(x: selected.x + dx, y: selected.y + dy);
+  }
+
+  /// Aligns the selected layer against the artboard edges/centre.
+  void alignSelectedToArtboard(LayerAlignment alignment) {
+    final selected = _selectedLayer;
+    if (selected == null || selected.locked) return;
+    final doc = state.document;
+    switch (alignment) {
+      case LayerAlignment.left:
+        updateSelectedLayerGeometry(x: 0);
+      case LayerAlignment.hCenter:
+        updateSelectedLayerGeometry(x: (doc.width - selected.width) / 2);
+      case LayerAlignment.right:
+        updateSelectedLayerGeometry(x: doc.width - selected.width);
+      case LayerAlignment.top:
+        updateSelectedLayerGeometry(y: 0);
+      case LayerAlignment.vCenter:
+        updateSelectedLayerGeometry(y: (doc.height - selected.height) / 2);
+      case LayerAlignment.bottom:
+        updateSelectedLayerGeometry(y: doc.height - selected.height);
+    }
+  }
+
+  /// Sets the artboard's background fill. Undoable like any edit.
+  void setBackgroundColor(Color color) {
+    _applyDocument(
+      state.document.copyWith(backgroundColor: color),
+      state.selectedLayerId,
+    );
+  }
+
+  /// Resizes the artboard (a "Resize" preset). Layers keep their positions.
+  void resizeArtboard(double width, double height) {
+    if (width <= 0 || height <= 0) return;
+    _applyDocument(
+      state.document.copyWith(width: width, height: height),
+      state.selectedLayerId,
+    );
+  }
+
+  /// Locks/unlocks a layer by id (from the Layers panel, not necessarily the
+  /// selection). A locked layer can't be moved or selected on the canvas.
+  void setLayerLocked(String id, bool locked) =>
+      _setFlags(id, locked: locked);
+
+  /// Shows/hides a layer by id. A hidden layer isn't painted or hit-tested.
+  void setLayerHidden(String id, bool hidden) =>
+      _setFlags(id, hidden: hidden);
+
+  void _setFlags(String id, {bool? locked, bool? hidden}) {
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id)
+          layer.copyWithFlags(locked: locked, hidden: hidden)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), state.selectedLayerId);
+  }
+
+  /// Bold / italic / alignment / line-height on the selected text layer.
+  void updateSelectedTextFormat({
+    bool? bold,
+    bool? italic,
+    TextAlign? align,
+    double? lineHeight,
+  }) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithTextFormat(
+            bold: bold,
+            italic: italic,
+            align: align,
+            lineHeight: lineHeight,
+          )
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
+  }
+
+  /// Sets (or clears, with null) the font family of the selected text layer.
+  void updateSelectedTextFontFamily(String? fontFamily) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is TextCanvasLayer)
+          layer.copyWithFontFamily(fontFamily)
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
+  }
+
+  /// Border colour/width and corner radius on the selected shape layer.
+  void updateSelectedShapeStyle({
+    Color? strokeColor,
+    double? strokeWidth,
+    double? cornerRadius,
+    bool clearStroke = false,
+  }) {
+    final id = state.selectedLayerId;
+    if (id == null) return;
+    final updated = [
+      for (final layer in state.document.layers)
+        if (layer.id == id && layer is ShapeCanvasLayer)
+          layer.copyWithShapeStyle(
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            cornerRadius: cornerRadius,
+            clearStroke: clearStroke,
+          )
+        else
+          layer,
+    ];
+    _applyDocument(state.document.copyWithLayers(updated), id);
   }
 
   /// General geometry update — the property panel's position/size/
@@ -255,6 +388,8 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
   CanvasLayer _cloneWithOffset(CanvasLayer layer, String newId, Offset delta) {
     final nx = layer.x + delta.dx;
     final ny = layer.y + delta.dy;
+    // A duplicate is always unlocked and visible so it can be worked on
+    // immediately, even if the original was locked/hidden.
     return switch (layer) {
       ShapeCanvasLayer s => ShapeCanvasLayer(
           id: newId,
@@ -266,6 +401,9 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           opacity: s.opacity,
           shapeKind: s.shapeKind,
           fillColor: s.fillColor,
+          strokeColor: s.strokeColor,
+          strokeWidth: s.strokeWidth,
+          cornerRadius: s.cornerRadius,
         ),
       TextCanvasLayer t => TextCanvasLayer(
           id: newId,
@@ -279,6 +417,10 @@ class CanvasController extends StateNotifier<CanvasEditorState> {
           fontSize: t.fontSize,
           color: t.color,
           fontFamily: t.fontFamily,
+          bold: t.bold,
+          italic: t.italic,
+          align: t.align,
+          lineHeight: t.lineHeight,
         ),
       ImageCanvasLayer i => ImageCanvasLayer(
           id: newId,

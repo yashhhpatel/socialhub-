@@ -1,10 +1,28 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/canvas_document.dart';
 import '../models/canvas_layer.dart';
 import 'canvas_image_cache.dart';
+
+/// A snap guide line to draw over the artboard while dragging — a vertical or
+/// horizontal line at an artboard-space [position].
+enum GuideAxis { vertical, horizontal }
+
+class CanvasGuide {
+  const CanvasGuide(this.axis, this.position);
+  final GuideAxis axis;
+  final double position;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CanvasGuide && other.axis == axis && other.position == position;
+
+  @override
+  int get hashCode => Object.hash(axis, position);
+}
 
 /// Paints the artboard and every layer on it, in one pass, in a single
 /// coordinate space transform per layer (translate to center, rotate,
@@ -22,6 +40,7 @@ class CanvasPainter extends CustomPainter {
     required this.scale,
     required this.offset,
     required this.imageCache,
+    this.guides = const [],
   }) : super(repaint: imageCache);
 
   final CanvasDocument document;
@@ -29,25 +48,30 @@ class CanvasPainter extends CustomPainter {
   final double scale;
   final Offset offset;
   final CanvasImageCache imageCache;
+  final List<CanvasGuide> guides;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
 
-    // Artboard background — makes the artboard's extent visible even
-    // before any layers are added, and gives images/shapes with
-    // transparency something defined to render over.
+    // Artboard background — the document's own background colour (defaults to
+    // white). Makes the artboard's extent visible even before any layers are
+    // added, and gives transparent layers something defined to render over.
     final artboardRect = Rect.fromLTWH(0, 0, document.width * scale, document.height * scale);
-    canvas.drawRect(artboardRect, Paint()..color = Colors.white);
+    canvas.drawRect(artboardRect, Paint()..color = document.backgroundColor);
 
     for (final layer in document.layers) {
+      if (layer.hidden) continue; // hidden layers stay in the doc but don't paint
+
       _paintLayer(canvas, layer);
 
       if (layer.id == selectedLayerId) {
         _paintSelectionOutline(canvas, layer);
       }
     }
+
+    _paintGuides(canvas);
 
     canvas.restore();
   }
@@ -80,22 +104,60 @@ class CanvasPainter extends CustomPainter {
           canvas.drawRect(bounds, Paint()..color = Colors.grey.shade300);
         }
 
-      case TextCanvasLayer(:final text, :final fontSize, :final color, :final fontFamily):
+      case TextCanvasLayer(
+          :final text,
+          :final fontSize,
+          :final color,
+          :final fontFamily,
+          :final bold,
+          :final italic,
+          :final align,
+          :final lineHeight,
+        ):
         final textPainter = TextPainter(
           text: TextSpan(
             text: text,
-            style: TextStyle(fontSize: fontSize * scale, color: color, fontFamily: fontFamily),
+            style: TextStyle(
+              fontSize: fontSize * scale,
+              color: color,
+              fontFamily: fontFamily,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+              fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+              height: lineHeight,
+            ),
           ),
+          textAlign: align,
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: bounds.width);
         textPainter.paint(canvas, Offset.zero);
 
-      case ShapeCanvasLayer(:final shapeKind, :final fillColor):
-        final paint = Paint()..color = fillColor;
+      case ShapeCanvasLayer(
+          :final shapeKind,
+          :final fillColor,
+          :final strokeColor,
+          :final strokeWidth,
+          :final cornerRadius,
+        ):
+        final fill = Paint()..color = fillColor;
         if (shapeKind == ShapeKind.ellipse) {
-          canvas.drawOval(bounds, paint);
+          canvas.drawOval(bounds, fill);
+          if (strokeColor != null && strokeWidth > 0) {
+            canvas.drawOval(bounds, _strokePaint(strokeColor, strokeWidth));
+          }
+        } else if (cornerRadius > 0) {
+          final rrect = RRect.fromRectAndRadius(
+            bounds,
+            Radius.circular(cornerRadius * scale),
+          );
+          canvas.drawRRect(rrect, fill);
+          if (strokeColor != null && strokeWidth > 0) {
+            canvas.drawRRect(rrect, _strokePaint(strokeColor, strokeWidth));
+          }
         } else {
-          canvas.drawRect(bounds, paint);
+          canvas.drawRect(bounds, fill);
+          if (strokeColor != null && strokeWidth > 0) {
+            canvas.drawRect(bounds, _strokePaint(strokeColor, strokeWidth));
+          }
         }
 
       case VideoCanvasLayer(:final posterUrl):
@@ -123,6 +185,11 @@ class CanvasPainter extends CustomPainter {
     canvas.restore(); // matches the translate/rotate save
   }
 
+  Paint _strokePaint(Color color, double width) => Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width * scale;
+
   /// Centered translucent circle + play triangle, sized to the layer, so a
   /// video layer is visually distinct from an image one on the canvas.
   void _paintPlayBadge(Canvas canvas, Rect bounds) {
@@ -139,6 +206,26 @@ class CanvasPainter extends CustomPainter {
       ..lineTo(center.dx + t, center.dy)
       ..close();
     canvas.drawPath(triangle, Paint()..color = Colors.white);
+  }
+
+  /// Draws the active snap guides (center/edge alignment) as thin accent
+  /// lines spanning the artboard.
+  void _paintGuides(Canvas canvas) {
+    if (guides.isEmpty) return;
+    final paint = Paint()
+      ..color = const Color(0xFFEC4899) // pink, distinct from the blue selection
+      ..strokeWidth = 1;
+    final w = document.width * scale;
+    final h = document.height * scale;
+    for (final guide in guides) {
+      if (guide.axis == GuideAxis.vertical) {
+        final x = guide.position * scale;
+        canvas.drawLine(Offset(x, 0), Offset(x, h), paint);
+      } else {
+        final y = guide.position * scale;
+        canvas.drawLine(Offset(0, y), Offset(w, y), paint);
+      }
+    }
   }
 
   void _paintSelectionOutline(Canvas canvas, CanvasLayer layer) {
@@ -167,6 +254,7 @@ class CanvasPainter extends CustomPainter {
     return oldDelegate.document != document ||
         oldDelegate.selectedLayerId != selectedLayerId ||
         oldDelegate.scale != scale ||
-        oldDelegate.offset != offset;
+        oldDelegate.offset != offset ||
+        !listEquals(oldDelegate.guides, guides);
   }
 }

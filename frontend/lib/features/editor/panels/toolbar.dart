@@ -1,12 +1,28 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error_message.dart';
 import '../../../core/theme/tokens/spacing_tokens.dart';
+import '../../media_library/data/api_media_repository.dart';
+import '../../media_library/domain/media_item.dart';
 import '../canvas/models/canvas_document.dart';
 import '../canvas/models/canvas_layer.dart';
 import '../canvas/state/canvas_controller.dart';
 import '../state/autosave_controller.dart';
 import '../state/editor_actions_controller.dart';
+
+/// Artboard size presets offered by the toolbar's "Resize" menu — the common
+/// social formats, so a design can be reframed for a platform in one click.
+const _artboardPresets = <({String label, double width, double height})>[
+  (label: 'Instagram Square · 1080×1080', width: 1080, height: 1080),
+  (label: 'Instagram Portrait · 1080×1350', width: 1080, height: 1350),
+  (label: 'Story / Reel · 1080×1920', width: 1080, height: 1920),
+  (label: 'Facebook Post · 1200×630', width: 1200, height: 630),
+  (label: 'X Post · 1600×900', width: 1600, height: 900),
+  (label: 'LinkedIn · 1200×627', width: 1200, height: 627),
+];
 
 /// SCOPE NOTE: add-layer actions only, per this milestone. Deliberately
 /// NOT here yet: image upload (needs Milestone 3.2's Cloudinary endpoint
@@ -135,6 +151,36 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
     );
   }
 
+  /// Opens a picker of the org's uploaded images and drops the chosen one in
+  /// as an image layer, centred on the artboard. Reuses the media library —
+  /// the same catalogue the Create Post & Publish page uploads to.
+  Future<void> _pickAndAddImage(
+    BuildContext context,
+    CanvasController controller,
+    double centerX,
+    double centerY,
+    CanvasDocument doc,
+  ) async {
+    final url = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ImagePickerDialog(),
+    );
+    if (url == null) return;
+    // A generous default box; images paint BoxFit.cover, and the user can
+    // resize from the property panel.
+    final side = math.min(doc.width, doc.height) * 0.6;
+    controller.addLayer(
+      ImageCanvasLayer(
+        id: _nextLayerId(),
+        x: centerX - side / 2,
+        y: centerY - side / 2,
+        width: side,
+        height: side,
+        imageUrl: url,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = canvasControllerProvider(document);
@@ -199,9 +245,31 @@ class EditorToolbar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
             _ToolbarButton(
+              icon: Icons.image_outlined,
+              tooltip: 'Add image',
+              onPressed: () => _pickAndAddImage(
+                context,
+                controller,
+                centerX,
+                centerY,
+                state.document,
+              ),
+            ),
+            _ToolbarButton(
               icon: Icons.videocam_outlined,
               tooltip: 'Add video',
               onPressed: () => _promptAddVideo(context, controller, centerX, centerY),
+            ),
+            const VerticalDivider(width: SpacingTokens.md, indent: 12, endIndent: 12),
+            PopupMenuButton<({String label, double width, double height})>(
+              tooltip: 'Resize artboard',
+              icon: const Icon(Icons.aspect_ratio),
+              onSelected: (preset) =>
+                  controller.resizeArtboard(preset.width, preset.height),
+              itemBuilder: (context) => [
+                for (final preset in _artboardPresets)
+                  PopupMenuItem(value: preset, child: Text(preset.label)),
+              ],
             ),
             const VerticalDivider(width: SpacingTokens.md, indent: 12, endIndent: 12),
             _ToolbarButton(
@@ -318,6 +386,113 @@ class _AutosaveIndicator extends StatelessWidget {
           ),
         Text(label, style: theme.textTheme.bodySmall?.copyWith(color: color)),
       ],
+    );
+  }
+}
+
+/// Picks one image from the org's media library to place on the canvas.
+/// Pops with the chosen image URL (or null on cancel).
+class _ImagePickerDialog extends ConsumerWidget {
+  const _ImagePickerDialog();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.sizeOf(context);
+    final library = ref.watch(mediaLibraryProvider);
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: size.height * 0.8,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Add an image', style: theme.textTheme.titleLarge),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.md),
+              Flexible(
+                child: library.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text(
+                    'Could not load your media: ${describeApiError(e)}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  data: (items) {
+                    final images = items.where((m) => !m.isVideo).toList();
+                    if (images.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(SpacingTokens.lg),
+                        child: Text(
+                          'No images in your library yet. Upload some from '
+                          'Create Post & Publish first.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    }
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 140,
+                        mainAxisSpacing: SpacingTokens.sm,
+                        crossAxisSpacing: SpacingTokens.sm,
+                        childAspectRatio: 1,
+                      ),
+                      itemCount: images.length,
+                      itemBuilder: (context, i) => _ImageTile(item: images[i]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageTile extends StatelessWidget {
+  const _ImageTile({required this.item});
+
+  final MediaItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => Navigator.of(context).pop(item.url),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          item.url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: theme.colorScheme.surfaceContainerHighest,
+            child: const Center(child: Icon(Icons.broken_image_outlined)),
+          ),
+        ),
+      ),
     );
   }
 }

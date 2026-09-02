@@ -59,6 +59,10 @@ class LayerPanel extends ConsumerWidget {
                         layer: layer,
                         selected: selected,
                         onTap: () => controller.selectLayerById(layer.id),
+                        onToggleHidden: () =>
+                            controller.setLayerHidden(layer.id, !layer.hidden),
+                        onToggleLocked: () =>
+                            controller.setLayerLocked(layer.id, !layer.locked),
                       );
                     },
                   ),
@@ -145,11 +149,19 @@ class _LayerActions extends StatelessWidget {
 }
 
 class _LayerRow extends StatelessWidget {
-  const _LayerRow({required this.layer, required this.selected, required this.onTap});
+  const _LayerRow({
+    required this.layer,
+    required this.selected,
+    required this.onTap,
+    required this.onToggleHidden,
+    required this.onToggleLocked,
+  });
 
   final CanvasLayer layer;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onToggleHidden;
+  final VoidCallback onToggleLocked;
 
   IconData get _icon => switch (layer) {
         ImageCanvasLayer() => Icons.image_outlined,
@@ -193,10 +205,38 @@ class _LayerRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? colorScheme.primary : colorScheme.onSurface,
+                    color: layer.hidden
+                        ? colorScheme.onSurface.withOpacity(0.4)
+                        : selected
+                            ? colorScheme.primary
+                            : colorScheme.onSurface,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
+              ),
+              // Hide/show and lock/unlock, so a background can be parked while
+              // editing on top.
+              IconButton(
+                tooltip: layer.hidden ? 'Show' : 'Hide',
+                visualDensity: VisualDensity.compact,
+                iconSize: 16,
+                color: colorScheme.onSurface.withOpacity(0.6),
+                icon: Icon(
+                  layer.hidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                ),
+                onPressed: onToggleHidden,
+              ),
+              IconButton(
+                tooltip: layer.locked ? 'Unlock' : 'Lock',
+                visualDensity: VisualDensity.compact,
+                iconSize: 16,
+                color: layer.locked
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withOpacity(0.6),
+                icon: Icon(
+                  layer.locked ? Icons.lock_outline : Icons.lock_open_outlined,
+                ),
+                onPressed: onToggleLocked,
               ),
             ],
           ),

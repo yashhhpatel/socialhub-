@@ -9,23 +9,32 @@ import '../canvas/state/canvas_controller.dart';
 const _colorSwatches = <Color>[
   Color(0xFF111827), // near-black
   Color(0xFFFFFFFF),
+  Color(0xFF6B7280),
   Color(0xFFEF4444),
   Color(0xFFF59E0B),
   Color(0xFF10B981),
   Color(0xFF3B82F6),
+  Color(0xFF6C5CE7),
   Color(0xFF8B5CF6),
   Color(0xFFEC4899),
 ];
 
-/// Shows editable position/size/rotation/opacity for the selected layer,
-/// plus color for shape/text layers (not applicable to images — see
-/// _ColorSection). Shows a neutral empty state when nothing is selected.
-///
-/// SCOPE NOTE: color editing is preset swatches, not a full HSV/hex
-/// picker — a deliberate simplification for this milestone; a richer
-/// picker is a reasonable future enhancement, not something this
-/// milestone's "position, size, rotation, color" requirement demands be
-/// built to that depth yet.
+/// Recently applied colours, so a custom colour picked once is one tap away
+/// for the rest of the session. Session-only (a StateProvider), capped at 8.
+final _recentColorsProvider = StateProvider<List<Color>>((ref) => const []);
+
+/// Font families offered for text layers. Null = the app default. Only
+/// families that actually render on web CanvasKit are listed.
+const _fontFamilies = <({String label, String? family})>[
+  (label: 'Default', family: null),
+  (label: 'Lato', family: 'Lato'),
+  (label: 'Roboto', family: 'Roboto'),
+];
+
+/// Shows editable properties for the selected layer — position, size,
+/// rotation, opacity, alignment, and type-specific controls (text format,
+/// colour, shape border/corners, video trim). When nothing is selected it
+/// shows the canvas's own properties (background colour).
 class PropertyPanel extends ConsumerWidget {
   const PropertyPanel({super.key, required this.document});
 
@@ -48,16 +57,19 @@ class PropertyPanel extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(SpacingTokens.md),
-            child: Text('Properties', style: Theme.of(context).textTheme.headlineMedium),
+            child: Text(
+              selectedLayer == null ? 'Canvas' : 'Properties',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
           ),
           const Divider(height: 1),
           Expanded(
             child: selectedLayer == null
-                ? Padding(
+                ? SingleChildScrollView(
                     padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: Text(
-                      'Select a layer to edit its properties.',
-                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+                    child: _CanvasProperties(
+                      document: state.document,
+                      controller: controller,
                     ),
                   )
                 : SingleChildScrollView(
@@ -80,6 +92,47 @@ class PropertyPanel extends ConsumerWidget {
       if (layer.id == id) return layer;
     }
     return null;
+  }
+}
+
+/// Canvas-level properties, shown when no layer is selected: the artboard's
+/// background colour and its current size.
+class _CanvasProperties extends StatelessWidget {
+  const _CanvasProperties({required this.document, required this.controller});
+
+  final CanvasDocument document;
+  final CanvasController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('Background'),
+        _ColorControl(
+          selectedColor: document.backgroundColor,
+          onColorSelected: controller.setBackgroundColor,
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        const _SectionLabel('Artboard size'),
+        Text(
+          '${document.width.round()} × ${document.height.round()}',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          'Use "Resize" in the toolbar to switch platform sizes.',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        Text(
+          'Select a layer to edit it, or add one from the toolbar.',
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
+      ],
+    );
   }
 }
 
@@ -139,6 +192,9 @@ class _PropertyFields extends StatelessWidget {
           ],
         ),
         const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Arrange on canvas'),
+        _ArrangeRow(controller: controller),
+        const SizedBox(height: SpacingTokens.md),
         const _SectionLabel('Rotation'),
         _NumberField(
           label: 'Degrees',
@@ -163,17 +219,12 @@ class _PropertyFields extends StatelessWidget {
             onChanged: controller.updateSelectedLayerText,
           ),
           const SizedBox(height: SpacingTokens.md),
-          const _SectionLabel('Font size'),
-          _NumberField(
-            label: 'Size',
-            value: layer.fontSize,
-            onChanged: controller.updateSelectedTextFontSize,
-          ),
+          _TextFormatControls(layer: layer, controller: controller),
         ],
         if (layer is ShapeCanvasLayer || layer is TextCanvasLayer) ...[
           const SizedBox(height: SpacingTokens.md),
           const _SectionLabel('Color'),
-          _ColorSwatchRow(
+          _ColorControl(
             selectedColor: switch (layer) {
               ShapeCanvasLayer(:final fillColor) => fillColor,
               TextCanvasLayer(:final color) => color,
@@ -182,6 +233,10 @@ class _PropertyFields extends StatelessWidget {
             },
             onColorSelected: controller.updateSelectedLayerColor,
           ),
+        ],
+        if (layer is ShapeCanvasLayer) ...[
+          const SizedBox(height: SpacingTokens.md),
+          _ShapeStyleControls(layer: layer, controller: controller),
         ],
         if (layer is VideoCanvasLayer) ...[
           const SizedBox(height: SpacingTokens.md),
@@ -216,6 +271,217 @@ class _PropertyFields extends StatelessWidget {
   }
 }
 
+/// Align-to-artboard controls (left/center/right, top/middle/bottom).
+class _ArrangeRow extends StatelessWidget {
+  const _ArrangeRow({required this.controller});
+
+  final CanvasController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, String tip, LayerAlignment a) => IconButton(
+          tooltip: tip,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(icon, size: 18),
+          onPressed: () => controller.alignSelectedToArtboard(a),
+        );
+    return Wrap(
+      spacing: 0,
+      children: [
+        btn(Icons.align_horizontal_left, 'Left', LayerAlignment.left),
+        btn(Icons.align_horizontal_center, 'Center', LayerAlignment.hCenter),
+        btn(Icons.align_horizontal_right, 'Right', LayerAlignment.right),
+        btn(Icons.align_vertical_top, 'Top', LayerAlignment.top),
+        btn(Icons.align_vertical_center, 'Middle', LayerAlignment.vCenter),
+        btn(Icons.align_vertical_bottom, 'Bottom', LayerAlignment.bottom),
+      ],
+    );
+  }
+}
+
+/// Bold / italic / alignment / line-height / font-family for a text layer.
+class _TextFormatControls extends StatelessWidget {
+  const _TextFormatControls({required this.layer, required this.controller});
+
+  final TextCanvasLayer layer;
+  final CanvasController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('Font size'),
+        _NumberField(
+          label: 'Size',
+          value: layer.fontSize,
+          onChanged: controller.updateSelectedTextFontSize,
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Font'),
+        DropdownButton<String?>(
+          isExpanded: true,
+          value: _fontFamilies.any((f) => f.family == layer.fontFamily)
+              ? layer.fontFamily
+              : null,
+          items: [
+            for (final f in _fontFamilies)
+              DropdownMenuItem<String?>(value: f.family, child: Text(f.label)),
+          ],
+          onChanged: (family) =>
+              controller.updateSelectedTextFontFamily(family),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Style'),
+        Row(
+          children: [
+            _ToggleIcon(
+              icon: Icons.format_bold,
+              tooltip: 'Bold',
+              active: layer.bold,
+              onPressed: () =>
+                  controller.updateSelectedTextFormat(bold: !layer.bold),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            _ToggleIcon(
+              icon: Icons.format_italic,
+              tooltip: 'Italic',
+              active: layer.italic,
+              onPressed: () =>
+                  controller.updateSelectedTextFormat(italic: !layer.italic),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Alignment'),
+        Row(
+          children: [
+            _ToggleIcon(
+              icon: Icons.format_align_left,
+              tooltip: 'Align left',
+              active: layer.align == TextAlign.left,
+              onPressed: () =>
+                  controller.updateSelectedTextFormat(align: TextAlign.left),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            _ToggleIcon(
+              icon: Icons.format_align_center,
+              tooltip: 'Align center',
+              active: layer.align == TextAlign.center,
+              onPressed: () =>
+                  controller.updateSelectedTextFormat(align: TextAlign.center),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            _ToggleIcon(
+              icon: Icons.format_align_right,
+              tooltip: 'Align right',
+              active: layer.align == TextAlign.right,
+              onPressed: () =>
+                  controller.updateSelectedTextFormat(align: TextAlign.right),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const _SectionLabel('Line height'),
+        _NumberField(
+          label: 'e.g. 1.2',
+          value: layer.lineHeight,
+          onChanged: (v) => controller.updateSelectedTextFormat(
+            lineHeight: v <= 0 ? 1.0 : v,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Border colour/width and corner radius for a shape layer.
+class _ShapeStyleControls extends StatelessWidget {
+  const _ShapeStyleControls({required this.layer, required this.controller});
+
+  final ShapeCanvasLayer layer;
+  final CanvasController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('Border'),
+        _ColorControl(
+          selectedColor: layer.strokeColor,
+          onColorSelected: (c) => controller.updateSelectedShapeStyle(
+            strokeColor: c,
+            // Give a new border a visible default width if it had none.
+            strokeWidth: layer.strokeWidth <= 0 ? 4 : null,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _NumberField(
+                label: 'Border width',
+                value: layer.strokeWidth,
+                onChanged: (v) =>
+                    controller.updateSelectedShapeStyle(strokeWidth: v < 0 ? 0 : v),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            IconButton(
+              tooltip: 'Remove border',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.format_color_reset_outlined, size: 18),
+              onPressed: () =>
+                  controller.updateSelectedShapeStyle(clearStroke: true, strokeWidth: 0),
+            ),
+          ],
+        ),
+        if (layer.shapeKind == ShapeKind.rectangle) ...[
+          const SizedBox(height: SpacingTokens.md),
+          const _SectionLabel('Corner radius'),
+          _NumberField(
+            label: 'Radius',
+            value: layer.cornerRadius,
+            onChanged: (v) =>
+                controller.updateSelectedShapeStyle(cornerRadius: v < 0 ? 0 : v),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToggleIcon extends StatelessWidget {
+  const _ToggleIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.active,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool active;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: active ? scheme.primary.withOpacity(0.16) : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: IconButton(
+        tooltip: tooltip,
+        visualDensity: VisualDensity.compact,
+        color: active ? scheme.primary : scheme.onSurface.withOpacity(0.7),
+        icon: Icon(icon, size: 18),
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
 
@@ -235,11 +501,131 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ColorSwatchRow extends StatelessWidget {
-  const _ColorSwatchRow({required this.selectedColor, required this.onColorSelected});
+/// Colour control: preset swatches, a "recent" row, and a hex input for any
+/// custom colour. Applying a colour records it in [_recentColorsProvider].
+class _ColorControl extends ConsumerStatefulWidget {
+  const _ColorControl({required this.selectedColor, required this.onColorSelected});
 
   final Color? selectedColor;
   final ValueChanged<Color> onColorSelected;
+
+  @override
+  ConsumerState<_ColorControl> createState() => _ColorControlState();
+}
+
+class _ColorControlState extends ConsumerState<_ColorControl> {
+  late final TextEditingController _hex;
+
+  @override
+  void initState() {
+    super.initState();
+    _hex = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _hex.dispose();
+    super.dispose();
+  }
+
+  void _apply(Color color) {
+    widget.onColorSelected(color);
+    final recent = [...ref.read(_recentColorsProvider)]
+      ..removeWhere((c) => c == color)
+      ..insert(0, color);
+    ref.read(_recentColorsProvider.notifier).state = recent.take(8).toList();
+  }
+
+  void _applyHex() {
+    final parsed = _parseHex(_hex.text);
+    if (parsed != null) {
+      _apply(parsed);
+      _hex.clear();
+    }
+  }
+
+  static Color? _parseHex(String input) {
+    var hex = input.trim().replaceAll('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    if (hex.length != 8) return null;
+    final value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recent = ref.watch(_recentColorsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SwatchWrap(
+          colors: _colorSwatches,
+          selectedColor: widget.selectedColor,
+          onTapped: _apply,
+        ),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: SpacingTokens.sm),
+          const _MiniLabel('Recent'),
+          _SwatchWrap(
+            colors: recent,
+            selectedColor: widget.selectedColor,
+            onTapped: _apply,
+          ),
+        ],
+        const SizedBox(height: SpacingTokens.sm),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _hex,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixText: '#',
+                  hintText: 'RRGGBB',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => _applyHex(),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.xs),
+            IconButton(
+              tooltip: 'Apply hex colour',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.check, size: 18),
+              onPressed: _applyHex,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniLabel extends StatelessWidget {
+  const _MiniLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              ),
+        ),
+      );
+}
+
+class _SwatchWrap extends StatelessWidget {
+  const _SwatchWrap({
+    required this.colors,
+    required this.selectedColor,
+    required this.onTapped,
+  });
+
+  final List<Color> colors;
+  final Color? selectedColor;
+  final ValueChanged<Color> onTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -247,12 +633,12 @@ class _ColorSwatchRow extends StatelessWidget {
       spacing: SpacingTokens.sm,
       runSpacing: SpacingTokens.sm,
       children: [
-        for (final color in _colorSwatches)
+        for (final color in colors)
           GestureDetector(
-            onTap: () => onColorSelected(color),
+            onTap: () => onTapped(color),
             child: Container(
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,

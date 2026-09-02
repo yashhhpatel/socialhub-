@@ -87,6 +87,61 @@ void main() {
       expect(image.width, 400);
     });
 
+    test('round-trips the new styling fields (bg, lock/hide, text, shape)', () {
+      const document = CanvasDocument(
+        width: 1080,
+        height: 1080,
+        backgroundColor: Color(0xFF0D0F14),
+        layers: [
+          ShapeCanvasLayer(
+            id: 'shape_2',
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            shapeKind: ShapeKind.rectangle,
+            fillColor: Color(0xFF223344),
+            strokeColor: Color(0xFFFF0000),
+            strokeWidth: 4,
+            cornerRadius: 12,
+            locked: true,
+          ),
+          TextCanvasLayer(
+            id: 'text_2',
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 40,
+            text: 'Styled',
+            bold: true,
+            italic: true,
+            align: TextAlign.center,
+            lineHeight: 1.5,
+            hidden: true,
+          ),
+        ],
+      );
+
+      final restored = CanvasDocument.fromJson(
+        jsonDecode(jsonEncode(document.toJson())) as Map<String, dynamic>,
+      );
+
+      expect(restored.backgroundColor, const Color(0xFF0D0F14));
+
+      final shape = restored.layers[0] as ShapeCanvasLayer;
+      expect(shape.strokeColor, const Color(0xFFFF0000));
+      expect(shape.strokeWidth, 4);
+      expect(shape.cornerRadius, 12);
+      expect(shape.locked, isTrue);
+
+      final text = restored.layers[1] as TextCanvasLayer;
+      expect(text.bold, isTrue);
+      expect(text.italic, isTrue);
+      expect(text.align, TextAlign.center);
+      expect(text.lineHeight, 1.5);
+      expect(text.hidden, isTrue);
+    });
+
     test('preserves layer ORDER, which is z-order on the canvas', () {
       const document = CanvasDocument(
         width: 100,
@@ -141,7 +196,10 @@ void main() {
 
     test('document JSON matches the backend CanvasJsonDto contract keys', () {
       const document = CanvasDocument(width: 1, height: 1);
-      expect(document.toJson().keys.toSet(), {'width', 'height', 'layers'});
+      expect(
+        document.toJson().keys.toSet(),
+        {'width', 'height', 'backgroundColor', 'layers'},
+      );
     });
   });
 }
