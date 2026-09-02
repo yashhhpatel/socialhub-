@@ -27,28 +27,37 @@ class InfoPageScreen extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
         horizontal: SpacingTokens.lg,
-        vertical: SpacingTokens.xl,
+        vertical: SpacingTokens.xxl,
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 780),
+          constraints: const BoxConstraints(maxWidth: 820),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(page.title, style: theme.textTheme.headlineLarge),
-              const SizedBox(height: SpacingTokens.sm),
+              Text(
+                page.title,
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w700,
+                  height: 1.15,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
               Text(
                 page.intro,
-                style: theme.textTheme.bodyLarge?.copyWith(
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
                   color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.5,
+                  height: 1.55,
                 ),
               ),
               const SizedBox(height: SpacingTokens.xl),
               for (final section in page.sections)
                 _SectionView(section: section),
               // A little breathing room below the last section.
-              const SizedBox(height: SpacingTokens.lg),
+              const SizedBox(height: SpacingTokens.md),
             ],
           ),
         ),
@@ -67,21 +76,38 @@ class _SectionView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.xl),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: SpacingTokens.lg),
+      padding: const EdgeInsets.all(SpacingTokens.xl),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(section.heading, style: theme.textTheme.titleLarge),
-          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            section.heading,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.md),
           if (section.body.isNotEmpty)
             Text(
               section.body,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 16,
+                height: 1.7,
+              ),
             ),
           if (section.bullets.isNotEmpty) ...[
             if (section.body.isNotEmpty)
-              const SizedBox(height: SpacingTokens.sm),
+              const SizedBox(height: SpacingTokens.md),
             for (final bullet in section.bullets)
               _Bullet(text: bullet),
           ],
@@ -100,17 +126,17 @@ class _Bullet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.textTheme.bodyMedium?.copyWith(height: 1.5);
+    final style = theme.textTheme.bodyLarge?.copyWith(fontSize: 16, height: 1.65);
     return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+      padding: const EdgeInsets.only(bottom: SpacingTokens.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 2, right: SpacingTokens.sm),
+            padding: const EdgeInsets.only(top: 9, right: SpacingTokens.md),
             child: Icon(
               Icons.circle,
-              size: 6,
+              size: 7,
               color: theme.colorScheme.primary,
             ),
           ),
